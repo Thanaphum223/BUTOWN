@@ -1,0 +1,2 @@
+INSERT INTO category(id,municipality_id,department_id,workflow_id,name,sla_hours)
+SELECT gen_random_uuid(),c.municipality_id,c.department_id,c.workflow_id,n.name,c.sla_hours FROM (SELECT DISTINCT ON (municipality_id) * FROM category ORDER BY municipality_id,name) c CROSS JOIN (VALUES ('น้ำรั่ว / น้ำท่วม'),('รถติด / กีดขวาง'),('ไฟดับ / ไฟส่องสว่าง'),('น้ำไม่ไหล / ท่อแตก'),('ต้นไม้ล้ม'),('ไฟไหม้ / เหตุฉุกเฉิน'),('ขอรถกระเช้า')) n(name) WHERE NOT EXISTS(SELECT 1 FROM category existing WHERE existing.municipality_id=c.municipality_id AND existing.name=n.name);

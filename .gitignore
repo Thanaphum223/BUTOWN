@@ -1,0 +1,10 @@
+node_modules/
+dist/
+target/
+.env
+.env.*
+!.env.example
+work/
+private-files/
+*.log
+*.tsbuildinfo

@@ -1,0 +1,63 @@
+name: Verify TownTrack
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_DB: towntrack
+          POSTGRES_USER: towntrack
+          POSTGRES_PASSWORD: ci-database-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U towntrack -d towntrack"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DB_URL: jdbc:postgresql://127.0.0.1:5432/towntrack
+      DB_USER: towntrack
+      DB_PASSWORD: ci-database-password
+      BOOTSTRAP_PASSWORD: ci-bootstrap-password-123456
+      DEMO_PASSWORD: ci-demo-password-123456
+      TT_BOOTSTRAP_PASSWORD: ci-bootstrap-password-123456
+      TT_DEMO_PASSWORD: ci-demo-password-123456
+      COOKIE_SECURE: "false"
+      DEV_UNSCANNED_FILES: "true"
+      FILE_ROOT: /tmp/towntrack-ci-files
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: mvn -B -f backend/pom.xml verify
+      - run: npm ci && npm run build && npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Start test services
+        run: |
+          mkdir -p work
+          java -jar backend/target/towntrack-0.1.0.jar >work/backend.log 2>&1 &
+          (cd frontend && npm run dev >../work/frontend.log 2>&1) &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/actuator/health && curl -fsS http://127.0.0.1:5173/; then break; fi
+            sleep 2
+          done
+      - run: npx playwright test
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            backend/target/surefire-reports
+            work/playwright-report

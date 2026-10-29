@@ -1,0 +1,846 @@
+import NewCase from "./NewCase";
+import { lazy } from "react";
+const Teams = lazy(() => import("./Teams"));
+const Admin = lazy(() => import("./Admin"));
+const Detail = lazy(() => import("./Detail"));
+const CitizenHome = lazy(() => import("./CitizenHome"));
+const StaffWorkspace = lazy(() => import("./StaffWorkspace"));
+import { useEffect, useState, useRef } from "react";
+import {
+  App as AntApp,
+  Alert,
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  Col,
+  Descriptions,
+  Empty,
+  Form,
+  Input,
+  InputNumber,
+  Layout,
+  List,
+  Menu,
+  Modal,
+  Row,
+  Select,
+  Space,
+  Spin,
+  Statistic,
+  Steps,
+  Table,
+  Tag,
+  Tabs,
+  Timeline,
+  Typography,
+  Upload,
+  Switch,
+} from "antd";
+import {
+  EnvironmentOutlined,
+  DashboardOutlined,
+  FileTextOutlined,
+  PlusOutlined,
+  BellOutlined,
+  SettingOutlined,
+  LogoutOutlined,
+  ReloadOutlined,
+  ArrowLeftOutlined,
+  UploadOutlined,
+  TeamOutlined,
+  LockOutlined,
+} from "@ant-design/icons";
+import {
+  api,
+  post,
+  refreshCsrf,
+  statusNames,
+  actionNames,
+  roleNames,
+  date,
+} from "./api";
+import LocationMap from "./LocationMap";
+const { Title, Text, Paragraph } = Typography;
+type RowData = Record<string, any>;
+function StateTag({ value }: { value: string }) {
+  return (
+    <Tag
+      color={
+        ["CLOSED", "RESOLVED"].includes(value)
+          ? "success"
+          : ["REJECTED", "TERMINATED"].includes(value)
+            ? "error"
+            : value.includes("REVISION")
+              ? "warning"
+              : "processing"
+      }
+    >
+      {statusNames[value] || value}
+    </Tag>
+  );
+}
+function useData<T>(url: string, refresh = 0) {
+  const [data, setData] = useState<T>();
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let alive = true;
+    setError("");
+    api<T>(url)
+      .then((d) => {
+        if (alive) setData(d);
+      })
+      .catch((e) => {
+        if (alive) setError(e.message);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [url, refresh]);
+  return { data, error };
+}
+function ErrorBox({ error }: { error: string }) {
+  return error ? (
+    <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />
+  ) : null;
+}
+function Login({ onLogin }: { onLogin: () => void }) {
+  const { data: line } = useData<RowData>("/public/line");
+  const lineStarted = useRef(false);
+  async function lineLogin() {
+    setBusy(true);
+    setError("");
+    try {
+      const { default: liff } = await import("@line/liff");
+      await liff.init({ liffId: line!.liffId });
+      if (!liff.isLoggedIn()) {
+        liff.login({
+          redirectUri:
+            window.location.origin + window.location.pathname + "?lineLogin=1",
+        });
+        return;
+      }
+      const idToken = liff.getIDToken();
+      if (!idToken) throw new Error("กรุณาเปิดสิทธิ์ openid ของ LIFF");
+      await post("/auth/line", { idToken });
+      await refreshCsrf();
+      window.history.replaceState({}, "", window.location.pathname);
+      onLogin();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  useEffect(() => {
+    if (
+      line?.enabled &&
+      new URLSearchParams(window.location.search).get("lineLogin") === "1" &&
+      !lineStarted.current
+    ) {
+      lineStarted.current = true;
+      void lineLogin();
+    }
+  }, [line]);
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  const { data: towns } = useData<RowData[]>("/public/municipalities");
+  const { message } = AntApp.useApp();
+  async function login(v: RowData) {
+    setBusy(true);
+    setError("");
+    try {
+      await refreshCsrf();
+      await api("/auth/login", {
+        method: "POST",
+        body: new URLSearchParams(v),
+      });
+      await refreshCsrf();
+      onLogin();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function register(v: RowData) {
+    setBusy(true);
+    setError("");
+    try {
+      await post("/auth/register", v);
+      message.success("สร้างบัญชีแล้ว กรุณาเข้าสู่ระบบ");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="login">
+      <section className="login-story">
+        <div className="brand">
+          <span className="municipal-mark">ท</span>
+          <span>
+            TownTrack<small>พื้นที่ทำงานเทศบาล</small>
+          </span>
+        </div>
+        <Tag color="gold">MUNICIPAL SERVICE PLATFORM</Tag>
+        <h1>
+          ทุกปัญหาในเมือง
+          <br />
+          ติดตามได้จนแก้ไข
+        </h1>
+        <p>
+          รับเรื่อง • จัดทีม • ลงพื้นที่ • ตรวจสอบผล
+          <br />
+          เชื่อมการทำงานของเทศบาลไว้ในที่เดียว
+        </p>
+        <div className="login-feature">
+          <TeamOutlined /> ทำงานร่วมกัน พร้อมประวัติทุกขั้นตอน
+        </div>
+      </section>
+      <Card className="login-card">
+        <Title level={3}>ยินดีต้อนรับ</Title>
+        <Paragraph type="secondary">
+          เข้าสู่ระบบบริการเทศบาล TownTrack
+        </Paragraph>
+        <ErrorBox error={error} />
+        {line?.enabled && (
+          <Button
+            block
+            style={{ marginBottom: 16 }}
+            loading={busy}
+            onClick={lineLogin}
+          >
+            เข้าสู่ระบบด้วย LINE
+          </Button>
+        )}
+        <Tabs
+          items={[
+            {
+              key: "login",
+              label: "เข้าสู่ระบบ",
+              children: (
+                <Form layout="vertical" onFinish={login}>
+                  <Form.Item
+                    label="ชื่อผู้ใช้"
+                    name="username"
+                    rules={[{ required: true }]}
+                  >
+                    <Input autoComplete="username" size="large" />
+                  </Form.Item>
+                  <Form.Item
+                    label="รหัสผ่าน"
+                    name="password"
+                    rules={[{ required: true }]}
+                  >
+                    <Input.Password
+                      autoComplete="current-password"
+                      size="large"
+                    />
+                  </Form.Item>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    block
+                    size="large"
+                    loading={busy}
+                  >
+                    เข้าสู่ระบบ
+                  </Button>
+                </Form>
+              ),
+            },
+            {
+              key: "register",
+              label: "สมัครบัญชีประชาชน",
+              children: (
+                <Form layout="vertical" onFinish={register}>
+                  <Form.Item
+                    label="เทศบาล"
+                    name="municipalityId"
+                    rules={[{ required: true }]}
+                  >
+                    <Select
+                      options={towns?.map((t) => ({
+                        value: t.id,
+                        label: t.name,
+                      }))}
+                    />
+                  </Form.Item>
+                  <Form.Item
+                    label="ชื่อที่ใช้ติดต่อ"
+                    name="displayName"
+                    rules={[{ required: true, max: 200 }]}
+                  >
+                    <Input />
+                  </Form.Item>
+                  <Form.Item
+                    label="ชื่อผู้ใช้ (อังกฤษ/ตัวเลข อย่างน้อย 4 ตัว)"
+                    name="username"
+                    rules={[
+                      { required: true, pattern: /^[a-zA-Z0-9._-]{4,60}$/ },
+                    ]}
+                  >
+                    <Input autoComplete="username" />
+                  </Form.Item>
+                  <Form.Item
+                    label="รหัสผ่าน อย่างน้อย 12 ตัวอักษร"
+                    name="password"
+                    rules={[{ required: true, min: 12, max: 72 }]}
+                  >
+                    <Input.Password autoComplete="new-password" />
+                  </Form.Item>
+                  <Button type="primary" htmlType="submit" block loading={busy}>
+                    สมัครบัญชีประชาชน
+                  </Button>
+                </Form>
+              ),
+            },
+          ]}
+        />
+      </Card>
+    </div>
+  );
+}
+export default function App() {
+  const [fontLarge, setFontLarge] = useState(false);
+  const [user, setUser] = useState<RowData | null>(),
+    [view, setView] = useState("dashboard"),
+    [selected, setSelected] = useState(""),
+    [refresh, setRefresh] = useState(0);
+  const { message } = AntApp.useApp();
+  const load = () =>
+    api<RowData>("/auth/me")
+      .then(setUser)
+      .catch(() => setUser(null));
+  useEffect(() => {
+    void load();
+  }, []);
+  const open = (id: string) => {
+    setSelected(id);
+    setView("detail");
+  };
+  if (user === undefined)
+    return (
+      <div className="loading">
+        <Spin size="large" />
+      </div>
+    );
+  if (!user)
+    return (
+      <Login
+        onLogin={() => {
+          void load();
+          setView("dashboard");
+        }}
+      />
+    );
+  const items = [
+    { key: "dashboard", icon: <DashboardOutlined />, label: "ภาพรวม" },
+    {
+      key: "cases",
+      icon: <FileTextOutlined />,
+      label: user.role === "CITIZEN" ? "คำร้องของฉัน" : "งานและคำร้อง",
+    },
+    ...(user.role === "CITIZEN"
+      ? [
+          { key: "new", icon: <PlusOutlined />, label: "แจ้งปัญหา" },
+          {
+            key: "following",
+            icon: <EnvironmentOutlined />,
+            label: "เรื่องที่ติดตาม",
+          },
+        ]
+      : []),
+    ...(user.role === "LEADER"
+      ? [{ key: "teams", icon: <TeamOutlined />, label: "ทีมลงพื้นที่" }]
+      : []),
+    { key: "notifications", icon: <BellOutlined />, label: "การแจ้งเตือน" },
+    ...(user.role === "ADMIN"
+      ? [{ key: "admin", icon: <SettingOutlined />, label: "จัดการระบบ" }]
+      : []),
+    { key: "password", icon: <LockOutlined />, label: "เปลี่ยนรหัสผ่าน" },
+  ];
+  return (
+    <Layout
+      className={
+        "shell " +
+        (user.role === "CITIZEN" ? "citizen-shell" : "staff-shell") +
+        (fontLarge ? " font-large" : "")
+      }
+    >
+      {user.role !== "CITIZEN" && (
+        <Layout.Sider
+          breakpoint="lg"
+          collapsedWidth={0}
+          width={200}
+          theme="light"
+          className="sidebar"
+        >
+          <div className="brand">
+            <EnvironmentOutlined /> TownTrack
+          </div>
+          <div className="nav-label">บริการเทศบาล</div>
+          <Menu
+            mode="inline"
+            selectedKeys={[view === "detail" ? "cases" : view]}
+            items={items}
+            onClick={({ key }) => setView(key)}
+          />
+          <div className="sidebar-bottom">
+            <Tag color="cyan">{roleNames[user.role]}</Tag>
+            <p>
+              ประสานงานอย่างเป็นระบบ
+              <br />
+              ติดตามผลอย่างโปร่งใส
+            </p>
+          </div>
+        </Layout.Sider>
+      )}
+      <Layout>
+        <Layout.Header className="topbar">
+          <div className="header-identity">
+            <span className="municipal-mark">ท</span>
+            <div>
+              <strong>
+                {user.role === "CITIZEN"
+                  ? "เทศบาลใกล้คุณ"
+                  : "ศูนย์รับเรื่องเทศบาล"}
+              </strong>
+              <small>
+                {user.role === "CITIZEN"
+                  ? "บริการประชาชน · TownTrack"
+                  : "งานบริการประชาชน · " + roleNames[user.role]}
+              </small>
+            </div>
+          </div>
+          <Space>
+            {user.role === "CITIZEN" && (
+              <Button
+                aria-pressed={fontLarge}
+                onClick={() => setFontLarge((v) => !v)}
+              >
+                {fontLarge ? "ก− ย่อ" : "ก+ ขยาย"}
+              </Button>
+            )}
+            <Avatar style={{ background: "#d9eeea", color: "#075c54" }}>
+              {user.display_name?.[0]}
+            </Avatar>
+            <span className="account-name">{user.display_name}</span>
+            <Button
+              aria-label="ออกจากระบบ"
+              icon={<LogoutOutlined />}
+              onClick={async () => {
+                try {
+                  await api("/auth/logout", { method: "POST" });
+                  setUser(null);
+                } catch (e) {
+                  message.error((e as Error).message);
+                }
+              }}
+            />
+          </Space>
+        </Layout.Header>
+        <Layout.Content className="content">
+          {view === "dashboard" && user.role === "CITIZEN" ? (
+            <CitizenHome
+              onNew={() => setView("new")}
+              onTrack={() => setView("cases")}
+              onFollowing={() => setView("following")}
+            />
+          ) : (view === "dashboard" || view === "cases") &&
+            user.role !== "CITIZEN" ? (
+            <StaffWorkspace user={user} dashboard={view === "dashboard"} />
+          ) : view === "dashboard" || view === "cases" ? (
+            <CaseList
+              user={user}
+              dashboard={view === "dashboard"}
+              refresh={refresh}
+              open={open}
+              onNew={() => setView("new")}
+              reload={() => setRefresh((x) => x + 1)}
+            />
+          ) : view === "new" ? (
+            <NewCase
+              onCancel={() => setView("dashboard")}
+              onDone={(id) => {
+                setRefresh((x) => x + 1);
+                open(id);
+              }}
+            />
+          ) : view === "detail" ? (
+            <Detail id={selected} user={user} back={() => setView("cases")} />
+          ) : view === "following" ? (
+            <Following open={open} />
+          ) : view === "notifications" ? (
+            <Notifications open={open} />
+          ) : view === "teams" ? (
+            <Teams />
+          ) : view === "admin" ? (
+            <Admin />
+          ) : (
+            <Password onDone={() => setUser(null)} />
+          )}
+        </Layout.Content>
+        <Layout.Footer className="footer">
+          TownTrack • ระบบรับเรื่องและบริหารงานลงพื้นที่
+        </Layout.Footer>
+      </Layout>
+      {user.role === "CITIZEN" && view !== "new" && (
+        <nav className="citizen-bottom-nav" aria-label="เมนูประชาชน">
+          {[
+            { key: "dashboard", icon: <EnvironmentOutlined />, label: "ชุมชน" },
+            { key: "new", icon: <PlusOutlined />, label: "แจ้งปัญหา" },
+            { key: "cases", icon: <FileTextOutlined />, label: "ติดตามเรื่อง" },
+            {
+              key: "notifications",
+              icon: <BellOutlined />,
+              label: "แจ้งเตือน",
+            },
+            { key: "password", icon: <LockOutlined />, label: "บัญชี" },
+          ].map((item) => (
+            <a
+              key={item.key}
+              href={"#" + item.key}
+              aria-current={
+                (view === "detail" ? "cases" : view) === item.key
+                  ? "page"
+                  : undefined
+              }
+              onClick={(e) => {
+                e.preventDefault();
+                setView(item.key);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </a>
+          ))}
+        </nav>
+      )}
+    </Layout>
+  );
+}
+function CaseList({
+  user,
+  dashboard,
+  refresh,
+  open,
+  onNew,
+  reload,
+}: {
+  user: RowData;
+  dashboard: boolean;
+  refresh: number;
+  open: (id: string) => void;
+  onNew: () => void;
+  reload: () => void;
+}) {
+  const [page, setPage] = useState(1),
+    [size, setSize] = useState(10);
+  const [search, setSearch] = useState(""),
+    [query, setQuery] = useState(""),
+    [status, setStatus] = useState<string>();
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setQuery(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+  const { data, error } = useData<RowData>(
+    "/complaints?page=" +
+      (page - 1) +
+      "&size=" +
+      size +
+      "&q=" +
+      encodeURIComponent(query) +
+      "&status=" +
+      encodeURIComponent(status || ""),
+    refresh,
+  );
+  const rows: RowData[] = data?.items || [];
+  const terminal = ["CLOSED", "TERMINATED", "REJECTED"];
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <Text className="eyebrow">TOWNTRACK / WORKSPACE</Text>
+          <Title level={2}>
+            {dashboard ? "ภาพรวมการดำเนินงาน" : "งานและคำร้อง"}
+          </Title>
+          <Text type="secondary">
+            {user.role === "CITIZEN"
+              ? "ติดตามปัญหาที่คุณแจ้งและดูความคืบหน้า"
+              : "ติดตามคำร้องและงานที่อยู่ในขอบเขตความรับผิดชอบ"}
+          </Text>
+        </div>
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={reload}>
+            โหลดใหม่
+          </Button>
+          {user.role === "CITIZEN" && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={onNew}>
+              แจ้งปัญหา
+            </Button>
+          )}
+        </Space>
+      </div>
+      <ErrorBox error={error} />
+      {dashboard && (
+        <Row gutter={[16, 16]} className="stats">
+          {[
+            ["คำร้องทั้งหมด", data?.stats.total || 0],
+            ["กำลังดำเนินการ", data?.stats.in_progress || 0],
+            ["ปิดเรื่องสำเร็จ", data?.stats.closed || 0],
+            ["เกินกำหนด", data?.stats.overdue || 0],
+          ].map(([label, n], i) => (
+            <Col xs={12} xl={6} key={label}>
+              <Card>
+                <div className={"stat-icon stat-" + i}>
+                  <FileTextOutlined />
+                </div>
+                <Statistic title={label} value={n} />
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      )}
+      <Card
+        title="รายการคำร้อง"
+        extra={<Text type="secondary">พบ {data?.total || 0} รายการ</Text>}
+      >
+        <Space wrap className="filters">
+          <Input.Search
+            placeholder="ค้นหาหัวข้อหรือเลขคำร้อง"
+            allowClear
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: 280 }}
+          />
+          <Select
+            placeholder="ทุกสถานะ"
+            allowClear
+            style={{ width: 230 }}
+            value={status}
+            onChange={(value) => {
+              setStatus(value);
+              setPage(1);
+            }}
+            options={Object.entries(statusNames).map(([value, label]) => ({
+              value,
+              label,
+            }))}
+          />
+        </Space>
+        <Table
+          rowKey="id"
+          loading={!data && !error}
+          dataSource={rows}
+          scroll={{ x: 850 }}
+          pagination={{
+            current: page,
+            pageSize: size,
+            total: data?.total || 0,
+            showSizeChanger: true,
+            onChange: (p, s) => {
+              setPage(p);
+              setSize(s);
+            },
+          }}
+          columns={[
+            {
+              title: "คำร้อง",
+              dataIndex: "title",
+              render: (v, r) => (
+                <>
+                  <Button
+                    type="link"
+                    className="case-link"
+                    onClick={() => open(r.id)}
+                  >
+                    {v}
+                  </Button>
+                  <div>
+                    <Text type="secondary" className="small">
+                      #{r.id.slice(0, 8).toUpperCase()}
+                    </Text>
+                  </div>
+                </>
+              ),
+            },
+            { title: "ประเภท", dataIndex: "category_name" },
+            {
+              title: "สถานะ",
+              dataIndex: "status",
+              render: (v) => <StateTag value={v} />,
+            },
+            { title: "วันที่แจ้ง", dataIndex: "created_at", render: date },
+            {
+              title: "กำหนดเสร็จ",
+              dataIndex: "due_at",
+              render: (v, r) => (
+                <Text
+                  type={
+                    !terminal.includes(r.status) && new Date(v) < new Date()
+                      ? "danger"
+                      : undefined
+                  }
+                >
+                  {date(v)}
+                </Text>
+              ),
+            },
+            {
+              title: "",
+              render: (_, r) => (
+                <Button onClick={() => open(r.id)}>ดูรายละเอียด</Button>
+              ),
+            },
+          ]}
+        />
+      </Card>
+    </>
+  );
+}
+function Following({ open }: { open: (id: string) => void }) {
+  const [refresh, setRefresh] = useState(0);
+  const { data, error } = useData<RowData[]>("/following", refresh);
+  const { message } = AntApp.useApp();
+  return (
+    <>
+      <Title level={2}>เรื่องที่ติดตาม</Title>
+      <ErrorBox error={error} />
+      <Card>
+        <Alert
+          style={{ marginBottom: 16 }}
+          type="info"
+          message="แสดงเฉพาะประเภทปัญหาและสถานะของเรื่องที่ติดตาม เพื่อรักษาข้อมูลผู้แจ้ง"
+        />
+        <List
+          dataSource={data}
+          locale={{ emptyText: "ยังไม่มีเรื่องที่ติดตาม" }}
+          renderItem={(r) => (
+            <List.Item
+              actions={[
+                <Button
+                  key="unfollow"
+                  onClick={async () => {
+                    try {
+                      await api("/complaints/" + r.id + "/follow", {
+                        method: "DELETE",
+                      });
+                      setRefresh((x) => x + 1);
+                    } catch (e) {
+                      message.error((e as Error).message);
+                    }
+                  }}
+                >
+                  เลิกติดตาม
+                </Button>,
+              ]}
+            >
+              <List.Item.Meta
+                title={r.category_name + " • #" + r.id.slice(0, 8)}
+                description={
+                  <Space wrap>
+                    <StateTag value={r.status} />
+                    <Text type="secondary">{date(r.updated_at)}</Text>
+                  </Space>
+                }
+              />
+            </List.Item>
+          )}
+        />
+      </Card>
+    </>
+  );
+}
+function Notifications({ open }: { open: (id: string) => void }) {
+  const [refresh, setRefresh] = useState(0);
+  const { data, error } = useData<RowData[]>("/notifications", refresh);
+  const { message } = AntApp.useApp();
+  return (
+    <>
+      <div className="page-heading">
+        <Title level={2}>การแจ้งเตือน</Title>
+        <Button
+          onClick={async () => {
+            try {
+              await post("/notifications/read", {});
+              setRefresh((x) => x + 1);
+            } catch (e) {
+              message.error((e as Error).message);
+            }
+          }}
+        >
+          อ่านทั้งหมดแล้ว
+        </Button>
+      </div>
+      <ErrorBox error={error} />
+      <Card>
+        <List
+          dataSource={data}
+          locale={{ emptyText: "ยังไม่มีการแจ้งเตือน" }}
+          renderItem={(r) => (
+            <List.Item>
+              <List.Item.Meta
+                avatar={
+                  <Badge dot={!r.read_at}>
+                    <Avatar icon={<BellOutlined />} />
+                  </Badge>
+                }
+                title={r.message}
+                description={
+                  date(r.created_at) + " • #" + r.complaint_id.slice(0, 8)
+                }
+              />
+            </List.Item>
+          )}
+        />
+      </Card>
+    </>
+  );
+}
+function Password({ onDone }: { onDone: () => void }) {
+  const { message } = AntApp.useApp();
+  return (
+    <>
+      <Title level={2}>เปลี่ยนรหัสผ่าน</Title>
+      <Card style={{ maxWidth: 520 }}>
+        <Form
+          layout="vertical"
+          onFinish={async (v) => {
+            try {
+              await post("/auth/password", v);
+              message.success("เปลี่ยนรหัสผ่านแล้ว กรุณาเข้าสู่ระบบใหม่");
+              onDone();
+            } catch (e) {
+              message.error((e as Error).message);
+            }
+          }}
+        >
+          <Form.Item
+            name="currentPassword"
+            label="รหัสผ่านเดิม"
+            rules={[{ required: true }]}
+          >
+            <Input.Password autoComplete="current-password" />
+          </Form.Item>
+          <Form.Item
+            name="newPassword"
+            label="รหัสผ่านใหม่ (อย่างน้อย 12 ตัวอักษร)"
+            rules={[{ required: true, min: 12, max: 72 }]}
+          >
+            <Input.Password autoComplete="new-password" />
+          </Form.Item>
+          <Button type="primary" htmlType="submit">
+            บันทึกรหัสผ่านใหม่
+          </Button>
+        </Form>
+      </Card>
+    </>
+  );
+}

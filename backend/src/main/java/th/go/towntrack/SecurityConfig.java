@@ -1,0 +1,129 @@
+package th.go.towntrack;
+
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.context.annotation.*;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.userdetails.*;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+@Configuration
+public class SecurityConfig {
+  @Bean
+  org.springframework.security.core.session.SessionRegistry sessionRegistry() {
+    return new org.springframework.security.core.session.SessionRegistryImpl();
+  }
+
+  @Bean
+  org.springframework.security.web.session.HttpSessionEventPublisher sessionEvents() {
+    return new org.springframework.security.web.session.HttpSessionEventPublisher();
+  }
+
+  @Bean
+  PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder(12);
+  }
+
+  @Bean
+  UserDetailsService users(Db db) {
+    return name -> {
+      var rows = db.list("SELECT * FROM app_user WHERE username=? AND enabled=true", name);
+      if (rows.isEmpty()) throw new UsernameNotFoundException("Invalid credentials");
+      var u = rows.getFirst();
+      return User.withUsername(name)
+          .password((String) u.get("password_hash"))
+          .roles((String) u.get("role"))
+          .build();
+    };
+  }
+
+  @Bean
+  SecurityFilterChain security(
+      HttpSecurity h, org.springframework.security.core.session.SessionRegistry sessions)
+      throws Exception {
+    h.authorizeHttpRequests(
+            a ->
+                a.requestMatchers(
+                        "/api/auth/csrf",
+                        "/api/auth/login",
+                        "/api/auth/register",
+                        "/api/public/municipalities",
+                        "/api/public/line",
+                        "/api/auth/line",
+                        "/actuator/health")
+                    .permitAll()
+                    .anyRequest()
+                    .authenticated())
+        .formLogin(
+            f ->
+                f.loginProcessingUrl("/api/auth/login")
+                    .successHandler(
+                        (q, s, a) -> {
+                          s.setCharacterEncoding("UTF-8");
+                          s.setContentType("application/json");
+                          s.getWriter().write("{\"ok\":true}");
+                        })
+                    .failureHandler(
+                        (q, s, e) -> {
+                          s.setStatus(401);
+                          s.setContentType("application/json");
+                          s.getWriter().write("{\"message\":\"ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง\"}");
+                        }))
+        .logout(
+            l ->
+                l.logoutUrl("/api/auth/logout").logoutSuccessHandler((q, s, a) -> s.setStatus(204)))
+        .sessionManagement(
+            sm ->
+                sm.maximumSessions(5)
+                    .sessionRegistry(sessions)
+                    .expiredSessionStrategy(event -> event.getResponse().sendError(401)))
+        .requestCache(c -> c.disable())
+        .exceptionHandling(
+            e ->
+                e.authenticationEntryPoint((q, s, x) -> s.sendError(401))
+                    .accessDeniedHandler((q, s, x) -> s.sendError(403)))
+        .headers(
+            x ->
+                x.contentSecurityPolicy(
+                    c -> c.policyDirectives("default-src 'none'; frame-ancestors 'none'")))
+        .addFilterBefore(new LoginLimit(), UsernamePasswordAuthenticationFilter.class);
+    return h.build();
+  }
+
+  static class LoginLimit extends OncePerRequestFilter {
+    record Window(long start, int count) {}
+
+    private final Map<String, Window> attempts = new ConcurrentHashMap<>();
+
+    protected void doFilterInternal(HttpServletRequest q, HttpServletResponse s, FilterChain c)
+        throws ServletException, IOException {
+      if (q.getMethod().equals("POST")
+          && (q.getRequestURI().equals("/api/auth/login")
+              || q.getRequestURI().equals("/api/auth/register")
+              || q.getRequestURI().equals("/api/auth/line"))) {
+        long now = System.currentTimeMillis();
+        if (attempts.size() > 10000)
+          attempts.entrySet().removeIf(e -> now - e.getValue().start() > 60000);
+        Window w =
+            attempts.compute(
+                q.getRemoteAddr(),
+                (k, v) ->
+                    v == null || now - v.start() > 60000
+                        ? new Window(now, 1)
+                        : new Window(v.start(), v.count() + 1));
+        if (w.count() > 20) {
+          s.setStatus(429);
+          return;
+        }
+      }
+      c.doFilter(q, s);
+    }
+  }
+}

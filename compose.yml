@@ -1,0 +1,59 @@
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_DB: towntrack
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:?Set DB_ADMIN_PASSWORD}
+      APP_DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/init-db.sh:/docker-entrypoint-initdb.d/10-towntrack.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d towntrack"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  clamav:
+    image: clamav/clamav:stable
+    volumes:
+      - clamdata:/var/lib/clamav
+    restart: unless-stopped
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.backend
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/towntrack
+      DB_USER: towntrack
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      BOOTSTRAP_PASSWORD: ${BOOTSTRAP_PASSWORD:?Set BOOTSTRAP_PASSWORD}
+      BIND_ADDRESS: 0.0.0.0
+      COOKIE_SECURE: "true"
+      FILE_ROOT: /data/files
+      CLAMAV_HOST: clamav
+      GEOCODING_BASE_URL: ${GEOCODING_BASE_URL:-}
+      LINE_LOGIN_CHANNEL_ID: ${LINE_LOGIN_CHANNEL_ID:-}
+      LINE_LIFF_ID: ${LINE_LIFF_ID:-}
+      LINE_MUNICIPALITY_ID: ${LINE_MUNICIPALITY_ID:-}
+      LINE_CHANNEL_ACCESS_TOKEN: ${LINE_CHANNEL_ACCESS_TOKEN:-}
+    volumes:
+      - files:/data/files
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.frontend
+    ports:
+      - "127.0.0.1:8090:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+volumes:
+  pgdata:
+  files:
+  clamdata:

@@ -1,0 +1,2438 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "TownTrack API",
+    "version": "0.1.0",
+    "description": "Session-authenticated API. All unsafe requests require a CSRF token obtained from /auth/csrf. Data access is scoped by municipality, department and assignment."
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "security": [
+    {
+      "session": []
+    }
+  ],
+  "paths": {
+    "/auth/csrf": {
+      "get": {
+        "summary": "Get CSRF token",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "description": "Token"
+                    },
+                    "headerName": {
+                      "type": "string",
+                      "description": "Header name"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": []
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Login using local account",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "csrf": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "description": "Username"
+                  },
+                  "password": {
+                    "type": "string",
+                    "writeOnly": true
+                  }
+                },
+                "required": ["username", "password"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "summary": "Register citizen account",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "csrf": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Registration"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/line": {
+      "post": {
+        "summary": "Verify LIFF ID token with LINE and create citizen session",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "csrf": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idToken": {
+                    "type": "string",
+                    "writeOnly": true
+                  }
+                },
+                "required": ["idToken"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "summary": "Current account",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "summary": "Logout",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "Logged out"
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ]
+      }
+    },
+    "/auth/password": {
+      "post": {
+        "summary": "Change password and expire all account sessions",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currentPassword": {
+                    "type": "string",
+                    "writeOnly": true
+                  },
+                  "newPassword": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 72,
+                    "writeOnly": true
+                  }
+                },
+                "required": ["currentPassword", "newPassword"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/municipalities": {
+      "get": {
+        "summary": "Public municipalities",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": []
+      }
+    },
+    "/public/line": {
+      "get": {
+        "summary": "Public line",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": []
+      }
+    },
+    "/catalog": {
+      "get": {
+        "summary": "Categories, custom field schemas and departments",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        }
+      }
+    },
+    "/people": {
+      "get": {
+        "summary": "Assignable accounts in caller department",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "role",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["LEADER", "FIELD", "APPROVER"]
+            }
+          }
+        ]
+      }
+    },
+    "/complaints": {
+      "get": {
+        "summary": "Paginated complaints, search and full scoped statistics",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ComplaintSummary"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "size": {
+                      "type": "integer"
+                    },
+                    "stats": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "in_progress": {
+                          "type": "integer"
+                        },
+                        "closed": {
+                          "type": "integer"
+                        },
+                        "overdue": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NEW",
+                "TRIAGED",
+                "ASSIGNED",
+                "ACCEPTED",
+                "RESOURCE_DRAFT",
+                "RESOURCE_CHECK",
+                "RESOURCE_REVISION",
+                "RESOURCE_APPROVAL",
+                "READY",
+                "IN_PROGRESS",
+                "LEADER_REVIEW",
+                "FIELD_REVISION",
+                "OFFICER_REVIEW",
+                "LEADER_REVISION",
+                "RESOLVED",
+                "CLOSED",
+                "TERMINATED",
+                "REJECTED"
+              ]
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "Create complaint with workflow and form snapshots",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewComplaint"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/complaints/{id}": {
+      "get": {
+        "summary": "Role-filtered complaint details, files and available actions",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/complaints/{id}/actions": {
+      "post": {
+        "summary": "Execute authorized workflow transition atomically",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nearby": {
+      "get": {
+        "summary": "Sanitized open cases in the same category within 100 meters",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "category_name": {
+                        "type": "string",
+                        "description": "Category"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "NEW",
+                          "TRIAGED",
+                          "ASSIGNED",
+                          "ACCEPTED",
+                          "RESOURCE_DRAFT",
+                          "RESOURCE_CHECK",
+                          "RESOURCE_REVISION",
+                          "RESOURCE_APPROVAL",
+                          "READY",
+                          "IN_PROGRESS",
+                          "LEADER_REVIEW",
+                          "FIELD_REVISION",
+                          "OFFICER_REVIEW",
+                          "LEADER_REVISION",
+                          "RESOLVED",
+                          "CLOSED",
+                          "TERMINATED",
+                          "REJECTED"
+                        ]
+                      },
+                      "latitude": {
+                        "type": "number"
+                      },
+                      "longitude": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "categoryId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "latitude",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            }
+          },
+          {
+            "in": "query",
+            "name": "longitude",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            }
+          }
+        ]
+      }
+    },
+    "/complaints/{id}/follow": {
+      "post": {
+        "summary": "Follow a nearby complaint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "categoryId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "latitude": {
+                    "type": "number"
+                  },
+                  "longitude": {
+                    "type": "number"
+                  }
+                },
+                "required": ["categoryId", "latitude", "longitude"]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Unfollow complaint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/following": {
+      "get": {
+        "summary": "Sanitized followed complaint statuses",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        }
+      }
+    },
+    "/complaints/{id}/files": {
+      "post": {
+        "summary": "Upload private evidence in allowed stage",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "File name"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "PNG JPEG or PDF; maximum 10 MiB. Production requires antivirus."
+                  }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/{id}": {
+      "get": {
+        "summary": "Authorized attachment download",
+        "responses": {
+          "200": {
+            "description": "Private file, attachment disposition",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/teams": {
+      "get": {
+        "summary": "Leader-owned active teams",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create team with representative and members",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Team name"
+                  },
+                  "memberIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "minItems": 1,
+                    "maxItems": 50
+                  },
+                  "representativeId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": ["name", "memberIds", "representativeId"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/{id}/retire": {
+      "post": {
+        "summary": "Retire team without changing existing work membership",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/notifications": {
+      "get": {
+        "summary": "Current user notifications",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        }
+      }
+    },
+    "/notifications/read": {
+      "post": {
+        "summary": "Mark own notifications as read",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ]
+      }
+    },
+    "/admin": {
+      "get": {
+        "summary": "Municipality-scoped administration configuration",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        }
+      }
+    },
+    "/admin/municipality": {
+      "post": {
+        "summary": "Rename own municipality",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Municipality name"
+                  }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/departments": {
+      "post": {
+        "summary": "Create department",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name"
+                  }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users": {
+      "post": {
+        "summary": "Create account within own municipality",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "description": "Username"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 72,
+                    "writeOnly": true
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "description": "Display name"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "CITIZEN",
+                      "OFFICER",
+                      "LEADER",
+                      "FIELD",
+                      "APPROVER",
+                      "ADMIN"
+                    ]
+                  },
+                  "departmentId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": ["username", "password", "displayName", "role"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users/{id}/enabled": {
+      "post": {
+        "summary": "Enable or disable an account except own account",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["enabled"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/workflows": {
+      "post": {
+        "summary": "Publish immutable workflow version with approval stages",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name"
+                  },
+                  "approvalStages": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  }
+                },
+                "required": ["name", "approvalStages"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/categories": {
+      "post": {
+        "summary": "Create or update category for future complaints",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": [],
+            "csrf": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Name"
+                  },
+                  "departmentId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "workflowId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "slaHours": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 87600
+                  },
+                  "fields": {
+                    "type": "array",
+                    "maxItems": 30,
+                    "items": {
+                      "$ref": "#/components/schemas/Field"
+                    }
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["name", "departmentId", "workflowId", "slaHours"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/audit": {
+      "get": {
+        "summary": "Latest 200 municipality audit records",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        }
+      }
+    },
+    "/admin/deliveries": {
+      "get": {
+        "summary": "Latest 200 LINE delivery states without tokens",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid data"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden or CSRF invalid"
+          },
+          "404": {
+            "description": "Not found in allowed scope"
+          },
+          "409": {
+            "description": "Stale version or conflict"
+          },
+          "429": {
+            "description": "Rate limit"
+          },
+          "503": {
+            "description": "Integration or scanner unavailable"
+          }
+        }
+      }
+    },
+    "/geocoding/search": {
+      "get": {
+        "summary": "Configured place lookup (search), disabled until provider is set",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nominatim-compatible result"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "429": {
+            "description": "Lookup rate limit"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/geocoding/reverse": {
+      "get": {
+        "summary": "Configured place lookup (reverse), disabled until provider is set",
+        "parameters": [
+          {
+            "name": "latitude",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "longitude",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nominatim-compatible result"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "429": {
+            "description": "Lookup rate limit"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "JSESSIONID"
+      },
+      "csrf": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-CSRF-TOKEN"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "User-facing error"
+          }
+        }
+      },
+      "NewComplaint": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "nullable": true
+          },
+          "answers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 4000
+            }
+          },
+          "contactName": {
+            "type": "string",
+            "maxLength": 200,
+            "nullable": true
+          },
+          "contactPhone": {
+            "type": "string",
+            "maxLength": 30,
+            "pattern": "^[0-9+() -]*$",
+            "nullable": true
+          }
+        },
+        "required": ["categoryId", "title", "description", "address"]
+      },
+      "Action": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "TRIAGE",
+              "REJECT",
+              "ASSIGN",
+              "ACCEPT",
+              "DECLINE",
+              "REQUEST_RESOURCE",
+              "PROPOSE",
+              "RETURN_RESOURCE",
+              "SEND_APPROVAL",
+              "APPROVE",
+              "DENY",
+              "START",
+              "REPORT",
+              "RETURN_FIELD",
+              "FORWARD_REPORT",
+              "RETURN_LEADER",
+              "VERIFY",
+              "CLOSE"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "leaderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "assigneeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approverIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 5,
+            "uniqueItems": true
+          },
+          "proposal": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "durationDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3650
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 20000
+          }
+        },
+        "required": ["action", "version", "reason"]
+      },
+      "Field": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_]{0,39}$"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "required": ["key", "label", "required"]
+      },
+      "Registration": {
+        "type": "object",
+        "properties": {
+          "municipalityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]{4,60}$"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 72,
+            "writeOnly": true
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": ["municipalityId", "username", "password", "displayName"]
+      },
+      "ComplaintSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NEW",
+              "TRIAGED",
+              "ASSIGNED",
+              "ACCEPTED",
+              "RESOURCE_DRAFT",
+              "RESOURCE_CHECK",
+              "RESOURCE_REVISION",
+              "RESOURCE_APPROVAL",
+              "READY",
+              "IN_PROGRESS",
+              "LEADER_REVIEW",
+              "FIELD_REVISION",
+              "OFFICER_REVIEW",
+              "LEADER_REVISION",
+              "RESOLVED",
+              "CLOSED",
+              "TERMINATED",
+              "REJECTED"
+            ]
+          },
+          "version": {
+            "type": "integer"
+          },
+          "category_name": {
+            "type": "string",
+            "description": "Category"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "due_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,2 @@
+ALTER TABLE workflow_version ADD COLUMN approval_stages integer NOT NULL DEFAULT 1 CHECK(approval_stages BETWEEN 1 AND 5);
+CREATE TABLE approval_assignment(resource_id uuid NOT NULL REFERENCES resource_request, step integer NOT NULL CHECK(step>0), approver_id uuid NOT NULL REFERENCES app_user, decision varchar(20), reason text, decided_at timestamptz, PRIMARY KEY(resource_id,step), UNIQUE(resource_id,approver_id));

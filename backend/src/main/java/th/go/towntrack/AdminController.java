@@ -1,0 +1,234 @@
+package th.go.towntrack;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/admin")
+public class AdminController {
+  final Db db;
+  final Access access;
+  final Workflow workflow;
+  final PasswordEncoder encoder;
+  final ObjectMapper json;
+
+  public AdminController(Db d, Access a, Workflow w, PasswordEncoder e, ObjectMapper j) {
+    db = d;
+    access = a;
+    workflow = w;
+    encoder = e;
+    json = j;
+  }
+
+  Map<String, Object> admin(Authentication a) {
+    var u = access.user(a);
+    access.role(u, "ADMIN");
+    return u;
+  }
+
+  @GetMapping
+  public Object config(Authentication a) {
+    var u = admin(a);
+    return Map.of(
+        "municipality",
+        db.one("SELECT id,name FROM municipality WHERE id=?", u.get("municipality_id")),
+        "users",
+        db.list(
+            "SELECT id,username,display_name,role,department_id,enabled FROM app_user WHERE"
+                + " municipality_id=? ORDER BY created_at",
+            u.get("municipality_id")),
+        "departments",
+        db.list("SELECT id,name FROM department WHERE municipality_id=?", u.get("municipality_id")),
+        "categories",
+        db.list(
+            "SELECT *,fields::text field_schema FROM category WHERE municipality_id=? ORDER BY"
+                + " name",
+            u.get("municipality_id")),
+        "workflows",
+        db.list(
+            "SELECT * FROM workflow_version WHERE municipality_id=? ORDER BY version DESC",
+            u.get("municipality_id")));
+  }
+
+  @PostMapping("/municipality")
+  public void rename(@RequestBody Map<String, Object> b, Authentication a) {
+    var u = admin(a);
+    db.run(
+        "UPDATE municipality SET name=? WHERE id=?",
+        Workflow.text(b, "name", 200),
+        u.get("municipality_id"));
+  }
+
+  @PostMapping("/departments")
+  public Object department(@RequestBody Map<String, Object> b, Authentication a) {
+    var u = admin(a);
+    UUID id = UUID.randomUUID();
+    db.run(
+        "INSERT INTO department(id,municipality_id,name) VALUES(?,?,?)",
+        id,
+        u.get("municipality_id"),
+        Workflow.text(b, "name", 200));
+    return Map.of("id", id);
+  }
+
+  @PostMapping("/users")
+  public Object user(@RequestBody Map<String, Object> b, Authentication a) {
+    var u = admin(a);
+    String role = Workflow.text(b, "role", 20);
+    if (!List.of("ADMIN", "OFFICER", "LEADER", "FIELD", "APPROVER", "CITIZEN").contains(role))
+      throw new IllegalArgumentException();
+    String name = Workflow.text(b, "username", 60);
+    if (!name.matches("[a-zA-Z0-9._-]{4,60}")) throw new IllegalArgumentException();
+    String password = Workflow.text(b, "password", 72);
+    if (password.length() < 12) throw new IllegalArgumentException();
+    UUID dept = b.get("departmentId") == null ? null : Db.id(b.get("departmentId"));
+    if (!role.equals("CITIZEN") && dept == null) throw new IllegalArgumentException();
+    if (dept != null)
+      db.one(
+          "SELECT id FROM department WHERE id=? AND municipality_id=?",
+          dept,
+          u.get("municipality_id"));
+    UUID id = UUID.randomUUID();
+    db.run(
+        "INSERT INTO"
+            + " app_user(id,municipality_id,department_id,username,password_hash,display_name,role)"
+            + " VALUES(?,?,?,?,?,?,?)",
+        id,
+        u.get("municipality_id"),
+        dept,
+        name,
+        encoder.encode(password),
+        Workflow.text(b, "displayName", 200),
+        role);
+    workflow.audit(u, null, "CREATE_USER", null, null, "สร้างบัญชี " + name);
+    return Map.of("id", id);
+  }
+
+  @PostMapping("/users/{id}/enabled")
+  public void enabled(
+      @PathVariable UUID id, @RequestBody Map<String, Boolean> b, Authentication a) {
+    var u = admin(a);
+    if (u.get("id").equals(id)) throw new IllegalArgumentException();
+    db.one(
+        "SELECT id FROM app_user WHERE id=? AND municipality_id=?", id, u.get("municipality_id"));
+    if (b.get("enabled") == null) throw new IllegalArgumentException();
+    db.run("UPDATE app_user SET enabled=? WHERE id=?", b.get("enabled"), id);
+    workflow.audit(
+        u, null, "USER_ENABLED", null, null, "บัญชี " + id + " enabled=" + b.get("enabled"));
+  }
+
+  @PostMapping("/workflows")
+  @Transactional
+  public Object workflow(@RequestBody Map<String, Object> b, Authentication a) {
+    var u = admin(a);
+    db.one("SELECT id FROM municipality WHERE id=? FOR UPDATE", u.get("municipality_id"));
+    int stages = Integer.parseInt(String.valueOf(b.get("approvalStages")));
+    if (stages < 1 || stages > 5) throw new IllegalArgumentException();
+    int v =
+        ((Number)
+                db.one(
+                        "SELECT COALESCE(MAX(version),0)+1 n FROM workflow_version WHERE"
+                            + " municipality_id=?",
+                        u.get("municipality_id"))
+                    .get("n"))
+            .intValue();
+    UUID id = workflow.createDefault((UUID) u.get("municipality_id"), v);
+    db.run(
+        "UPDATE workflow_version SET name=?,approval_stages=? WHERE id=?",
+        Workflow.text(b, "name", 200),
+        stages,
+        id);
+    workflow.audit(
+        u,
+        null,
+        "PUBLISH_WORKFLOW",
+        null,
+        null,
+        "เผยแพร่ Workflow รุ่น " + v + " จำนวนผู้อนุมัติ " + stages);
+    return Map.of("id", id);
+  }
+
+  @PostMapping("/categories")
+  @Transactional
+  public Object category(@RequestBody Map<String, Object> b, Authentication a) throws Exception {
+    var u = admin(a);
+    UUID dept = Db.id(b.get("departmentId")), wf = Db.id(b.get("workflowId"));
+    db.one(
+        "SELECT id FROM department WHERE id=? AND municipality_id=?",
+        dept,
+        u.get("municipality_id"));
+    db.one(
+        "SELECT id FROM workflow_version WHERE id=? AND municipality_id=? AND published=true",
+        wf,
+        u.get("municipality_id"));
+    int hours = Integer.parseInt(String.valueOf(b.get("slaHours")));
+    if (hours < 1 || hours > 87600) throw new IllegalArgumentException();
+    Object fields = b.getOrDefault("fields", List.of());
+    var tree = json.valueToTree(fields);
+    if (!tree.isArray() || tree.size() > 30) throw new IllegalArgumentException();
+    Set<String> keys = new HashSet<>();
+    for (var f : tree) {
+      String key = f.path("key").asText();
+      if (!key.matches("[a-zA-Z][a-zA-Z0-9_]{0,39}")
+          || !keys.add(key)
+          || f.path("label").asText().isBlank()
+          || f.path("label").asText().length() > 200
+          || !f.path("required").isBoolean()) throw new IllegalArgumentException();
+    }
+    UUID id = b.get("id") == null ? UUID.randomUUID() : Db.id(b.get("id"));
+    String name = Workflow.text(b, "name", 200);
+    if (b.get("id") == null)
+      db.run(
+          "INSERT INTO category(id,municipality_id,department_id,workflow_id,name,sla_hours,fields)"
+              + " VALUES(?,?,?,?,?,?,?::jsonb)",
+          id,
+          u.get("municipality_id"),
+          dept,
+          wf,
+          name,
+          hours,
+          json.writeValueAsString(fields));
+    else {
+      db.one(
+          "SELECT id FROM category WHERE id=? AND municipality_id=?", id, u.get("municipality_id"));
+      db.run(
+          "UPDATE category SET"
+              + " name=?,department_id=?,workflow_id=?,sla_hours=?,fields=?::jsonb,active=? WHERE"
+              + " id=?",
+          name,
+          dept,
+          wf,
+          hours,
+          json.writeValueAsString(fields),
+          b.getOrDefault("active", true),
+          id);
+    }
+    workflow.audit(u, null, "CONFIG_CATEGORY", null, null, "ตั้งค่าประเภทปัญหา " + name);
+    return Map.of("id", id);
+  }
+
+  @GetMapping("/audit")
+  public Object audit(Authentication a) {
+    var u = admin(a);
+    return db.list(
+        "SELECT e.id,e.action,e.from_status,e.to_status,e.reason,e.created_at,u.display_name"
+            + " actor_name FROM audit_event e JOIN app_user u ON u.id=e.actor_id WHERE"
+            + " e.municipality_id=? ORDER BY e.created_at DESC LIMIT 200",
+        u.get("municipality_id"));
+  }
+
+  @GetMapping("/deliveries")
+  public Object deliveries(Authentication a) {
+    var u = admin(a);
+    return db.list(
+        "SELECT d.notification_id,d.state,d.attempts,d.last_error,d.next_attempt,d.sent_at FROM"
+            + " notification_delivery d JOIN notification n ON n.id=d.notification_id JOIN"
+            + " complaint c ON c.id=n.complaint_id WHERE c.municipality_id=? ORDER BY n.created_at"
+            + " DESC LIMIT 200",
+        u.get("municipality_id"));
+  }
+}

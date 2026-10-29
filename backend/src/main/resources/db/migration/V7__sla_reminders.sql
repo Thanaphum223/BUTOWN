@@ -1,0 +1,1 @@
+CREATE TABLE sla_reminder(complaint_id uuid NOT NULL REFERENCES complaint,user_id uuid NOT NULL REFERENCES app_user,created_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(complaint_id,user_id));

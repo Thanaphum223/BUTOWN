@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX user_external_identity ON app_user(municipality_id,external_id) WHERE external_id IS NOT NULL;
+CREATE TABLE notification_delivery(notification_id uuid PRIMARY KEY REFERENCES notification,idempotency_key uuid NOT NULL UNIQUE, state varchar(20) NOT NULL DEFAULT 'PENDING',attempts integer NOT NULL DEFAULT 0,next_attempt timestamptz NOT NULL DEFAULT now(),last_error varchar(100),sent_at timestamptz);
