@@ -10,7 +10,7 @@
 5. POST /api/auth/logout ออกจากระบบ; POST /api/auth/password ส่ง currentPassword,newPassword และทำให้ Session ทั้งบัญชีหมดอายุ
 
 ## ยื่นและดำเนินคำร้อง
-POST /complaints: categoryId,title,description,address,latitude/longitude (ใส่คู่กันหรือ null ทั้งคู่),answers
+POST /complaints: multipart/form-data โดย part `complaint` เป็น application/json มี categoryId,title,description,address,latitude/longitude (ใส่คู่กันหรือ null ทั้งคู่),answers และ part `files` เป็นไฟล์หลักฐานอย่างน้อย 1 ไฟล์ รวมไม่เกิน 1 GB ถ้าไฟล์ไม่ผ่านจะไม่บันทึกคำร้อง
 GET /complaints?page=0&size=10&q=คำค้น&status=NEW: แบ่งหน้าจาก Server ค้นหาในข้อมูลทั้งหมดตามสิทธิ์ ตอบ items,total,page,size,stats (สถิติรวมทั้งขอบเขต)
 GET /complaints/{id}: ข้อมูลตามบทบาท, history, files; บุคลากรได้ workOrders, resources, reports, reviews, approvals, approvalStages และ actions เพิ่ม
 
@@ -33,7 +33,7 @@ POST /complaints/{id}/actions ตัวอย่าง:
 - DENY ยุติทั้งคำร้องทันที ไม่มีเส้นทางให้เริ่มงานต่อ
 
 ## ไฟล์
-POST /complaints/{id}/files เป็น multipart/form-data ชื่อ field=file รองรับ PNG/JPEG/PDF ไม่เกิน 10 MiB ตามขั้นตอนและผู้ใช้
+POST /complaints/{id}/files เป็น multipart/form-data ชื่อ field=file รองรับ PNG/JPEG/PDF/MP4/MOV/WebM รวมไฟล์เดิมต่อคำร้องไม่เกิน 1 GB (1024 MB) ตามขั้นตอนและผู้ใช้
 GET /files/{id} ตรวจสิทธิ์ระดับคำร้องและส่งเป็น attachment ไม่เปิดไฟล์เป็น public URL
 
 ## เคสใกล้เคียง
@@ -54,3 +54,6 @@ UUID เป็นรหัสอ้างอิง ไม่ใช้แทน�
 ## GPS และข้อมูลติดต่อ
 POST /complaints รองรับ contactName (ไม่เกิน 200) และ contactPhone (ไม่เกิน 30) แบบไม่บังคับ ข้อมูลนี้ไม่แสดงใน nearby API
 GET /geocoding/search?q=... และ /geocoding/reverse?latitude=...&longitude=... ต้อง Login และตั้ง GEOCODING_BASE_URL ก่อน มิฉะนั้นตอบ 503 โดยใช้หมุด/ที่อยู่ที่กรอกเองต่อได้
+
+## เหตุฉุกเฉิน
+GET /emergency/nearby?latitude=...&longitude=...&type=hospital&radiusKm=5 เปิดอ่านได้โดยไม่ต้องเข้าสู่ระบบ รองรับ hospital, police, fire_station, clinic และรัศมี 5/10/20 กม. ตอบ places พร้อมชื่อ ที่อยู่ ระยะเส้นตรง เบอร์ตรง และแหล่งข้อมูล ไม่ส่งข้อมูลคำร้องหรือข้อมูลผู้ใช้

@@ -20,6 +20,11 @@ public class Errors {
     return ResponseEntity.badRequest().body(Map.of("message", "ข้อมูลไม่ครบหรือรูปแบบไม่ถูกต้อง"));
   }
 
+  @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+  ResponseEntity<?> uploadTooLarge(Exception e) {
+    return ResponseEntity.status(413).body(Map.of("message", "ไฟล์แนบรวมทั้งหมดต่อคำร้องต้องไม่เกิน 1 GB (1024 MB)"));
+  }
+
   @ExceptionHandler(DataIntegrityViolationException.class)
   ResponseEntity<?> conflict(Exception e) {
     return ResponseEntity.status(409)

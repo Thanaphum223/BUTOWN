@@ -27,11 +27,12 @@
 - docs/ARCHITECTURE.md: โครงสร้างข้อมูล ขอบเขตสิทธิ์ กติกางาน และสมมติฐาน
 - docs/API.md และ docs/openapi.json: API และตัวอย่างการเรียก
 - docs/USER_GUIDE.md: ขั้นตอนใช้งานตามบทบาท
+- docs/EMERGENCY_CONTACTS.md: สายด่วนและข้อมูลสถานที่สำคัญใกล้ฉัน
 - docs/OPERATIONS.md: ติดตั้ง สำรอง กู้คืน และเชื่อม LINE
 - docs/STATUS.md: ผลทดสอบและข้อจำกัดที่ยังต้องจัดการ
 
 ## เชื่อม GovCenter ภายหลัง
-ยังไม่เรียก GovCenter และไม่สมมติ endpoint ใช้ GovCenterPort เป็นขอบเขต Integration และ integration_reference สำหรับจับคู่รหัส ดูข้อกำหนดในเอกสาร Architecture ก่อนลงมือเชื่อม
+การเชื่อม GovCenter ใช้ GovCenterPort เป็นขอบเขต Integration และ integration_reference สำหรับจับคู่รหัส รายละเอียดอยู่ใน docs/ARCHITECTURE.md
 
 ## GPS และฟอร์มแจ้งปัญหา
 ดู docs/GPS_WIZARD.md: ขอสิทธิ์ครั้งแรก แชร์พิกัด Prefill ฟอร์ม 3 ขั้น ใบรับเรื่อง และบริการค้นหาที่อยู่ที่ตั้งค่าได้

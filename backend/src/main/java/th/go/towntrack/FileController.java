@@ -17,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api")
 public class FileController {
+  static final long MAX_TOTAL_BYTES = 1024L * 1024 * 1024;
   final Db db;
   final Access access;
   final Path root;
@@ -38,7 +39,7 @@ public class FileController {
     this.dev = dev;
   }
 
-  void scan(byte[] data) throws IOException {
+  void scan(Path file) throws IOException {
     if (clamHost.isBlank()) {
       if (!dev)
         throw new ResponseStatusException(
@@ -47,13 +48,16 @@ public class FileController {
     }
     try (Socket sock = new Socket()) {
       sock.connect(new InetSocketAddress(clamHost, 3310), 5000);
-      sock.setSoTimeout(30000);
+      sock.setSoTimeout(600000);
       var out = new DataOutputStream(sock.getOutputStream());
       out.write(new byte[] {'z', 'I', 'N', 'S', 'T', 'R', 'E', 'A', 'M', 0});
-      for (int i = 0; i < data.length; i += 8192) {
-        int n = Math.min(8192, data.length - i);
-        out.writeInt(n);
-        out.write(data, i, n);
+      try (InputStream input = Files.newInputStream(file)) {
+        byte[] buffer = new byte[64 * 1024];
+        int n;
+        while ((n = input.read(buffer)) != -1) {
+          out.writeInt(n);
+          out.write(buffer, 0, n);
+        }
       }
       out.writeInt(0);
       out.flush();
@@ -81,8 +85,18 @@ public class FileController {
           default -> false;
         };
     if (!allowed) Access.deny();
-    byte[] data = f.getBytes();
-    if (data.length == 0 || data.length > 10 * 1024 * 1024) throw new IllegalArgumentException();
+    // Serialize uploads to the same complaint so concurrent files cannot exceed the quota.
+    db.one("SELECT id FROM complaint WHERE id=? FOR UPDATE", id);
+    long used = ((Number) db.one(
+        "SELECT COALESCE(SUM(size_bytes),0) used FROM attachment WHERE complaint_id=?", id)
+        .get("used")).longValue();
+    long size = f.getSize();
+    if (size <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ไฟล์ต้องไม่ว่าง");
+    if (size > MAX_TOTAL_BYTES || used > MAX_TOTAL_BYTES - size)
+      throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,
+          "ไฟล์แนบรวมทั้งหมดต่อคำร้องต้องไม่เกิน 1 GB (1024 MB)");
+    byte[] data;
+    try (InputStream input = f.getInputStream()) { data = input.readNBytes(4096); }
     String type;
     String ext;
     if (data.length > 8
@@ -102,10 +116,20 @@ public class FileController {
         && new String(data, 0, 5, java.nio.charset.StandardCharsets.US_ASCII).equals("%PDF-")) {
       type = "application/pdf";
       ext = ".pdf";
+    } else if (data.length >= 16 && ascii(data, 4, 4).equals("ftyp")
+        && List.of("isom", "iso2", "iso3", "iso4", "iso5", "iso6", "mp41", "mp42",
+            "avc1", "M4V ", "MSNV", "dash", "qt  ").contains(ascii(data, 8, 4))) {
+      boolean quicktime = ascii(data, 8, 4).equals("qt  ");
+      type = quicktime ? "video/quicktime" : "video/mp4";
+      ext = quicktime ? ".mov" : ".mp4";
+    } else if (data.length >= 16 && data[0] == 0x1a && data[1] == 0x45
+        && data[2] == (byte) 0xdf && data[3] == (byte) 0xa3
+        && ascii(data, 0, data.length).contains("webm")) {
+      type = "video/webm";
+      ext = ".webm";
     } else
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, "รองรับเฉพาะ PNG, JPEG และ PDF ที่ถูกต้อง");
-    scan(data);
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "รองรับ PNG, JPEG, PDF และวิดีโอ MP4, MOV, WebM ที่มีรูปแบบไฟล์ถูกต้อง");
     UUID fileId = UUID.randomUUID();
     String key = fileId + ext;
     String name =
@@ -114,8 +138,24 @@ public class FileController {
             .replaceAll("[\\/\r\n]", "_");
     if (name.length() > 200) name = name.substring(0, 200) + ext;
     Path dest = root.resolve(key);
-    Files.write(dest, data, StandardOpenOption.CREATE_NEW);
+    MessageDigest digest = MessageDigest.getInstance("SHA-256");
     try {
+      try (InputStream input = f.getInputStream();
+          OutputStream output = Files.newOutputStream(dest, StandardOpenOption.CREATE_NEW)) {
+        byte[] buffer = new byte[64 * 1024];
+        long written = 0;
+        int n;
+        while ((n = input.read(buffer)) != -1) {
+          written += n;
+          if (written > size || used > MAX_TOTAL_BYTES - written)
+            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,
+                "ไฟล์แนบรวมทั้งหมดต่อคำร้องต้องไม่เกิน 1 GB (1024 MB)");
+          digest.update(buffer, 0, n);
+          output.write(buffer, 0, n);
+        }
+        if (written != size) throw new IOException("Incomplete upload");
+      }
+      scan(dest);
       db.run(
           "INSERT INTO"
               + " attachment(id,complaint_id,uploaded_by,original_name,content_type,size_bytes,sha256,storage_key)"
@@ -125,14 +165,27 @@ public class FileController {
           u.get("id"),
           name,
           type,
-          data.length,
-          HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(data)),
+          size,
+          HexFormat.of().formatHex(digest.digest()),
           key);
     } catch (Exception e) {
       Files.deleteIfExists(dest);
       throw e;
     }
+    if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive())
+      org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+          new org.springframework.transaction.support.TransactionSynchronization() {
+            public void afterCompletion(int status) {
+              if (status != STATUS_COMMITTED) {
+                try { Files.deleteIfExists(dest); } catch (IOException ignored) {}
+              }
+            }
+          });
     return Map.of("id", fileId, "name", name);
+  }
+
+  static String ascii(byte[] data, int offset, int length) {
+    return new String(data, offset, length, java.nio.charset.StandardCharsets.US_ASCII);
   }
 
   @GetMapping("/files/{id}")

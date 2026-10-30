@@ -56,6 +56,7 @@ public class SecurityConfig {
                         "/api/auth/register",
                         "/api/public/municipalities",
                         "/api/public/line",
+                        "/api/emergency/nearby",
                         "/api/auth/line",
                         "/actuator/health")
                     .permitAll()

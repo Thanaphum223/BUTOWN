@@ -63,33 +63,119 @@ class TownTrackIntegrationTest {
     return r.with(user("test" + role).roles(role));
   }
 
+  org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder complaintRequest(Map<String, ?> body) throws Exception {
+    return multipart("/api/complaints")
+        .file(new MockMultipartFile("complaint", "complaint.json", "application/json", json.writeValueAsBytes(body)))
+        .file(new MockMultipartFile("files", "initial.pdf", "application/pdf", "%PDF-1.4 initial evidence".getBytes()));
+  }
+
   UUID create() throws Exception {
-    var result =
-        mvc.perform(
-                as(
-                    post("/api/complaints")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                            json.writeValueAsString(
-                                Map.of(
-                                    "categoryId",
-                                    cat,
-                                    "title",
-                                    "Broken road",
-                                    "description",
-                                    "Private citizen details",
-                                    "address",
-                                    "Test street",
-                                    "latitude",
-                                    13.75,
-                                    "longitude",
-                                    100.5))),
-                    "CITIZEN"))
-            .andExpect(status().isOk())
-            .andReturn();
-    return UUID.fromString(
-        json.readTree(result.getResponse().getContentAsString()).get("id").asText());
+    var result = mvc.perform(as(complaintRequest(Map.of(
+        "categoryId", cat, "title", "Broken road", "description", "Private citizen details",
+        "address", "Test street", "latitude", 13.75, "longitude", 100.5)).with(csrf()), "CITIZEN"))
+        .andExpect(status().isOk()).andReturn();
+    return UUID.fromString(json.readTree(result.getResponse().getContentAsString()).get("id").asText());
+  }
+
+  @Test
+  void communityFollowAndDetailsKeepReporterDataPrivate() throws Exception {
+    UUID id = create();
+    db.run("UPDATE complaint SET reporter_id=? WHERE id=?", users.get("OFFICER"), id);
+    var response = mvc.perform(as(get("/api/community/complaints/" + id), "CITIZEN"))
+        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    assertFalse(response.contains("Private citizen details"));
+    assertFalse(response.contains("Test street"));
+    assertFalse(response.contains("reporter_id"));
+    for (int n = 0; n < 2; n++)
+      mvc.perform(as(post("/api/community/complaints/" + id + "/follow").with(csrf()), "CITIZEN"))
+          .andExpect(status().isOk());
+    mvc.perform(as(get("/api/community/complaints?latitude=13.75&longitude=100.5"), "CITIZEN"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].following").value(true));
+    mvc.perform(as(get("/api/following"), "CITIZEN"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
+    mvc.perform(as(delete("/api/complaints/" + id + "/follow").with(csrf()), "CITIZEN"))
+        .andExpect(status().isOk());
+    mvc.perform(as(get("/api/following"), "CITIZEN"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+    UUID otherTown = UUID.randomUUID();
+    db.run("INSERT INTO municipality(id,name) VALUES(?,'Other town')", otherTown);
+    db.run("INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role) VALUES(?,?,?,'unused','Other','CITIZEN')", UUID.randomUUID(), otherTown, "otherCommunityCitizen");
+    mvc.perform(get("/api/community/complaints/" + id).with(user("otherCommunityCitizen").roles("CITIZEN")))
+        .andExpect(status().isNotFound());
+    mvc.perform(post("/api/community/complaints/" + id + "/follow").with(csrf()).with(user("otherCommunityCitizen").roles("CITIZEN")))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void votesAreUniqueAndTopFiveAreRanked() throws Exception {
+    UUID id = create();
+    for (int n = 0; n < 2; n++)
+      mvc.perform(as(post("/api/community/complaints/" + id + "/vote").with(csrf()), "CITIZEN"))
+          .andExpect(status().isOk());
+    mvc.perform(as(get("/api/community/complaints?latitude=13.75&longitude=100.5"), "CITIZEN"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.top[0].votes").value(1))
+        .andExpect(jsonPath("$.top[0].voted").value(true));
+    mvc.perform(as(delete("/api/community/complaints/" + id + "/vote").with(csrf()), "CITIZEN"))
+        .andExpect(status().isOk());
+    mvc.perform(as(get("/api/community/complaints?latitude=13.75&longitude=100.5"), "CITIZEN"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.top.length()").value(0));
+    for (int n = 0; n < 6; n++) {
+      UUID caseId = create();
+      for (String role : new ArrayList<>(users.keySet()).subList(0, n + 1))
+        db.run("INSERT INTO complaint_vote(complaint_id,user_id) VALUES(?,?)", caseId, users.get(role));
+    }
+    mvc.perform(as(get("/api/community/complaints?latitude=13.75&longitude=100.5"), "CITIZEN"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.top.length()").value(5))
+        .andExpect(jsonPath("$.top[0].votes").value(6))
+        .andExpect(jsonPath("$.top[4].votes").value(2));
+  }
+
+  @Test
+  void communityListsOtherReportersAndClosedCasesWithoutPrivateData() throws Exception {
+    UUID visible = create();
+    UUID farAway = create();
+    db.run("UPDATE complaint SET location=ST_SetSRID(ST_MakePoint(101.5,14.75),4326)::geography WHERE id=?", farAway);
+    db.run("UPDATE complaint SET reporter_id=?,status='CLOSED' WHERE id=?", users.get("OFFICER"), visible);
+    UUID otherTown = UUID.randomUUID();
+    db.run("INSERT INTO municipality(id,name) VALUES(?,'Other town')", otherTown);
+    db.run("INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role) VALUES(?,?,?,'unused','Other','CITIZEN')", UUID.randomUUID(), otherTown, "otherCitizen");
+    mvc.perform(get("/api/community/complaints?latitude=13.75&longitude=100.5").with(user("otherCitizen").roles("CITIZEN")))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(0));
+    var response = mvc.perform(as(get("/api/community/complaints?latitude=13.75&longitude=100.5"), "CITIZEN"))
+        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    var data = json.readTree(response);
+    assertEquals(1, data.get("total").asInt());
+    assertEquals(visible.toString(), data.get("items").get(0).get("id").asText());
+    assertEquals("CLOSED", data.get("items").get(0).get("status").asText());
+    assertEquals(1, data.get("stats").get("closed").asInt());
+    assertFalse(response.contains("Private citizen details"));
+    assertFalse(response.contains("reporter_id"));
+    assertFalse(response.contains("Test street"));
+    mvc.perform(as(get("/api/community/complaints?latitude=13.75&longitude=100.5&size=101"), "CITIZEN"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void complaintCannotBeSubmittedWithoutEvidence() throws Exception {
+    var body = Map.of("categoryId", cat, "title", "No evidence", "description", "Details", "address", "Street");
+    mvc.perform(as(post("/api/complaints").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        .content(json.writeValueAsString(body)), "CITIZEN"))
+        .andExpect(status().isBadRequest());
+    mvc.perform(as(multipart("/api/complaints")
+        .file(new MockMultipartFile("complaint", "complaint.json", "application/json", json.writeValueAsBytes(body)))
+        .with(csrf()), "CITIZEN"))
+        .andExpect(status().isBadRequest());
+    assertTrue(db.list("SELECT id FROM complaint WHERE municipality_id=?", town).isEmpty());
+  }
+
+  @Test
+  void invalidInitialEvidenceIsRejected() throws Exception {
+    var body = Map.of("categoryId", cat, "title", "Bad evidence", "description", "Details", "address", "Street");
+    mvc.perform(as(multipart("/api/complaints")
+        .file(new MockMultipartFile("complaint", "complaint.json", "application/json", json.writeValueAsBytes(body)))
+        .file(new MockMultipartFile("files", "fake.mp4", "video/mp4", "MZ-invalid".getBytes()))
+        .with(csrf()), "CITIZEN"))
+        .andExpect(status().isBadRequest());
   }
 
   long version(UUID id) {
@@ -584,13 +670,64 @@ class TownTrackIntegrationTest {
   }
 
   @Test
+  void videoFormatsAcceptedAndTotalQuotaEnforced() throws Exception {
+    UUID id = create();
+    byte[] mp4 = java.util.HexFormat.of().parseHex("000000186674797069736f6d0000020069736f6d6d703432");
+    byte[] mov = mp4.clone();
+    System.arraycopy("qt  ".getBytes(java.nio.charset.StandardCharsets.US_ASCII), 0, mov, 8, 4);
+    byte[] webm = java.util.HexFormat.of().parseHex("1a45dfa3934282887765626d000000000000");
+    for (var entry : Map.of("clip.mp4", mp4, "clip.mov", mov, "clip.webm", webm).entrySet()) {
+      mvc.perform(multipart("/api/complaints/" + id + "/files")
+          .file(new MockMultipartFile("file", entry.getKey(), "application/octet-stream", entry.getValue()))
+          .with(user("testCITIZEN")).with(csrf())).andExpect(status().isOk());
+    }
+    var rows = db.list("SELECT id,size_bytes,content_type FROM attachment WHERE complaint_id=?", id);
+    assertEquals(Set.of("video/mp4", "video/quicktime", "video/webm"),
+        new HashSet<>(rows.stream().map(r -> (String) r.get("content_type")).filter(t -> t.startsWith("video/")).toList()));
+    long used = rows.stream().mapToLong(r -> ((Number) r.get("size_bytes")).longValue()).sum();
+    var first = rows.getFirst();
+    // Simulate existing large attachments without allocating 1 GB in the test JVM.
+    db.run("UPDATE attachment SET size_bytes=size_bytes+? WHERE id=?",
+        FileController.MAX_TOTAL_BYTES - used - mp4.length, first.get("id"));
+    mvc.perform(multipart("/api/complaints/" + id + "/files")
+        .file(new MockMultipartFile("file", "last.mp4", "video/mp4", mp4))
+        .with(user("testCITIZEN")).with(csrf())).andExpect(status().isOk());
+    mvc.perform(multipart("/api/complaints/" + id + "/files")
+        .file(new MockMultipartFile("file", "excess.mp4", "video/mp4", mp4))
+        .with(user("testCITIZEN")).with(csrf())).andExpect(status().isPayloadTooLarge());
+    assertEquals(FileController.MAX_TOTAL_BYTES,
+        ((Number) db.one("SELECT SUM(size_bytes) size FROM attachment WHERE complaint_id=?", id).get("size")).longValue());
+  }
+
+  @Test
+  void videoOverOldTenMbLimitStreamsSuccessfully() throws Exception {
+    UUID id = create();
+    byte[] data = new byte[11 * 1024 * 1024];
+    byte[] header = java.util.HexFormat.of().parseHex("000000186674797069736f6d0000020069736f6d6d703432");
+    System.arraycopy(header, 0, data, 0, header.length);
+    mvc.perform(multipart("/api/complaints/" + id + "/files")
+        .file(new MockMultipartFile("file", "large.mp4", "video/mp4", data))
+        .with(user("testCITIZEN")).with(csrf())).andExpect(status().isOk());
+    assertEquals(data.length, ((Number) db.one("SELECT size_bytes FROM attachment WHERE complaint_id=? AND original_name='large.mp4'", id).get("size_bytes")).longValue());
+  }
+
+  @Test
+  void renamedExecutableIsNotAcceptedAsVideo() throws Exception {
+    UUID id = create();
+    mvc.perform(multipart("/api/complaints/" + id + "/files")
+        .file(new MockMultipartFile("file", "fake.mp4", "video/mp4", "MZnot-a-video".getBytes()))
+        .with(user("testCITIZEN")).with(csrf())).andExpect(status().isBadRequest());
+    assertEquals(1, db.list("SELECT id FROM attachment WHERE complaint_id=?", id).size());
+  }
+
+  @Test
   void productionUploadsFailClosedWithoutAntivirus(
       @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
     var files = new FileController(db, new Access(db), directory.toString(), "", false);
     var error =
         assertThrows(
             org.springframework.web.server.ResponseStatusException.class,
-            () -> files.scan("%PDF-1.4".getBytes()));
+            () -> files.scan(directory.resolve("proof.pdf")));
     assertEquals(503, error.getStatusCode().value());
   }
 
@@ -608,10 +745,7 @@ class TownTrackIntegrationTest {
     var result =
         mvc.perform(
                 as(
-                    post("/api/complaints")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json.writeValueAsString(body)),
+                    complaintRequest(body).with(csrf()),
                     "CITIZEN"))
             .andExpect(status().isOk())
             .andReturn();

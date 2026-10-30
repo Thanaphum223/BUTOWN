@@ -40,22 +40,7 @@ public class Bootstrap implements CommandLineRunner {
         demo.isBlank() ? "เทศบาล (กรุณาตั้งชื่อในระบบ)" : "เทศบาลทดสอบ TownTrack");
     db.run("INSERT INTO department(id,municipality_id,name) VALUES(?,?,'กองช่าง')", dept, m);
     UUID w = workflow.createDefault(m, 1);
-    db.run(
-        "INSERT INTO category(id,municipality_id,department_id,workflow_id,name,sla_hours)"
-            + " VALUES(?,?,?,?,'ถนนและทางเท้า',72)",
-        UUID.randomUUID(),
-        m,
-        dept,
-        w);
-    for (String category :
-        List.of(
-            "น้ำรั่ว / น้ำท่วม",
-            "รถติด / กีดขวาง",
-            "ไฟดับ / ไฟส่องสว่าง",
-            "น้ำไม่ไหล / ท่อแตก",
-            "ต้นไม้ล้ม",
-            "ไฟไหม้ / เหตุฉุกเฉิน",
-            "ขอรถกระเช้า"))
+    for (String category : MunicipalCategories.NAMES)
       db.run(
           "INSERT INTO category(id,municipality_id,department_id,workflow_id,name,sla_hours)"
               + " VALUES(?,?,?,?,?,72)",

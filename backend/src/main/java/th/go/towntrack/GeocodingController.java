@@ -56,7 +56,7 @@ public class GeocodingController {
   public Object search(@RequestParam String q) throws Exception {
     if (q.isBlank() || q.length() > 200) throw new IllegalArgumentException();
     return call(
-        "/search?format=jsonv2&limit=5&q="
+        "/search?format=jsonv2&limit=5&countrycodes=th&addressdetails=1&q="
             + URLEncoder.encode(q, java.nio.charset.StandardCharsets.UTF_8));
   }
 

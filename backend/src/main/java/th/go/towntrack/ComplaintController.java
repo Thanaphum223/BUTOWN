@@ -17,12 +17,14 @@ public class ComplaintController {
   final Access access;
   final Workflow workflow;
   final ObjectMapper json;
+  final FileController files;
 
-  public ComplaintController(Db d, Access a, Workflow w, ObjectMapper j) {
+  public ComplaintController(Db d, Access a, Workflow w, ObjectMapper j, FileController files) {
     db = d;
     access = a;
     workflow = w;
     json = j;
+    this.files = files;
   }
 
   @GetMapping("/catalog")
@@ -52,9 +54,34 @@ public class ComplaintController {
       @Size(max = 200) String contactName,
       @Size(max = 30) @Pattern(regexp = "[0-9+() -]*") String contactPhone) {}
 
-  @PostMapping("/complaints")
-  @Transactional
-  public Object create(@Valid @RequestBody NewComplaint b, Authentication a) throws Exception {
+  @PostMapping(value = "/complaints", consumes = "application/json")
+  public Object missingEvidence(@Valid @RequestBody NewComplaint b, Authentication a) {
+    access.role(access.user(a), "CITIZEN");
+    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "กรุณาแนบหลักฐานอย่างน้อย 1 ไฟล์");
+  }
+
+  @PostMapping(value = "/complaints", consumes = "multipart/form-data")
+  @Transactional(rollbackFor = Exception.class)
+  public Object createWithEvidence(
+      @Valid @RequestPart("complaint") NewComplaint b,
+      @RequestPart(value = "files", required = false) List<org.springframework.web.multipart.MultipartFile> evidence,
+      Authentication a) throws Exception {
+    access.role(access.user(a), "CITIZEN");
+    if (evidence == null || evidence.isEmpty() || evidence.stream().anyMatch(org.springframework.web.multipart.MultipartFile::isEmpty))
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "กรุณาแนบหลักฐานอย่างน้อย 1 ไฟล์");
+    long total = 0;
+    for (var file : evidence) {
+      if (file.getSize() > FileController.MAX_TOTAL_BYTES - total)
+        throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "ไฟล์แนบรวมทั้งหมดต่อคำร้องต้องไม่เกิน 1 GB (1024 MB)");
+      total += file.getSize();
+    }
+    var result = createRecord(b, a);
+    UUID id = (UUID) result.get("id");
+    for (var file : evidence) files.upload(id, file, a);
+    return result;
+  }
+
+  Map<String, Object> createRecord(NewComplaint b, Authentication a) throws Exception {
     var u = access.user(a);
     access.role(u, "CITIZEN");
     var cat =
@@ -298,9 +325,83 @@ public class ComplaintController {
         u.get("role"));
   }
 
+  @GetMapping("/community/complaints")
+  public Object community(Authentication a,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "12") int size,
+      @RequestParam(required = false) UUID categoryId,
+      @RequestParam double latitude, @RequestParam double longitude) {
+    var u = access.user(a);
+    access.role(u, "CITIZEN");
+    if (!Double.isFinite(latitude) || !Double.isFinite(longitude)
+        || Math.abs(latitude) > 90 || Math.abs(longitude) > 180 || page < 0 || page > 1000000 || size < 1 || size > 100) throw new IllegalArgumentException();
+    String base = " FROM complaint c JOIN category k ON k.id=c.category_id"
+        + " WHERE c.municipality_id=? AND (?::uuid IS NULL OR c.category_id=?::uuid)"
+        + " AND ST_DWithin(c.location,ST_SetSRID(ST_MakePoint(?,?),4326)::geography,5000)";
+    Object[] scope = {u.get("municipality_id"), categoryId, categoryId, longitude, latitude};
+    var stats = db.one("SELECT count(*) total,count(*) FILTER(WHERE c.status NOT IN"
+        + " ('CLOSED','REJECTED','TERMINATED')) in_progress,count(*) FILTER(WHERE c.status='CLOSED') closed"
+        + base, scope);
+    String fields = "SELECT (c.external_id LIKE 'mock-community-v1:%') mock,c.id,c.category_id,k.name category_name,c.status,c.created_at,"
+        + "(SELECT count(*) FROM complaint_vote v WHERE v.complaint_id=c.id) votes,"
+        + "EXISTS(SELECT 1 FROM follower f WHERE f.complaint_id=c.id AND f.user_id=?::uuid) following,"
+        + "EXISTS(SELECT 1 FROM complaint_vote v WHERE v.complaint_id=c.id AND v.user_id=?::uuid) voted,";
+    var items = db.list(fields
+        + "round(ST_Y(c.location::geometry)::numeric,3) latitude,"
+        + "round(ST_X(c.location::geometry)::numeric,3) longitude" + base
+        + " ORDER BY c.created_at DESC,c.id LIMIT ? OFFSET ?",
+        u.get("id"), u.get("id"), u.get("municipality_id"), categoryId, categoryId, longitude, latitude, size, (long) page * size);
+    var top = db.list(fields + "round(ST_Y(c.location::geometry)::numeric,3) latitude,"
+        + "round(ST_X(c.location::geometry)::numeric,3) longitude" + base
+        + " AND EXISTS(SELECT 1 FROM complaint_vote v WHERE v.complaint_id=c.id)"
+        + " ORDER BY votes DESC,c.created_at DESC,c.id LIMIT 5",
+        u.get("id"), u.get("id"), u.get("municipality_id"), categoryId, categoryId, longitude, latitude);
+    return Map.of("items", items, "top", top, "total", stats.get("total"), "stats", stats);
+  }
+
+  @GetMapping("/community/complaints/{id}")
+  public Object communityDetail(@PathVariable UUID id, Authentication a) {
+    var u = access.user(a);
+    access.role(u, "CITIZEN");
+    var c = db.one("SELECT c.id,k.name category_name,c.status,c.created_at,c.updated_at,"
+        + "round(ST_Y(c.location::geometry)::numeric,3) latitude,"
+        + "round(ST_X(c.location::geometry)::numeric,3) longitude,"
+        + "(c.external_id LIKE 'mock-community-v1:%') mock"
+        + " FROM complaint c JOIN category k ON k.id=c.category_id WHERE c.id=? AND c.municipality_id=?",
+        id, u.get("municipality_id"));
+    return Map.of("complaint", c, "history", db.list(
+        "SELECT from_status,to_status,created_at FROM audit_event WHERE complaint_id=? AND to_status IS NOT NULL ORDER BY created_at", id));
+  }
+
+  @PostMapping("/community/complaints/{id}/follow")
+  public Object communityFollow(@PathVariable UUID id, Authentication a) {
+    var u = access.user(a);
+    access.role(u, "CITIZEN");
+    db.one("SELECT id FROM complaint WHERE id=? AND municipality_id=?", id, u.get("municipality_id"));
+    db.run("INSERT INTO follower(complaint_id,user_id) VALUES(?,?) ON CONFLICT DO NOTHING", id, u.get("id"));
+    return Map.of("ok", true);
+  }
+
+  @PostMapping("/community/complaints/{id}/vote")
+  public Object vote(@PathVariable UUID id, Authentication a) {
+    var u = access.user(a);
+    access.role(u, "CITIZEN");
+    db.one("SELECT id FROM complaint WHERE id=? AND municipality_id=?", id, u.get("municipality_id"));
+    db.run("INSERT INTO complaint_vote(complaint_id,user_id) VALUES(?,?) ON CONFLICT DO NOTHING", id, u.get("id"));
+    return Map.of("ok", true);
+  }
+
+  @DeleteMapping("/community/complaints/{id}/vote")
+  public Object removeVote(@PathVariable UUID id, Authentication a) {
+    var u = access.user(a);
+    access.role(u, "CITIZEN");
+    db.run("DELETE FROM complaint_vote WHERE complaint_id=? AND user_id=?", id, u.get("id"));
+    return Map.of("ok", true);
+  }
+
   @GetMapping("/nearby")
   public Object nearby(
-      @RequestParam UUID categoryId,
+      @RequestParam(required = false) UUID categoryId,
       @RequestParam double latitude,
       @RequestParam double longitude,
       Authentication a) {
@@ -311,13 +412,14 @@ public class ComplaintController {
         || Math.abs(latitude) > 90
         || Math.abs(longitude) > 180) throw new IllegalArgumentException();
     return db.list(
-        "SELECT c.id,k.name category_name,c.status,round(ST_Y(c.location::geometry)::numeric,3)"
+        "SELECT c.id,c.category_id,k.name category_name,c.status,round(ST_Y(c.location::geometry)::numeric,3)"
             + " latitude,round(ST_X(c.location::geometry)::numeric,3) longitude FROM complaint c"
-            + " JOIN category k ON k.id=c.category_id WHERE c.municipality_id=? AND c.category_id=?"
+            + " JOIN category k ON k.id=c.category_id WHERE c.municipality_id=? AND (?::uuid IS NULL OR c.category_id=?::uuid)"
             + " AND c.status NOT IN ('REJECTED','TERMINATED','CLOSED') AND"
             + " ST_DWithin(c.location,ST_SetSRID(ST_MakePoint(?,?),4326)::geography,100) ORDER BY"
             + " c.created_at DESC LIMIT 20",
         u.get("municipality_id"),
+        categoryId,
         categoryId,
         longitude,
         latitude);

@@ -1,0 +1,13 @@
+-- Preserve old categories and complaints; disable the equipment request only.
+UPDATE category SET active=false WHERE name='ขอรถกระเช้า';
+UPDATE category c SET name='ท่อระบายน้ำ / น้ำท่วมขัง' WHERE c.name='น้ำรั่ว / น้ำท่วม' AND NOT EXISTS (SELECT 1 FROM category x WHERE x.municipality_id=c.municipality_id AND x.name='ท่อระบายน้ำ / น้ำท่วมขัง');
+UPDATE category c SET name='ไฟส่องสว่างสาธารณะ' WHERE c.name='ไฟดับ / ไฟส่องสว่าง' AND NOT EXISTS (SELECT 1 FROM category x WHERE x.municipality_id=c.municipality_id AND x.name='ไฟส่องสว่างสาธารณะ');
+UPDATE category c SET name='ต้นไม้ล้ม / กิ่งไม้เสี่ยงอันตราย' WHERE c.name='ต้นไม้ล้ม' AND NOT EXISTS (SELECT 1 FROM category x WHERE x.municipality_id=c.municipality_id AND x.name='ต้นไม้ล้ม / กิ่งไม้เสี่ยงอันตราย');
+UPDATE category c SET name='ประปาเทศบาล / น้ำไม่ไหล / ท่อแตก' WHERE c.name='น้ำไม่ไหล / ท่อแตก' AND NOT EXISTS (SELECT 1 FROM category x WHERE x.municipality_id=c.municipality_id AND x.name='ประปาเทศบาล / น้ำไม่ไหล / ท่อแตก');
+UPDATE category c SET name='สิ่งกีดขวางทางสาธารณะ' WHERE c.name='รถติด / กีดขวาง' AND NOT EXISTS (SELECT 1 FROM category x WHERE x.municipality_id=c.municipality_id AND x.name='สิ่งกีดขวางทางสาธารณะ');
+UPDATE category c SET name='ไฟไหม้ / สาธารณภัย / เหตุฉุกเฉิน' WHERE c.name='ไฟไหม้ / เหตุฉุกเฉิน' AND NOT EXISTS (SELECT 1 FROM category x WHERE x.municipality_id=c.municipality_id AND x.name='ไฟไหม้ / สาธารณภัย / เหตุฉุกเฉิน');
+INSERT INTO category(id,municipality_id,department_id,workflow_id,name,sla_hours)
+SELECT gen_random_uuid(),c.municipality_id,c.department_id,c.workflow_id,n.name,c.sla_hours
+FROM (SELECT DISTINCT ON (municipality_id) * FROM category WHERE active=true ORDER BY municipality_id,name) c
+CROSS JOIN (VALUES ('ถนนและทางเท้า'),('ท่อระบายน้ำ / น้ำท่วมขัง'),('ไฟส่องสว่างสาธารณะ'),('ขยะตกค้าง / ลักลอบทิ้งขยะ'),('น้ำเสีย / กลิ่นเหม็น'),('เสียงดัง / ฝุ่นควัน / เหตุรำคาญ'),('ต้นไม้ล้ม / กิ่งไม้เสี่ยงอันตราย'),('ประปาเทศบาล / น้ำไม่ไหล / ท่อแตก'),('สิ่งกีดขวางทางสาธารณะ'),('ป้ายจราจร / สัญญาณไฟในความดูแลเทศบาล'),('สัตว์จรจัด / สัตว์ก่อเหตุเดือดร้อน'),('ยุงลาย / แหล่งเพาะโรค'),('สุขาภิบาลตลาด / อาหาร / สถานประกอบการ'),('อาคารเสี่ยงอันตราย / ก่อสร้างผิดข้อบัญญัติ'),('สวนสาธารณะ / สนามเด็กเล่น / ลานกีฬา'),('คลอง / ทางน้ำสาธารณะ'),('ไฟไหม้ / สาธารณภัย / เหตุฉุกเฉิน'),('โรงเรียน / ศูนย์พัฒนาเด็กเล็กของเทศบาล'),('สวัสดิการเด็ก / ผู้สูงอายุ / ผู้พิการ'),('พื้นที่สาธารณะ / ทรัพย์สินเทศบาลชำรุด'),('สุสาน / ฌาปนสถานในความดูแลเทศบาล'),('บริการเทศบาล / การปฏิบัติงานเจ้าหน้าที่'),('อื่น ๆ (ในอำนาจหน้าที่เทศบาล)')) n(name)
+WHERE NOT EXISTS (SELECT 1 FROM category existing WHERE existing.municipality_id=c.municipality_id AND existing.name=n.name);

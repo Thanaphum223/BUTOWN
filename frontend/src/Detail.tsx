@@ -30,6 +30,7 @@ import {
 } from "@ant-design/icons";
 import { api, post, statusNames, actionNames, date } from "./api";
 import LocationMap from "./LocationMap";
+import { ATTACHMENT_ACCEPT, ATTACHMENT_HELP, attachmentError } from "./attachments";
 type D = Record<string, any>;
 const { Title, Text, Paragraph } = Typography;
 export default function Detail({
@@ -439,7 +440,13 @@ export default function Detail({
               uploadAllowed ? (
                 <Upload
                   showUploadList={false}
-                  accept=".png,.jpg,.jpeg,.pdf"
+                  accept={ATTACHMENT_ACCEPT}
+                  beforeUpload={(file) => {
+                    const used = (data.files || []).reduce((total: number, f: D) => total + Number(f.size_bytes), 0);
+                    const problem = attachmentError(file, used);
+                    if (problem) { message.error(problem); return Upload.LIST_IGNORE; }
+                    return true;
+                  }}
                   customRequest={async ({ file, onSuccess, onError }) => {
                     try {
                       const f = new FormData();
@@ -462,6 +469,7 @@ export default function Detail({
               ) : undefined
             }
           >
+            <Text type="secondary">{ATTACHMENT_HELP}</Text>
             <List
               dataSource={data.files}
               locale={{ emptyText: "ยังไม่มีไฟล์หลักฐาน" }}

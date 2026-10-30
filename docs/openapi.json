@@ -127,7 +127,10 @@
                     "writeOnly": true
                   }
                 },
-                "required": ["username", "password"]
+                "required": [
+                  "username",
+                  "password"
+                ]
               }
             }
           }
@@ -242,7 +245,9 @@
                     "writeOnly": true
                   }
                 },
-                "required": ["idToken"]
+                "required": [
+                  "idToken"
+                ]
               }
             }
           }
@@ -397,7 +402,10 @@
                     "writeOnly": true
                   }
                 },
-                "required": ["currentPassword", "newPassword"]
+                "required": [
+                  "currentPassword",
+                  "newPassword"
+                ]
               }
             }
           }
@@ -573,7 +581,11 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["LEADER", "FIELD", "APPROVER"]
+              "enum": [
+                "LEADER",
+                "FIELD",
+                "APPROVER"
+              ]
             }
           }
         ]
@@ -756,9 +768,31 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
+            "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/NewComplaint"
+                "type": "object",
+                "required": [
+                  "complaint",
+                  "files"
+                ],
+                "properties": {
+                  "complaint": {
+                    "$ref": "#/components/schemas/NewComplaint"
+                  },
+                  "files": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                }
+              },
+              "encoding": {
+                "complaint": {
+                  "contentType": "application/json"
+                }
               }
             }
           }
@@ -1064,7 +1098,11 @@
                     "type": "number"
                   }
                 },
-                "required": ["categoryId", "latitude", "longitude"]
+                "required": [
+                  "categoryId",
+                  "latitude",
+                  "longitude"
+                ]
               }
             }
           }
@@ -1243,7 +1281,9 @@
                     "description": "PNG JPEG or PDF; maximum 10 MiB. Production requires antivirus."
                   }
                 },
-                "required": ["file"]
+                "required": [
+                  "file"
+                ]
               }
             }
           }
@@ -1408,7 +1448,11 @@
                     "format": "uuid"
                   }
                 },
-                "required": ["name", "memberIds", "representativeId"]
+                "required": [
+                  "name",
+                  "memberIds",
+                  "representativeId"
+                ]
               }
             }
           }
@@ -1652,7 +1696,9 @@
                     "description": "Municipality name"
                   }
                 },
-                "required": ["name"]
+                "required": [
+                  "name"
+                ]
               }
             }
           }
@@ -1714,7 +1760,9 @@
                     "description": "Name"
                   }
                 },
-                "required": ["name"]
+                "required": [
+                  "name"
+                ]
               }
             }
           }
@@ -1801,7 +1849,12 @@
                     "format": "uuid"
                   }
                 },
-                "required": ["username", "password", "displayName", "role"]
+                "required": [
+                  "username",
+                  "password",
+                  "displayName",
+                  "role"
+                ]
               }
             }
           }
@@ -1873,7 +1926,9 @@
                     "type": "boolean"
                   }
                 },
-                "required": ["enabled"]
+                "required": [
+                  "enabled"
+                ]
               }
             }
           }
@@ -1940,7 +1995,10 @@
                     "maximum": 5
                   }
                 },
-                "required": ["name", "approvalStages"]
+                "required": [
+                  "name",
+                  "approvalStages"
+                ]
               }
             }
           }
@@ -2029,7 +2087,12 @@
                     "type": "boolean"
                   }
                 },
-                "required": ["name", "departmentId", "workflowId", "slaHours"]
+                "required": [
+                  "name",
+                  "departmentId",
+                  "workflowId",
+                  "slaHours"
+                ]
               }
             }
           }
@@ -2261,7 +2324,12 @@
             "nullable": true
           }
         },
-        "required": ["categoryId", "title", "description", "address"]
+        "required": [
+          "categoryId",
+          "title",
+          "description",
+          "address"
+        ]
       },
       "Action": {
         "type": "object",
@@ -2339,7 +2407,11 @@
             "maxLength": 20000
           }
         },
-        "required": ["action", "version", "reason"]
+        "required": [
+          "action",
+          "version",
+          "reason"
+        ]
       },
       "Field": {
         "type": "object",
@@ -2356,7 +2428,11 @@
             "type": "boolean"
           }
         },
-        "required": ["key", "label", "required"]
+        "required": [
+          "key",
+          "label",
+          "required"
+        ]
       },
       "Registration": {
         "type": "object",
@@ -2380,7 +2456,12 @@
             "maxLength": 200
           }
         },
-        "required": ["municipalityId", "username", "password", "displayName"]
+        "required": [
+          "municipalityId",
+          "username",
+          "password",
+          "displayName"
+        ]
       },
       "ComplaintSummary": {
         "type": "object",

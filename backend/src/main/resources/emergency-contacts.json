@@ -1,0 +1,81 @@
+[
+  {
+    "name": "โรงพยาบาลไทรน้อย",
+    "phones": [
+      "025971131",
+      "025971132"
+    ],
+    "source": "https://sainoihos.moph.go.th/project/index.php",
+    "checked": "2026-10-30",
+    "province": "นนทบุรี",
+    "latitude": 13.9821033,
+    "longitude": 100.3259635,
+    "address": "โรงพยาบาลไทรน้อย, ถนนบางกรวย-ไทรน้อย, บ้านคลองฝรั่ง, ตำบลไทรน้อย, เทศบาลเมืองไทรน้อย, อำเภอไทรน้อย, จังหวัดนนทบุรี, 11150, ประเทศไทย",
+    "type": "hospital",
+    "coordinateSource": "https://www.openstreetmap.org/way/1356233501"
+  },
+  {
+    "name": "โรงพยาบาลบางบัวทอง",
+    "phones": [
+      "025717899",
+      "025717900"
+    ],
+    "source": "https://bangbuathonghos.moph.go.th/contact.html",
+    "checked": "2026-10-30",
+    "province": "นนทบุรี",
+    "latitude": 13.9181817,
+    "longitude": 100.4230925,
+    "address": "โรงพยาบาลบางบัวทอง, 4, ถนนบางกรวย-ไทรน้อย, ตำบลโสนลอย, เทศบาลนครบางบัวทอง, อำเภอบางบัวทอง, จังหวัดนนทบุรี, 11110, ประเทศไทย",
+    "type": "hospital",
+    "coordinateSource": "https://www.openstreetmap.org/way/208342323"
+  },
+  {
+    "name": "สถานีตำรวจภูธรไทรน้อย",
+    "phones": [
+      "029238778",
+      "025971413"
+    ],
+    "source": "https://sainoi.nonthaburi.police.go.th/contact/",
+    "checked": "2026-10-30",
+    "province": "นนทบุรี",
+    "latitude": 13.9828178,
+    "longitude": 100.3234792,
+    "address": "สถานีตำรวจภูธรไทรน้อย, ซอยตำรวจ, บ้านคลองฝรั่ง, ตำบลไทรน้อย, เทศบาลเมืองไทรน้อย, อำเภอไทรน้อย, จังหวัดนนทบุรี, 11150, ประเทศไทย",
+    "type": "police",
+    "coordinateSource": "https://www.openstreetmap.org/way/1356233493"
+  },
+  {
+    "name": "สถานีตำรวจภูธรบางบัวทอง",
+    "phones": [
+      "021941050",
+      "021941052"
+    ],
+    "source": "https://bangbuathong.nonthaburi.police.go.th/contact/",
+    "checked": "2026-10-30",
+    "province": "นนทบุรี"
+  },
+  {
+    "name": "โรงพยาบาลลาดหลุมแก้ว",
+    "province": "ปทุมธานี",
+    "phones": [
+      "025991650",
+      "025991651"
+    ],
+    "source": "https://www.lkh.go.th/index.php/ContactUS",
+    "checked": "2026-10-30",
+    "latitude": 14.0372277,
+    "longitude": 100.4162407,
+    "address": "โรงพยาบาลลาดหลุมแก้ว, 346, ตำบลระแหง, เทศบาลตำบลระแหง, อำเภอลาดหลุมแก้ว, จังหวัดปทุมธานี, 12140, ประเทศไทย",
+    "type": "hospital",
+    "coordinateSource": "https://www.openstreetmap.org/node/7856667668"
+  },
+  {
+    "name": "สถานีตำรวจภูธรลาดหลุมแก้ว",
+    "province": "ปทุมธานี",
+    "phones": [
+      "025991288"
+    ],
+    "source": "https://latlumkaeo.pathumthani.police.go.th/ita-standards/informations/social-network/",
+    "checked": "2026-10-30"
+  }
+]

@@ -17,6 +17,12 @@ services:
     restart: unless-stopped
   clamav:
     image: clamav/clamav:stable
+    environment:
+      CLAMD_CONF_StreamMaxLength: 1024M
+      CLAMD_CONF_MaxFileSize: 1024M
+      CLAMD_CONF_MaxScanSize: 2048M
+      CLAMD_CONF_MaxScanTime: "600000"
+      CLAMD_CONF_AlertExceedsMax: "yes"
     volumes:
       - clamdata:/var/lib/clamav
     restart: unless-stopped

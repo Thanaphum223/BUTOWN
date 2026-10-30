@@ -8,6 +8,8 @@ import {
   Input,
   InputNumber,
   List,
+  Modal,
+  Pagination,
   Space,
   Typography,
   Upload,
@@ -21,15 +23,15 @@ import {
 import { api, post, statusNames } from "./api";
 import { useGeo } from "./GeoContext";
 import LocationMap from "./LocationMap";
+import { ATTACHMENT_ACCEPT, ATTACHMENT_HELP, attachmentError } from "./attachments";
 type D = Record<string, any>;
+type Place = { place_id: number; lat: string; lon: string; display_name: string };
 const { Title, Text } = Typography;
-const icons = ["▧", "≈", "↔", "ϟ", "◉", "♧", "♨", "⚒"];
+const icons = ["▧", "≈", "ϟ", "♻", "≈", "≋", "♧", "♧", "◉", "↔", "⚑", "♙", "⊕", "✓", "⌂", "⌂", "♧", "≈", "▤", "♡", "⚒", "◈", "☷", "…"];
 export default function NewCase({
   onDone,
-  onCancel,
 }: {
   onDone: (id: string) => void;
-  onCancel: () => void;
 }) {
   const geo = useGeo();
   const [form] = Form.useForm();
@@ -44,28 +46,39 @@ export default function NewCase({
     [nearby, setNearby] = useState<D[]>([]),
     [receipt, setReceipt] = useState<D>(),
     [placeQuery, setPlaceQuery] = useState("");
-  const saved = useRef<string | undefined>(undefined);
+  const [locationConfirmation, setLocationConfirmation] = useState<{ address: string; point?: [number, number] }>();
+  const [categoryQuery, setCategoryQuery] = useState("");
+  const [categorySearch, setCategorySearch] = useState("");
+  const [categoryPage, setCategoryPage] = useState(1);
+  const [nearbyBusy, setNearbyBusy] = useState(false);
+  const [nearbyError, setNearbyError] = useState("");
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [showPlaces, setShowPlaces] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchNotice, setSearchNotice] = useState("");
+  const [selectedPlace, setSelectedPlace] = useState<number>();
+  const searchVersion = useRef(0);
+  const pendingFiles = useRef<File[]>([]);
+  const [attachmentMissing, setAttachmentMissing] = useState(false);
   const { message } = App.useApp();
   const manual = useRef(false);
+  const filteredCategories = categories.filter((c) =>
+    c.name.toLocaleLowerCase("th").includes(categorySearch.toLocaleLowerCase("th")),
+  );
+  const categoryPageSize = 6;
+  const visibleCategories = filteredCategories.slice(
+    (categoryPage - 1) * categoryPageSize, categoryPage * categoryPageSize,
+  );
   const fields: D[] = category ? JSON.parse(category.fields) : [];
   useEffect(() => {
     api<D>("/catalog")
       .then((c) =>
         setCategories(
           [...c.categories].sort((a: D, b: D) => {
-            const order = [
-              "ถนน",
-              "น้ำรั่ว",
-              "รถติด",
-              "ไฟดับ",
-              "น้ำไม่ไหล",
-              "ต้นไม้",
-              "ไฟไหม้",
-              "กระเช้า",
-            ];
+            const order = ["ถนนและทางเท้า", "ท่อระบายน้ำ / น้ำท่วมขัง", "ไฟส่องสว่างสาธารณะ", "ขยะตกค้าง / ลักลอบทิ้งขยะ", "น้ำเสีย / กลิ่นเหม็น", "เสียงดัง / ฝุ่นควัน / เหตุรำคาญ", "ต้นไม้ / กิ่งไม้รบกวนทางสาธารณะ", "ต้นไม้ล้ม / กิ่งไม้เสี่ยงอันตราย", "ประปาเทศบาล / น้ำไม่ไหล / ท่อแตก", "สิ่งกีดขวางทางสาธารณะ", "ป้ายจราจร / สัญญาณไฟในความดูแลเทศบาล", "สัตว์จรจัด / สัตว์ก่อเหตุเดือดร้อน", "ยุงลาย / แหล่งเพาะโรค", "สุขาภิบาลตลาด / อาหาร / สถานประกอบการ", "อาคาร / การก่อสร้างผิดข้อบัญญัติ", "อาคารเสี่ยงอันตราย / ก่อสร้างผิดข้อบัญญัติ", "สวนสาธารณะ / สนามเด็กเล่น / ลานกีฬา", "คลอง / ทางน้ำสาธารณะ", "โรงเรียน / ศูนย์พัฒนาเด็กเล็กของเทศบาล", "สวัสดิการเด็ก / ผู้สูงอายุ / ผู้พิการ", "พื้นที่สาธารณะ / ทรัพย์สินเทศบาลชำรุด", "สุสาน / ฌาปนสถานในความดูแลเทศบาล", "บริการเทศบาล / การปฏิบัติงานเจ้าหน้าที่", "อื่น ๆ (ในอำนาจหน้าที่เทศบาล)"];
             const rank = (n: string) => {
-              const i = order.findIndex((word) => n.includes(word));
-              return i < 0 ? 100 : i;
+              const i = order.indexOf(n);
+              return i < 0 ? order.length - 1.5 : i;
             };
             return rank(a.name) - rank(b.name);
           }),
@@ -79,11 +92,21 @@ export default function NewCase({
   function selectPoint(p: [number, number]) {
     setPosition(p);
     setNearby([]);
-    if (!manual.current)
+    setSelectedPlace(undefined);
+    if (!manual.current) {
+      const known = places.find((place) => {
+        const radians = Math.PI / 180;
+        const dLat = (Number(place.lat) - p[0]) * radians;
+        const dLon = (Number(place.lon) - p[1]) * radians;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(p[0] * radians) *
+          Math.cos(Number(place.lat) * radians) * Math.sin(dLon / 2) ** 2;
+        return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) <= 100;
+      });
       form.setFieldValue(
         "address",
-        "พิกัด " + p[0].toFixed(6) + ", " + p[1].toFixed(6),
+        known?.display_name || "พิกัด " + p[0].toFixed(6) + ", " + p[1].toFixed(6),
       );
+    }
   }
   useEffect(() => {
     if (position && !form.getFieldValue("address"))
@@ -93,61 +116,86 @@ export default function NewCase({
       );
   }, []);
   useEffect(() => {
-    if (!position) return;
+    if (!position || manual.current || step !== 0) return;
+    const point = position;
+    let attempts = 0;
     let active = true;
-    const timer = setTimeout(() => {
-      api<D>(
-        "/geocoding/reverse?latitude=" +
-          position[0] +
-          "&longitude=" +
-          position[1],
-      )
-        .then((r) => {
-          if (active && !manual.current && r.display_name)
-            form.setFieldValue("address", r.display_name);
-        })
-        .catch(() => {});
-    }, 600);
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    async function lookup() {
+      attempts++;
+      try {
+        const r = await api<D>(
+          "/geocoding/reverse?latitude=" + point[0] + "&longitude=" + point[1],
+        );
+        if (active && !manual.current && r.display_name)
+          form.setFieldValue("address", r.display_name);
+      } catch (e) {
+        // A recent place search may still occupy the provider's rate-limit window.
+        if (active && attempts < 3 && (e as Error).message.includes("กรุณารอสักครู่"))
+          retry = setTimeout(() => { if (active) void lookup(); }, 1200);
+      }
+    }
+    const timer = setTimeout(() => void lookup(), 1200);
     return () => {
       active = false;
       clearTimeout(timer);
+      clearTimeout(retry);
     };
-  }, [position?.[0], position?.[1]]);
+  }, [position?.[0], position?.[1], step]);
   async function next() {
     try {
-      if (step === 0) {
-        if (!category) {
-          message.info("กรุณาเลือกประเภทปัญหา");
-          return;
-        }
-        setStep(1);
-      } else {
-        await form.validateFields(["address"]);
-        setStep(2);
-      }
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      const values = await form.validateFields(["address"]);
+      setLocationConfirmation({
+        address: values.address,
+        point: position ? [...position] : undefined,
+      });
     } catch {}
   }
-  async function nearbySearch() {
-    if (!category || !position) return;
-    try {
-      setNearby(
-        await api(
-          "/nearby?categoryId=" +
-            category.id +
-            "&latitude=" +
-            position[0] +
-            "&longitude=" +
-            position[1],
-        ),
-      );
-      message.info("ค้นหาในรัศมี 100 เมตรแล้ว");
-    } catch (e) {
-      message.error((e as Error).message);
+  useEffect(() => {
+    setNearby([]);
+    setNearbyError("");
+    if (!position || step !== 0) {
+      setNearbyBusy(false);
+      return;
     }
+    const controller = new AbortController();
+    let active = true;
+    setNearbyBusy(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await api<D[]>(
+          "/nearby?latitude=" + position[0] + "&longitude=" + position[1] +
+          (category ? "&categoryId=" + category.id : ""),
+          { signal: controller.signal },
+        );
+        if (active) setNearby(results);
+      } catch (e) {
+        if (active) setNearbyError((e as Error).message);
+      } finally {
+        if (active) setNearbyBusy(false);
+      }
+    }, 400);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [category?.id, position?.[0], position?.[1], step]);
+  function choosePlace(place: Place) {
+    manual.current = true;
+    selectPoint([Number(place.lat), Number(place.lon)]);
+    form.setFieldValue("address", place.display_name);
+    setSelectedPlace(place.place_id);
+    setShowPlaces(false);
   }
   async function searchPlace() {
-    const parts = placeQuery.trim().split(/[, ]+/).map(Number);
+    const query = placeQuery.trim();
+    if (!query || searching) return;
+    const version = ++searchVersion.current;
+    setPlaces([]);
+    setSelectedPlace(undefined);
+    setSearchNotice("");
+    const parts = query.split(/[, ]+/).map(Number);
     if (
       parts.length === 2 &&
       parts.every(Number.isFinite) &&
@@ -156,69 +204,65 @@ export default function NewCase({
     ) {
       manual.current = false;
       selectPoint([parts[0], parts[1]]);
+      setSearchNotice("ปักหมุดตามพิกัดแล้ว กรุณาตรวจสอบจุดเกิดเหตุบนแผนที่");
       return;
     }
+    setSearching(true);
     try {
-      const results = await api<D[]>(
-        "/geocoding/search?q=" + encodeURIComponent(placeQuery),
+      const results = await api<Place[]>(
+        "/geocoding/search?q=" + encodeURIComponent(query.replace(/^รพ\.?\s*/, "โรงพยาบาล")),
       );
+      if (version !== searchVersion.current) return;
+      setPlaces(results);
+      setShowPlaces(true);
       if (!results.length) {
-        message.info("ไม่พบสถานที่ กรุณาปักหมุดเอง");
-        return;
+        setSearchNotice("ไม่พบสถานที่ ลองใช้ชื่อเต็ม เพิ่มตำบลหรือจังหวัด หรือปักหมุดเอง");
       }
-      const first = results[0];
-      manual.current = true;
-      setPosition([Number(first.lat), Number(first.lon)]);
-      form.setFieldValue("address", first.display_name);
     } catch (e) {
-      message.info((e as Error).message);
+      if (version === searchVersion.current) setSearchNotice((e as Error).message);
+    } finally {
+      if (version === searchVersion.current) setSearching(false);
     }
   }
   async function submit() {
+    if (!category) {
+      message.info("กรุณาเลือกประเภทปัญหา");
+      return;
+    }
     try {
       await form.validateFields();
     } catch {
+      return;
+    }
+    if (!files.length) {
+      setAttachmentMissing(true);
+      message.error("กรุณาแนบหลักฐานอย่างน้อย 1 ไฟล์");
       return;
     }
     setBusy(true);
     setError("");
     try {
       const v = form.getFieldsValue(true);
-      let id = saved.current;
-      if (!id) {
-        const result = await post("/complaints", {
-          categoryId: category!.id,
-          title: v.title,
-          description: v.description,
-          address: v.address,
-          answers: v.answers || {},
-          latitude: position?.[0] ?? null,
-          longitude: position?.[1] ?? null,
-          contactName: v.contactName,
-          contactPhone: v.contactPhone,
-        });
-        id = result.id;
-        saved.current = id;
-      }
-      const failed: File[] = [];
-      for (const file of files) {
-        try {
-          const data = new FormData();
-          data.append("file", file);
-          await api("/complaints/" + id + "/files", {
-            method: "POST",
-            body: data,
-          });
-        } catch {
-          failed.push(file);
-        }
-      }
-      setFiles(failed);
+      const payload = {
+        categoryId: category!.id,
+        title: v.title,
+        description: v.description,
+        address: v.address,
+        answers: v.answers || {},
+        latitude: position?.[0] ?? null,
+        longitude: position?.[1] ?? null,
+        contactName: v.contactName,
+        contactPhone: v.contactPhone,
+      };
+      const body = new FormData();
+      body.append("complaint", new Blob([JSON.stringify(payload)], { type: "application/json" }));
+      for (const file of files) body.append("files", file);
+      const result = await api<{ id: string }>("/complaints", { method: "POST", body });
+      const id = result.id;
       setReceipt({
         id,
         category: category!.name,
         address: v.address,
-        partial: failed.length > 0,
       });
       window.scrollTo({ top: 0 });
     } catch (e) {
@@ -241,13 +285,6 @@ export default function NewCase({
           <Text strong>{receipt.category}</Text>
           <p>{receipt.address}</p>
         </Card>
-        {receipt.partial && (
-          <Alert
-            type="warning"
-            showIcon
-            message="คำร้องบันทึกแล้ว แต่แนบไฟล์ไม่ครบ กรุณาแนบเพิ่มในหน้ารายละเอียด"
-          />
-        )}
         <Button
           type="primary"
           block
@@ -274,18 +311,11 @@ export default function NewCase({
     );
   return (
     <div className="report-wizard">
-      <Button
-        type="text"
-        onClick={onCancel}
-        style={{ padding: 0, marginBottom: 16, fontSize: 12 }}
-      >
-        ยกเลิกและกลับหน้าชุมชน
-      </Button>
       <Text className="eyebrow" style={{ display: "block" }}>
         แจ้งปัญหาในชุมชน
       </Text>
       <ol className="report-stepper" aria-label="ขั้นตอนแจ้งปัญหา">
-        {["เลือกปัญหา", "จุดเกิดเหตุ", "รายละเอียด"].map((label, i) => (
+        {["จุดเกิดเหตุ", "รายละเอียดปัญหา"].map((label, i) => (
           <li
             key={label}
             aria-current={step === i ? "step" : undefined}
@@ -303,54 +333,35 @@ export default function NewCase({
           style={{ marginBottom: 16 }}
         />
       )}
+      <Modal
+        title="ยืนยันตำแหน่งจุดเกิดเหตุ"
+        open={!!locationConfirmation}
+        okText="ยืนยันตำแหน่ง"
+        cancelText="กลับไปแก้ไข"
+        maskClosable={false}
+        onCancel={() => setLocationConfirmation(undefined)}
+        onOk={() => {
+          setLocationConfirmation(undefined);
+          setStep(1);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+      >
+        <p>กรุณาตรวจสอบว่าจุดเกิดเหตุอยู่ที่สถานที่นี้ก่อนดำเนินการต่อ</p>
+        <Text strong>สถานที่ / จุดสังเกต</Text>
+        <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+          {locationConfirmation?.address}
+        </p>
+        <Text strong>พิกัดจุดเกิดเหตุ</Text>
+        <p>
+          {locationConfirmation?.point
+            ? `${locationConfirmation.point[0].toFixed(6)}, ${locationConfirmation.point[1].toFixed(6)}`
+            : "ยังไม่ได้ปักหมุด ใช้ที่อยู่ที่ระบุด้านบน"}
+        </p>
+      </Modal>
       <Form form={form} layout="vertical" preserve>
         <div hidden={step !== 0}>
-          <Title level={2}>พบปัญหาอะไร?</Title>
-          <Text type="secondary">แตะเลือกปัญหาที่ใกล้เคียงที่สุด</Text>
-          <div className="report-categories">
-            {categories.slice(0, 8).map((c, i) => (
-              <button
-                type="button"
-                key={c.id}
-                aria-pressed={category?.id === c.id}
-                onClick={() => {
-                  setCategory(c);
-                  setNearby([]);
-                }}
-              >
-                <span>{icons[i % icons.length]}</span>
-                {c.name}
-              </button>
-            ))}
-          </div>
-          {categories.length > 8 && (
-            <details>
-              <summary>ปัญหาอื่น ๆ</summary>
-              <div className="report-categories">
-                {categories.slice(8).map((c) => (
-                  <button
-                    type="button"
-                    key={c.id}
-                    aria-pressed={category?.id === c.id}
-                    onClick={() => setCategory(c)}
-                  >
-                    {c.name}
-                  </button>
-                ))}
-              </div>
-            </details>
-          )}
-        </div>
-        <div hidden={step !== 1}>
           <Title level={2}>เกิดเหตุที่ไหน?</Title>
           <Text type="secondary">{category?.name}</Text>
-          {category?.name.includes("ฉุกเฉิน") && (
-            <Alert
-              type="warning"
-              message="หากมีอันตรายเร่งด่วน โปรดติดต่อหน่วยฉุกเฉินโดยตรง การส่งคำร้องนี้ไม่ใช่การเรียกหน่วยฉุกเฉิน"
-              style={{ marginTop: 12 }}
-            />
-          )}
           <label className="control-label" htmlFor="place-query">
             ค้นหาชื่อสถานที่ หรือพิกัด
           </label>
@@ -358,11 +369,48 @@ export default function NewCase({
             id="place-query"
             placeholder="เช่น วัด โรงเรียน ตลาด หรือ 13.75, 100.50"
             value={placeQuery}
-            onChange={(e) => setPlaceQuery(e.target.value)}
+            onChange={(e) => {
+              setPlaceQuery(e.target.value);
+              searchVersion.current++;
+              setSearching(false);
+              setPlaces([]);
+              setSearchNotice("");
+              setSelectedPlace(undefined);
+            }}
+            onPressEnter={(e) => { e.preventDefault(); searchPlace(); }}
+            maxLength={200}
           />
-          <Button block style={{ margin: "10px 0 18px" }} onClick={searchPlace}>
+          <Button block style={{ margin: "10px 0 18px" }} onClick={searchPlace} loading={searching} disabled={!placeQuery.trim()}>
             ค้นหา
           </Button>
+          <div aria-live="polite" aria-busy={searching}>
+            {searchNotice && <Alert type="info" showIcon message={searchNotice} style={{ marginBottom: 16 }} />}
+            {showPlaces && places.length > 0 && (
+              <section aria-label="ผลการค้นหาสถานที่" style={{ marginBottom: 18 }}>
+                <Text strong>พบ {places.length} สถานที่ — เลือกจุดเกิดเหตุ</Text>
+                <List
+                  dataSource={places}
+                  rowKey="place_id"
+                  renderItem={(place) => (
+                    <List.Item>
+                      <Button
+                        block
+                        type={selectedPlace === place.place_id ? "primary" : "default"}
+                        aria-pressed={selectedPlace === place.place_id}
+                        onClick={() => choosePlace(place)}
+                        style={{ height: "auto", whiteSpace: "normal", textAlign: "left", padding: 12 }}
+                        icon={<EnvironmentOutlined />}
+                      >
+                        {place.display_name}
+                        {selectedPlace === place.place_id && " ✓ เลือกแล้ว"}
+                      </Button>
+                    </List.Item>
+                  )}
+                />
+                <Text type="secondary">ข้อมูลสถานที่ © OpenStreetMap contributors</Text>
+              </section>
+            )}
+          </div>
           <Button
             block
             type="primary"
@@ -384,9 +432,13 @@ export default function NewCase({
           <Text className="map-help">
             แตะบนแผนที่เพื่อย้ายหมุดให้ตรงจุดเกิดเหตุ หรือกรอกที่อยู่เอง
           </Text>
-          {step === 1 && (
+          {step === 0 && (
             <LocationMap
               value={position}
+              radiusMeters={100}
+              points={nearby.map((r) => ({
+                id: r.id, latitude: Number(r.latitude), longitude: Number(r.longitude), status: r.status,
+              }))}
               onChange={(p) => {
                 manual.current = false;
                 selectPoint(p);
@@ -434,14 +486,12 @@ export default function NewCase({
               />
             </Space>
           </details>
-          <Button
-            block
-            style={{ marginTop: 16 }}
-            disabled={!position}
-            onClick={nearbySearch}
-          >
-            ค้นหาเคสใกล้เคียง 100 เมตร
-          </Button>
+          <div role="status" aria-live="polite" style={{ marginTop: 16 }}>
+            <Text strong>{category ? "เคสประเภทเดียวกัน" : "เคสใกล้เคียง"}ในรัศมี 100 เมตร</Text>
+            <p>{!position ? "เลือกจุดเกิดเหตุเพื่อค้นหาเคสใกล้เคียงอัตโนมัติ" :
+              nearbyBusy ? "กำลังค้นหาเคสใกล้เคียง…" : nearbyError ? nearbyError :
+              nearby.length ? `พบ ${nearby.length} เคสใกล้เคียง` : "ไม่พบเคสใกล้เคียงในรัศมี 100 เมตร"}</p>
+          </div>
           <List
             dataSource={nearby}
             locale={{ emptyText: <span /> }}
@@ -453,7 +503,7 @@ export default function NewCase({
                     onClick={async () => {
                       try {
                         await post("/complaints/" + r.id + "/follow", {
-                          categoryId: category!.id,
+                          categoryId: r.category_id,
                           latitude: position![0],
                           longitude: position![1],
                         });
@@ -475,8 +525,61 @@ export default function NewCase({
             )}
           />
         </div>
-        <div hidden={step !== 2}>
-          <Title level={2}>เล่าให้เราทราบ</Title>
+        <div hidden={step !== 1}>
+          <Title level={2}>รายละเอียดปัญหา</Title>
+        <section aria-label="ประเภทปัญหา">
+          <Title level={2}>พบปัญหาอะไร?</Title>
+          <Text type="secondary">เลือกปัญหาในพื้นที่หรือบริการที่เทศบาลรับผิดชอบ หากไม่ตรงหมวดให้เลือกอื่น ๆ</Text>
+          <label className="control-label" htmlFor="category-query">ค้นหาประเภทปัญหา</label>
+          <Input.Search
+            id="category-query"
+            placeholder="เช่น ขยะ น้ำท่วม ไฟส่องสว่าง หรืออื่น ๆ"
+            enterButton="ค้นหา"
+            allowClear
+            value={categoryQuery}
+            onChange={(e) => {
+              setCategoryQuery(e.target.value);
+              if (!e.target.value) { setCategorySearch(""); setCategoryPage(1); }
+            }}
+            onSearch={(value) => { setCategorySearch(value.trim()); setCategoryPage(1); }}
+            onPressEnter={(e) => e.preventDefault()}
+          />
+          <p aria-live="polite">{categorySearch ? `พบ ${filteredCategories.length} ประเภทปัญหา` : `ทั้งหมด ${categories.length} ประเภทปัญหา`}</p>
+          <div className="report-categories" id="report-category-options">
+            {visibleCategories.map((c) => (
+              <button
+                type="button"
+                key={c.id}
+                aria-pressed={category?.id === c.id}
+                onClick={() => {
+                  const currentTitle = form.getFieldValue("title");
+                  if (!currentTitle?.trim() || currentTitle === category?.name)
+                    form.setFieldValue("title", c.name);
+                  setCategory(c);
+                  setNearby([]);
+                }}
+              >
+                <span>{icons[categories.indexOf(c) % icons.length]}</span>
+                {c.name}
+              </button>
+            ))}
+          </div>
+          {filteredCategories.length === 0 && (
+            <Alert type="info" showIcon message="ไม่พบประเภทปัญหา ลองใช้คำอื่น หรือล้างคำค้นแล้วเลือกหมวดอื่น ๆ" />
+          )}
+          <Pagination
+            current={categoryPage}
+            pageSize={categoryPageSize}
+            total={filteredCategories.length}
+            onChange={setCategoryPage}
+            showSizeChanger={false}
+            hideOnSinglePage
+            responsive
+            locale={{ prev_page: "หน้าก่อนหน้า", next_page: "หน้าถัดไป" }}
+            style={{ marginBottom: 20 }}
+          />
+        </section>
+
           <div className="report-context">
             <strong>{category?.name}</strong>
             <p>{address}</p>
@@ -504,14 +607,14 @@ export default function NewCase({
           <Form.Item
             label="หัวข้อปัญหา"
             name="title"
-            rules={[{ required: step === 2, max: 200 }]}
+            rules={[{ required: step === 1, max: 200 }]}
           >
             <Input placeholder="สรุปปัญหาที่พบ" />
           </Form.Item>
           <Form.Item
             label="รายละเอียด"
             name="description"
-            rules={[{ required: step === 2, max: 20000 }]}
+            rules={[{ required: step === 1, max: 20000 }]}
           >
             <Input.TextArea
               rows={5}
@@ -523,35 +626,49 @@ export default function NewCase({
               key={f.key}
               label={f.label}
               name={["answers", f.key]}
-              rules={[{ required: step === 2 && f.required, max: 4000 }]}
+              rules={[{ required: step === 1 && f.required, max: 4000 }]}
             >
               <Input />
             </Form.Item>
           ))}
-          <Form.Item label="ภาพหรือเอกสารประกอบ">
+          <Form.Item
+            label="ภาพ วิดีโอ หรือเอกสารประกอบ"
+            required
+            validateStatus={attachmentMissing ? "error" : undefined}
+            help={attachmentMissing ? "กรุณาแนบหลักฐานอย่างน้อย 1 ไฟล์" : undefined}
+          >
             <Upload
               multiple
-              accept=".png,.jpg,.jpeg,.pdf"
+              accept={ATTACHMENT_ACCEPT}
+              fileList={files.map((f) => ({
+                uid: (f as File & { uid?: string }).uid || f.name,
+                name: f.name, size: f.size, status: "done" as const,
+              }))}
               beforeUpload={(file) => {
-                if (file.size > 10 * 1024 * 1024) {
-                  message.error("ไฟล์ต้องไม่เกิน 10 MB");
+                const used = pendingFiles.current.reduce((total, f) => total + f.size, 0);
+                const problem = attachmentError(file, used);
+                if (problem) {
+                  message.error(problem);
                   return Upload.LIST_IGNORE;
                 }
-                setFiles((v) => [...v, file]);
+                setAttachmentMissing(false);
+                pendingFiles.current = [...pendingFiles.current, file];
+                setFiles(pendingFiles.current);
                 return false;
               }}
               onRemove={(file) => {
-                setFiles((v) =>
-                  v.filter(
-                    (f) => (f as File & { uid?: string }).uid !== file.uid,
-                  ),
+                pendingFiles.current = pendingFiles.current.filter(
+                  (f) => (f as File & { uid?: string }).uid !== file.uid,
                 );
+                setFiles(pendingFiles.current);
+                setAttachmentMissing(pendingFiles.current.length === 0);
                 return true;
               }}
             >
-              <Button icon={<UploadOutlined />}>แนบภาพหรือเอกสาร</Button>
+              <Button icon={<UploadOutlined />}>แนบภาพ วิดีโอ หรือเอกสาร</Button>
             </Upload>
-            <Text type="secondary">PNG, JPEG, PDF ไม่เกิน 10 MB ต่อไฟล์</Text>
+            <Text type="secondary">ต้องแนบอย่างน้อย 1 ไฟล์ — {ATTACHMENT_HELP}</Text>
+            <p aria-live="polite">ขนาดรวมที่เลือก: {(files.reduce((total, f) => total + f.size, 0) / 1024 ** 2).toFixed(1)} / 1024 MB</p>
           </Form.Item>
         </div>
         <div className="wizard-actions">
@@ -565,7 +682,7 @@ export default function NewCase({
               ย้อนกลับ
             </Button>
           )}
-          {step < 2 ? (
+          {step < 1 ? (
             <Button block type="primary" onClick={next}>
               ถัดไป
             </Button>

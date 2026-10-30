@@ -1,5 +1,7 @@
+import CommunityDetail from "./CommunityDetail";
 import NewCase from "./NewCase";
 import { lazy } from "react";
+const EmergencyContacts = lazy(() => import("./EmergencyContacts"));
 const Teams = lazy(() => import("./Teams"));
 const Admin = lazy(() => import("./Admin"));
 const Detail = lazy(() => import("./Detail"));
@@ -39,6 +41,8 @@ import {
 } from "antd";
 import {
   EnvironmentOutlined,
+  HomeOutlined,
+  AlertOutlined,
   DashboardOutlined,
   FileTextOutlined,
   PlusOutlined,
@@ -104,7 +108,7 @@ function ErrorBox({ error }: { error: string }) {
     <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />
   ) : null;
 }
-function Login({ onLogin }: { onLogin: () => void }) {
+function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () => void }) {
   const { data: line } = useData<RowData>("/public/line");
   const lineStarted = useRef(false);
   async function lineLogin() {
@@ -299,6 +303,9 @@ function Login({ onLogin }: { onLogin: () => void }) {
             },
           ]}
         />
+        <Button block icon={<AlertOutlined />} style={{ marginTop: 16 }} onClick={onEmergency}>
+          เบอร์ฉุกเฉิน
+        </Button>
       </Card>
     </div>
   );
@@ -327,9 +334,17 @@ export default function App() {
         <Spin size="large" />
       </div>
     );
+  if (!user && view === "emergency")
+    return (
+      <div className="content">
+        <Button icon={<HomeOutlined />} onClick={() => setView("dashboard")} style={{ marginBottom: 16 }}>กลับหน้าเข้าสู่ระบบ</Button>
+        <EmergencyContacts />
+      </div>
+    );
   if (!user)
     return (
       <Login
+        onEmergency={() => { setView("emergency"); window.scrollTo({ top: 0 }); }}
         onLogin={() => {
           void load();
           setView("dashboard");
@@ -443,9 +458,20 @@ export default function App() {
           </Space>
         </Layout.Header>
         <Layout.Content className="content">
+          {view !== "dashboard" && view !== "emergency" && (
+            <Button
+              icon={<HomeOutlined />}
+              onClick={() => {
+                setView("dashboard");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              style={{ marginBottom: 16 }}
+            >
+              กลับหน้าหลัก
+            </Button>
+          )}
           {view === "dashboard" && user.role === "CITIZEN" ? (
             <CitizenHome
-              onNew={() => setView("new")}
               onTrack={() => setView("cases")}
               onFollowing={() => setView("following")}
             />
@@ -463,7 +489,6 @@ export default function App() {
             />
           ) : view === "new" ? (
             <NewCase
-              onCancel={() => setView("dashboard")}
               onDone={(id) => {
                 setRefresh((x) => x + 1);
                 open(id);
@@ -475,6 +500,8 @@ export default function App() {
             <Following open={open} />
           ) : view === "notifications" ? (
             <Notifications open={open} />
+          ) : view === "emergency" ? (
+            <EmergencyContacts />
           ) : view === "teams" ? (
             <Teams />
           ) : view === "admin" ? (
@@ -487,10 +514,10 @@ export default function App() {
           TownTrack • ระบบรับเรื่องและบริหารงานลงพื้นที่
         </Layout.Footer>
       </Layout>
-      {user.role === "CITIZEN" && view !== "new" && (
-        <nav className="citizen-bottom-nav" aria-label="เมนูประชาชน">
+      {user.role === "CITIZEN" && (
+        <nav className={"citizen-bottom-nav" + (view === "new" ? " is-reporting" : "")} aria-label="เมนูประชาชน">
           {[
-            { key: "dashboard", icon: <EnvironmentOutlined />, label: "ชุมชน" },
+            { key: "dashboard", icon: <HomeOutlined />, label: "หน้าหลัก" },
             { key: "new", icon: <PlusOutlined />, label: "แจ้งปัญหา" },
             { key: "cases", icon: <FileTextOutlined />, label: "ติดตามเรื่อง" },
             {
@@ -498,7 +525,7 @@ export default function App() {
               icon: <BellOutlined />,
               label: "แจ้งเตือน",
             },
-            { key: "password", icon: <LockOutlined />, label: "บัญชี" },
+            { key: "emergency", icon: <AlertOutlined />, label: "เหตุฉุกเฉิน" },
           ].map((item) => (
             <a
               key={item.key}
@@ -706,11 +733,13 @@ function CaseList({
   );
 }
 function Following({ open }: { open: (id: string) => void }) {
+  const [detailId, setDetailId] = useState<string>();
   const [refresh, setRefresh] = useState(0);
   const { data, error } = useData<RowData[]>("/following", refresh);
   const { message } = AntApp.useApp();
   return (
     <>
+      <CommunityDetail id={detailId} onClose={() => setDetailId(undefined)} />
       <Title level={2}>เรื่องที่ติดตาม</Title>
       <ErrorBox error={error} />
       <Card>
@@ -725,6 +754,7 @@ function Following({ open }: { open: (id: string) => void }) {
           renderItem={(r) => (
             <List.Item
               actions={[
+                <Button key="detail" onClick={() => setDetailId(r.id)}>ดูรายละเอียด</Button>,
                 <Button
                   key="unfollow"
                   onClick={async () => {
