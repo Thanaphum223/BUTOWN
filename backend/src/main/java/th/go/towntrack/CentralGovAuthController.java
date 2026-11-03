@@ -24,11 +24,7 @@ public class CentralGovAuthController {
   final Clock clock;
   static final String PENDING = "gov_sso_pending", EXCHANGING = "gov_sso_exchanging";
 
-  record Pending(String state, Instant expires, UUID linkUser, boolean reuse) {
-    Pending(String state, Instant expires, UUID linkUser) {
-      this(state, expires, linkUser, false);
-    }
-  }
+  record Pending(String state, Instant expires, UUID linkUser, UUID municipality, boolean reuse) {}
 
   public CentralGovAuthController(
       GovCenterSsoClient client,
@@ -63,24 +59,30 @@ public class CentralGovAuthController {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ข้อมูลเริ่มต้น SSO ไม่ถูกต้อง");
     if (purpose.equals("REUSE") && signedIn(auth)) throw changedSession();
     UUID link = null;
+    UUID municipality;
     if (purpose.equals("LINK")) {
       if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName()))
         throw new ResponseStatusException(
             HttpStatus.UNAUTHORIZED, "กรุณาเข้าสู่ระบบก่อนเชื่อมบัญชี");
-      link =
-          (UUID)
-              db.one(
-                      "SELECT id FROM app_user WHERE username=? AND municipality_id=? AND enabled=true",
-                      auth.getName(),
-                      UUID.fromString(client.municipalityId))
-                  .get("id");
+      var account =
+          db.one(
+              "SELECT id,municipality_id FROM app_user WHERE username=? AND enabled=true",
+              auth.getName());
+      link = (UUID) account.get("id");
+      municipality = (UUID) account.get("municipality_id");
+    } else municipality = onlyMunicipality(db);
+    var session = request.getSession();
+    synchronized (org.springframework.web.util.WebUtils.getSessionMutex(session)) {
+      session.removeAttribute(EXCHANGING);
+      session.setAttribute(
+          PENDING,
+          new Pending(
+              state,
+              clock.instant().plusSeconds(600),
+              link,
+              municipality,
+              purpose.equals("REUSE")));
     }
-    request.getSession().removeAttribute(EXCHANGING);
-    request
-        .getSession()
-        .setAttribute(
-            PENDING,
-            new Pending(state, clock.instant().plusSeconds(600), link, purpose.equals("REUSE")));
     return Map.of("ok", true);
   }
 
@@ -118,9 +120,10 @@ public class CentralGovAuthController {
       if (auth == null
           || !auth.isAuthenticated()
           || db.list(
-                  "SELECT id FROM app_user WHERE id=? AND username=? AND enabled=true",
+                  "SELECT id FROM app_user WHERE id=? AND username=? AND municipality_id=? AND enabled=true",
                   pending.linkUser(),
-                  auth.getName())
+                  auth.getName(),
+                  pending.municipality())
               .isEmpty())
         throw new ResponseStatusException(
             HttpStatus.UNAUTHORIZED, "บัญชีที่กำลังเชื่อมเปลี่ยนไป กรุณาเริ่มใหม่");
@@ -135,8 +138,7 @@ public class CentralGovAuthController {
       } catch (IllegalStateException expired) {
         throw changedSession();
       }
-      var account =
-          identities.sync(UUID.fromString(client.municipalityId), verified, pending.linkUser());
+      var account = identities.sync(pending.municipality(), verified, pending.linkUser());
       var principal = users.loadUserByUsername(account.get("username").toString());
       var authentication =
           UsernamePasswordAuthenticationToken.authenticated(
@@ -159,6 +161,15 @@ public class CentralGovAuthController {
 
   static boolean signedIn(Authentication auth) {
     return auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName());
+  }
+
+  static UUID onlyMunicipality(Db db) {
+    var towns = db.list("SELECT id FROM municipality ORDER BY id LIMIT 2");
+    if (towns.size() != 1)
+      throw new ResponseStatusException(
+          HttpStatus.SERVICE_UNAVAILABLE,
+          "กรุณาตรวจสอบเทศบาลใน TownTrack ต้องมีเพียงหนึ่งแห่งสำหรับเริ่มเข้าสู่ระบบ Gov Center");
+    return (UUID) towns.getFirst().get("id");
   }
 
   static ResponseStatusException changedSession() {

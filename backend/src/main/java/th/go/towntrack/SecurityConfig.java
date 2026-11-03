@@ -51,9 +51,7 @@ public class SecurityConfig {
 
   @Bean
   SecurityFilterChain security(
-      HttpSecurity h,
-      org.springframework.security.core.session.SessionRegistry sessions,
-      @org.springframework.beans.factory.annotation.Value("${GOV_AUTH_MODE:local}") String govMode)
+      HttpSecurity h, org.springframework.security.core.session.SessionRegistry sessions)
       throws Exception {
     h.authorizeHttpRequests(
             a ->
@@ -118,10 +116,7 @@ public class SecurityConfig {
         .addFilterBefore(
             new SerializedLogout(),
             org.springframework.security.web.authentication.logout.LogoutFilter.class)
-        .addFilterBefore(new LoginLimit(), UsernamePasswordAuthenticationFilter.class)
-        .addFilterAfter(
-            new GovSessionGuard(govMode),
-            org.springframework.security.web.context.SecurityContextHolderFilter.class);
+        .addFilterBefore(new LoginLimit(), UsernamePasswordAuthenticationFilter.class);
     return h.build();
   }
 
@@ -138,47 +133,6 @@ public class SecurityConfig {
           chain.doFilter(q, s);
         }
       } else chain.doFilter(q, s);
-    }
-  }
-
-  static class GovSessionGuard extends OncePerRequestFilter {
-    final String mode;
-
-    GovSessionGuard(String mode) {
-      this.mode = mode;
-    }
-
-    protected void doFilterInternal(HttpServletRequest q, HttpServletResponse s, FilterChain chain)
-        throws ServletException, IOException {
-      var auth =
-          org.springframework.security.core.context.SecurityContextHolder.getContext()
-              .getAuthentication();
-      if (!Set.of(
-                  "/api/auth/csrf",
-                  "/api/auth/gov/start",
-                  "/api/auth/sso-callback",
-                  "/api/auth/gov",
-                  "/api/auth/logout",
-                  "/api/public/gov-auth")
-              .contains(q.getRequestURI())
-          && mode.equals("central")
-          && auth != null
-          && auth.isAuthenticated()
-          && auth.getAuthorities().stream()
-              .anyMatch(
-                  r -> r.getAuthority().matches("ROLE_(ADMIN|OFFICER|LEADER|FIELD|APPROVER)"))) {
-        var session = q.getSession(false);
-        Object expires = session == null ? null : session.getAttribute("gov_verified_until");
-        if (!(expires instanceof Long time)
-            || time <= java.time.Instant.now().getEpochSecond()
-            || !auth.getName().equals(session.getAttribute("gov_verified_username"))) {
-          org.springframework.security.core.context.SecurityContextHolder.clearContext();
-          if (session != null) session.invalidate();
-          s.sendError(503, "Central Gov-Auth verification required");
-          return;
-        }
-      }
-      chain.doFilter(q, s);
     }
   }
 

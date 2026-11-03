@@ -12,7 +12,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Component
 public class GovCenterSsoClient {
-  final String mode, apiUrl, authUrl, serviceCode, apiKey, callbackUrl, municipalityId;
+  static final String API_URL = "https://api-auth.govcenter.co";
+  static final String AUTH_URL = "https://auth.govcenter.co";
+  final String serviceCode, apiKey, callbackUrl;
   final ObjectMapper json;
   final HttpClient http =
       HttpClient.newBuilder()
@@ -22,23 +24,13 @@ public class GovCenterSsoClient {
 
   public GovCenterSsoClient(
       ObjectMapper json,
-      @Value("${GOV_AUTH_MODE:local}") String mode,
-      @Value("${IAM_API_URL:https://api-auth.govcenter.co}") String apiUrl,
-      @Value("${IAM_GOV_FRONTEND_URL:https://auth.govcenter.co}") String authUrl,
       @Value("${E_SERVICE_CODE:}") String serviceCode,
       @Value("${E_SERVICE_API_KEY:}") String apiKey,
-      @Value("${GOV_CALLBACK_URL:}") String callbackUrl,
-      @Value("${GOV_MUNICIPALITY_ID:}") String municipalityId) {
+      @Value("${GOV_CALLBACK_URL:}") String callbackUrl) {
     this.json = json;
-    this.mode = mode;
-    this.apiUrl = apiUrl.replaceAll("/+$", "");
-    this.authUrl = authUrl.replaceAll("/+$", "");
     this.serviceCode = serviceCode;
     this.apiKey = apiKey;
     this.callbackUrl = callbackUrl;
-    this.municipalityId = municipalityId;
-    if (!List.of("local", "central").contains(mode))
-      throw new IllegalArgumentException("GOV_AUTH_MODE");
   }
 
   static boolean trustedUrl(String value) {
@@ -58,13 +50,11 @@ public class GovCenterSsoClient {
 
   boolean configured() {
     try {
-      return !serviceCode.isBlank()
+      return serviceCode.matches("[a-zA-Z0-9_-]{1,64}")
           && !apiKey.isBlank()
-          && trustedUrl(apiUrl)
-          && trustedUrl(authUrl)
+          && apiKey.chars().allMatch(c -> c > 32 && c < 127)
           && trustedUrl(callbackUrl)
-          && "/auth/callback".equals(URI.create(callbackUrl).getPath())
-          && UUID.fromString(municipalityId) != null;
+          && "/auth/callback".equals(URI.create(callbackUrl).getPath());
     } catch (Exception e) {
       return false;
     }
@@ -79,11 +69,11 @@ public class GovCenterSsoClient {
   Map<String, Object> publicConfig() {
     return Map.of(
         "mode",
-        mode,
+        "local",
         "configured",
         configured(),
         "iamAuthUrl",
-        authUrl,
+        AUTH_URL,
         "serviceCode",
         serviceCode,
         "callbackUrl",
@@ -97,7 +87,7 @@ public class GovCenterSsoClient {
           HttpStatus.BAD_REQUEST, "ไม่พบรหัส SSO กรุณาเข้าสู่ระบบใหม่");
     try {
       var request =
-          HttpRequest.newBuilder(URI.create(apiUrl + "/e-services/sso/verify-code"))
+          HttpRequest.newBuilder(URI.create(API_URL + "/e-services/sso/verify-code"))
               .timeout(Duration.ofSeconds(8))
               .header("Content-Type", "application/json")
               .header("x-api-key", apiKey)

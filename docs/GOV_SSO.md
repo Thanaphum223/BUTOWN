@@ -6,7 +6,7 @@ TownTrack is an E-Service. Gov authenticates the person; TownTrack retains its o
 
 ## Verified code contract
 
-Gov issues a single-use code and returns it to the registered TownTrack `/auth/callback`, with the initiating state. The browser sends this code and state to TownTrack. The backend consumes the server-bound state once and calls `POST <IAM_API_URL>/e-services/sso/verify-code` with `{code}` and the server-only `x-api-key`. Only the verified response supplies the IAM identity and residence data. The browser must never supply a trusted identity, role, API key or central access token.
+Gov issues a single-use code and returns it to the registered TownTrack `/auth/callback`, with the initiating state. The browser sends this code and state to TownTrack. The backend consumes the server-bound state once and calls `POST https://api-auth.govcenter.co/e-services/sso/verify-code` with `{code}` and the server-only `x-api-key`. Only the verified response supplies the IAM identity and residence data. The browser must never supply a trusted identity, role, API key or central access token.
 
 New identities receive CITIZEN. Existing local accounts are linked only by an explicit authenticated LINK operation. Local roles, passwords and department assignments remain authoritative; never merge accounts by matching a name/email.
 
@@ -37,4 +37,8 @@ TownTrack accepts `/auth/callback`, `/auth/callback/` and a root Website URL car
 - Verify that the documented login flow returns a fresh code and the original state, including when the user already has a central login.
 - Complete one real login and prove verified user data reaches TownTrack, then verify the same IAM identity reuses its existing local account.
 
-No local change can read another origin's HttpOnly cookie or turn an API key into a user's authenticated session. Keep keys in the server environment and out of Git/frontend storage. Do not enable mandatory central authentication until live acceptance succeeds and an administrator account is safely linked.
+No local change can read another origin's HttpOnly cookie or turn an API key into a user's authenticated session. Keep keys in the server environment and out of Git/frontend storage. Local credentials remain available; Gov authentication never replaces local role authorization.
+
+## Three environment settings
+
+Only `E_SERVICE_API_KEY`, `E_SERVICE_CODE` and `GOV_CALLBACK_URL` configure the Gov integration. Official Gov auth/API URLs are fixed constants from the guide. Legacy endpoint/mode/municipality environment overrides are no longer read. LOGIN resolves the single municipality in TownTrack's own database at start and binds it to the pending request. Zero/multiple municipalities reject anonymous LOGIN clearly. LINK uses the authenticated account's own municipality and checks it again before exchange. No central municipality ID is required or trusted as a local tenant ID.
