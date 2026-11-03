@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   App,
   Alert,
@@ -15,6 +15,7 @@ import {
   Tabs,
   Typography,
 } from "antd";
+import { ReloadOutlined } from "@ant-design/icons";
 import { api, post, roleNames } from "./api";
 type D = Record<string, any>;
 const { Title, Text } = Typography;
@@ -23,21 +24,35 @@ export default function Admin() {
     [error, setError] = useState(""),
     [kind, setKind] = useState(""),
     [busy, setBusy] = useState(false),
-    [userQuery, setUserQuery] = useState("");
+    [userQuery, setUserQuery] = useState(""),
+    [userRoleFilter, setUserRoleFilter] = useState<string>(),
+    [refreshing, setRefreshing] = useState(false);
+  const loadRequest = useRef<AbortController | undefined>(undefined);
   const [form] = Form.useForm();
   const { message } = App.useApp();
   const selectedUser = Form.useWatch("userId", form);
   const selectedRole = Form.useWatch("role", form);
   async function load() {
+    loadRequest.current?.abort();
+    const request = new AbortController();
+    loadRequest.current = request;
+    setRefreshing(true);
     try {
-      setData(await api("/admin"));
+      setData(await api("/admin", {signal:request.signal}));
       setError("");
     } catch (e) {
-      setError((e as Error).message);
+      if (!request.signal.aborted) setError((e as Error).message);
+    } finally {
+      if (loadRequest.current === request) setRefreshing(false);
     }
   }
   useEffect(() => {
     void load();
+    const refresh = () => { if (document.visibilityState === "visible") void load(); };
+    const timer = window.setInterval(refresh, 10000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { window.clearInterval(timer);window.removeEventListener("focus",refresh);document.removeEventListener("visibilitychange",refresh);loadRequest.current?.abort(); };
   }, []);
   async function save(v: D) {
     setBusy(true);
@@ -67,6 +82,7 @@ export default function Admin() {
     form.resetFields();
     form.setFieldsValue({ slaHours: 72, approvalStages: 1, fields: [] });
     setKind(k);
+    if (k === "roles") void load();
   };
   if (!data)
     return error ? <Alert type="error" message={error} /> : <Card loading />;
@@ -106,14 +122,18 @@ export default function Admin() {
               label: "บัญชีผู้ใช้",
               children: (
                 <>
-                  <Space wrap style={{width:"100%",justifyContent:"space-between"}}>
+                  <Text type="secondary">เลือกบัญชีที่สมัครประชาชนไว้แล้ว เพื่อกำหนดบทบาทบุคลากรและหน่วยงาน โดยใช้รหัสผ่านเดิม</Text>
+                  {error&&<Alert type="error" showIcon message={error} style={{marginTop:12}}/>}
+                  <Space wrap style={{width:"100%",justifyContent:"space-between",marginTop:12}}>
                     <Input.Search aria-label="ค้นหาบัญชีผู้ใช้" placeholder="ค้นหาชื่อผู้ใช้หรือชื่อที่แสดง" allowClear value={userQuery} onChange={e=>setUserQuery(e.target.value)}/>
+                    <Select aria-label="กรองประเภทบัญชี" placeholder="ทุกบทบาท" allowClear style={{minWidth:160}} value={userRoleFilter} onChange={setUserRoleFilter} options={[{value:"CITIZEN",label:"บัญชีประชาชน"},...Object.entries(roleNames).filter(([role])=>role!=="CITIZEN").map(([value,label])=>({value,label}))]}/>
+                    <Button icon={<ReloadOutlined/>} loading={refreshing} onClick={()=>void load()}>โหลดรายชื่อใหม่</Button>
                     <Button type="primary" onClick={() => create("roles")}>กำหนดบทบาทให้บัญชีที่มีอยู่</Button>
                   </Space>
                   <Table<D>
                     style={{ marginTop: 16 }}
                     rowKey="id"
-                    dataSource={data.users.filter((u:D)=>(u.username+" "+u.display_name).toLocaleLowerCase().includes(userQuery.toLocaleLowerCase()))}
+                    dataSource={data.users.filter((u:D)=>(!userRoleFilter||u.role===userRoleFilter)&&(u.username+" "+u.display_name).toLocaleLowerCase().includes(userQuery.trim().toLocaleLowerCase()))}
                     scroll={{ x: 700 }}
                     columns={[
                       { title: "ชื่อผู้ใช้", dataIndex: "username" },
@@ -253,7 +273,7 @@ export default function Admin() {
           </Form.Item>
           {kind === "roles" ? <>
             <Form.Item name="userId" label="ค้นหาบัญชีที่สมัครไว้แล้ว" rules={[{required:true,message:"กรุณาเลือกบัญชีผู้ใช้"}]}>
-              <Select showSearch optionFilterProp="label" placeholder="พิมพ์ชื่อผู้ใช้หรือชื่อที่แสดง" notFoundContent="ไม่พบบัญชีที่สมัครไว้ในเทศบาลนี้"
+              <Select showSearch loading={refreshing} onOpenChange={open=>{if(open)void load();}} optionFilterProp="label" placeholder="พิมพ์ชื่อผู้ใช้หรือชื่อที่แสดงของบัญชีประชาชน" notFoundContent={refreshing?"กำลังโหลดรายชื่อ…":"ไม่พบบัญชีที่สมัครไว้ในเทศบาลนี้"}
                 options={data.users.map((u:D)=>({value:u.id,label:u.username+" — "+u.display_name}))}
                 onChange={id=>{const u=data.users.find((item:D)=>item.id===id);form.setFieldsValue({role:u?.role,departmentId:u?.department_id||undefined});}}/>
             </Form.Item>
