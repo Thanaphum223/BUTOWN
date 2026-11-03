@@ -48,3 +48,16 @@ test('citizen privacy notice and report location confirmation work', async ({ pa
   await confirmation.getByRole('button', { name: 'ยืนยันตำแหน่ง', exact: true }).click();
   await expect(page.getByLabel('หัวข้อปัญหา', { exact: true })).toBeVisible();
 });
+test('admin selects a registered account to assign a role without password entry', async ({ page }) => {
+  await login(page, 'admin');
+  await page.getByRole('menuitem', { name: /จัดการระบบ/ }).click();
+  await page.getByRole('button', { name: 'กำหนดบทบาทให้บัญชีที่มีอยู่', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'กำหนดบทบาทให้บัญชีที่มีอยู่' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('input[type=password]')).toHaveCount(0);
+  const account = dialog.getByRole('combobox', { name: 'ค้นหาบัญชีที่สมัครไว้แล้ว' });
+  await account.fill('citizen');
+  await page.getByText('citizen — บัญชีทดสอบ CITIZEN', { exact: true }).click();
+  await expect(dialog).toContainText('บทบาทปัจจุบัน: ประชาชน');
+  await expect(dialog.getByRole('combobox', { name: 'บทบาทที่ต้องการ' })).toBeVisible();
+});

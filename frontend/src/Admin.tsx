@@ -22,9 +22,12 @@ export default function Admin() {
   const [data, setData] = useState<D>(),
     [error, setError] = useState(""),
     [kind, setKind] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [userQuery, setUserQuery] = useState("");
   const [form] = Form.useForm();
   const { message } = App.useApp();
+  const selectedUser = Form.useWatch("userId", form);
+  const selectedRole = Form.useWatch("role", form);
   async function load() {
     try {
       setData(await api("/admin"));
@@ -49,7 +52,8 @@ export default function Admin() {
           throw new Error("รูปแบบ JSON ของช่องข้อมูลไม่ถูกต้อง");
         }
       }
-      await post("/admin/" + kind, v);
+      if (kind === "roles") await post("/admin/users/" + v.userId + "/role", {role:v.role,departmentId:v.departmentId||null});
+      else await post("/admin/" + kind, v);
       message.success("บันทึกแล้ว");
       setKind("");
       await load();
@@ -102,13 +106,14 @@ export default function Admin() {
               label: "บัญชีผู้ใช้",
               children: (
                 <>
-                  <Button type="primary" onClick={() => create("users")}>
-                    เพิ่มบัญชีผู้ใช้
-                  </Button>
+                  <Space wrap style={{width:"100%",justifyContent:"space-between"}}>
+                    <Input.Search aria-label="ค้นหาบัญชีผู้ใช้" placeholder="ค้นหาชื่อผู้ใช้หรือชื่อที่แสดง" allowClear value={userQuery} onChange={e=>setUserQuery(e.target.value)}/>
+                    <Button type="primary" onClick={() => create("roles")}>กำหนดบทบาทให้บัญชีที่มีอยู่</Button>
+                  </Space>
                   <Table<D>
                     style={{ marginTop: 16 }}
                     rowKey="id"
-                    dataSource={data.users}
+                    dataSource={data.users.filter((u:D)=>(u.username+" "+u.display_name).toLocaleLowerCase().includes(userQuery.toLocaleLowerCase()))}
                     scroll={{ x: 700 }}
                     columns={[
                       { title: "ชื่อผู้ใช้", dataIndex: "username" },
@@ -118,6 +123,8 @@ export default function Admin() {
                         dataIndex: "role",
                         render: (v) => roleNames[v],
                       },
+                      {title:"หน่วยงาน",dataIndex:"department_id",render:(id:string)=>data.departments.find((d:D)=>d.id===id)?.name||"—"},
+                      {title:"จัดการบทบาท",key:"editRole",render:(_,r)=><Button onClick={()=>{form.resetFields();form.setFieldsValue({userId:r.id,role:r.role,departmentId:r.department_id||undefined});setKind("roles");}}>กำหนดบทบาท</Button>},
                       {
                         title: "เปิดใช้งาน",
                         dataIndex: "enabled",
@@ -235,7 +242,7 @@ export default function Admin() {
       </Card>
       <Modal
         open={!!kind}
-        title="ตั้งค่าระบบ"
+        title={kind==="roles"?"กำหนดบทบาทให้บัญชีที่มีอยู่":"ตั้งค่าระบบ"}
         onCancel={() => setKind("")}
         footer={null}
         destroyOnHidden
@@ -244,7 +251,16 @@ export default function Admin() {
           <Form.Item name="id" hidden>
             <Input />
           </Form.Item>
-          {kind === "users" ? (
+          {kind === "roles" ? <>
+            <Form.Item name="userId" label="ค้นหาบัญชีที่สมัครไว้แล้ว" rules={[{required:true,message:"กรุณาเลือกบัญชีผู้ใช้"}]}>
+              <Select showSearch optionFilterProp="label" placeholder="พิมพ์ชื่อผู้ใช้หรือชื่อที่แสดง" notFoundContent="ไม่พบบัญชีที่สมัครไว้ในเทศบาลนี้"
+                options={data.users.map((u:D)=>({value:u.id,label:u.username+" — "+u.display_name}))}
+                onChange={id=>{const u=data.users.find((item:D)=>item.id===id);form.setFieldsValue({role:u?.role,departmentId:u?.department_id||undefined});}}/>
+            </Form.Item>
+            {selectedUser&&<Alert style={{marginBottom:16}} type="info" showIcon message={"บทบาทปัจจุบัน: "+roleNames[data.users.find((u:D)=>u.id===selectedUser)?.role]} description="บัญชีและรหัสผ่านเดิมยังใช้ได้ หลังบันทึกให้ผู้ใช้ออกจากระบบแล้วเข้าสู่ระบบใหม่"/>}
+            <Form.Item name="role" label="บทบาทที่ต้องการ" rules={[{required:true,message:"กรุณาเลือกบทบาท"}]}><Select options={Object.entries(roleNames).map(([value,label])=>({value,label}))} onChange={role=>{if(role==="CITIZEN")form.setFieldValue("departmentId",undefined);}}/></Form.Item>
+            <Form.Item name="departmentId" label="หน่วยงาน" rules={[{required:!!selectedRole&&!["ADMIN","CITIZEN"].includes(selectedRole),message:"กรุณาเลือกหน่วยงาน"}]}><Select disabled={selectedRole==="CITIZEN"} allowClear placeholder="เลือกหน่วยงาน" options={departments}/></Form.Item>
+          </> : kind === "users" ? (
             <>
               <Form.Item
                 name="username"

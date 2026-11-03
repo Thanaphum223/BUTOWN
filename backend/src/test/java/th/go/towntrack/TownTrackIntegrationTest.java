@@ -95,6 +95,29 @@ class TownTrackIntegrationTest {
   }
 
   @Test
+  void adminAssignsExistingAccountRoleWithoutChangingCredentials() throws Exception {
+    UUID target=users.get("CITIZEN");
+    String before=(String)db.one("SELECT password_hash FROM app_user WHERE id=?",target).get("password_hash");
+    var body=json.writeValueAsString(Map.of("role","OFFICER","departmentId",dept));
+    mvc.perform(as(post("/api/admin/users/"+target+"/role").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body),"ADMIN"))
+        .andExpect(status().isOk());
+    var changed=db.one("SELECT username,role,department_id,password_hash FROM app_user WHERE id=?",target);
+    assertEquals("OFFICER",changed.get("role"));
+    assertEquals(dept,changed.get("department_id"));
+    assertEquals(before,changed.get("password_hash"));
+    assertEquals("testCITIZEN",changed.get("username"));
+    assertEquals(1L,((Number)db.one("SELECT count(*) n FROM audit_event WHERE action='USER_ROLE'").get("n")).longValue());
+    mvc.perform(as(post("/api/admin/users/"+users.get("FIELD")+"/role").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body),"OFFICER"))
+        .andExpect(status().isForbidden());
+    mvc.perform(as(post("/api/admin/users/"+users.get("ADMIN")+"/role").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body),"ADMIN"))
+        .andExpect(status().isBadRequest());
+    mvc.perform(as(post("/api/admin/users/"+users.get("FIELD")+"/role").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"FIELD\"}"),"ADMIN"))
+        .andExpect(status().isBadRequest());
+    mvc.perform(as(post("/api/admin/users/"+UUID.randomUUID()+"/role").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body),"ADMIN"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
   void activeQueueExcludesFinishedCasesBeforeCountingAndPagination() throws Exception {
     for (String state : List.of("CLOSED", "REJECTED", "TERMINATED", "NEW")) {
       UUID id = create();

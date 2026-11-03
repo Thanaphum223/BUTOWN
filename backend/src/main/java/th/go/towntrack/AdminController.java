@@ -108,6 +108,28 @@ public class AdminController {
     return Map.of("id", id);
   }
 
+  @PostMapping("/users/{id}/role")
+  @Transactional
+  public void assignRole(@PathVariable UUID id, @RequestBody Map<String, Object> b, Authentication a) {
+    var u = admin(a);
+    var target = db.one("SELECT id,username,role,department_id FROM app_user WHERE id=? AND municipality_id=? FOR UPDATE", id, u.get("municipality_id"));
+    String role = Workflow.text(b, "role", 20);
+    if (!List.of("ADMIN", "OFFICER", "LEADER", "FIELD", "APPROVER", "CITIZEN").contains(role))
+      throw new IllegalArgumentException();
+    if (u.get("id").equals(id) && !role.equals("ADMIN"))
+      throw new IllegalArgumentException("ไม่สามารถลดสิทธิ์ผู้ดูแลระบบของตนเองได้");
+    UUID department = b.get("departmentId") == null ? null : Db.id(b.get("departmentId"));
+    if (role.equals("CITIZEN")) department = null;
+    if (!List.of("ADMIN", "CITIZEN").contains(role) && department == null)
+      throw new IllegalArgumentException("กรุณาเลือกหน่วยงานสำหรับบุคลากร");
+    if (department != null)
+      db.one("SELECT id FROM department WHERE id=? AND municipality_id=?", department, u.get("municipality_id"));
+    db.run("UPDATE app_user SET role=?,department_id=? WHERE id=? AND municipality_id=?", role, department, id, u.get("municipality_id"));
+    workflow.audit(u, null, "USER_ROLE", null, null,
+        "บัญชี " + target.get("username") + " role=" + target.get("role") + "->" + role
+        + " department=" + target.get("department_id") + "->" + department);
+  }
+
   @PostMapping("/users/{id}/enabled")
   public void enabled(
       @PathVariable UUID id, @RequestBody Map<String, Boolean> b, Authentication a) {
