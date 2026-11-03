@@ -13,6 +13,7 @@
     "@ant-design/icons": "^6.0.0",
     "@line/liff": "^2.31.2",
     "antd": "^5.27.0",
+    "gov-sso-login": "1.4.0",
     "leaflet": "^1.9.4",
     "mapbox-gl": "^3.33.0",
     "pdfjs-dist": "6.5.438",

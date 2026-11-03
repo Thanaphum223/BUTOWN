@@ -1,5 +1,6 @@
 import { MenuOutlined } from "@ant-design/icons";
 import GovLogin from "./GovLogin";
+import GovCallback from "./GovCallback";
 import CitizenTracking from "./CitizenTracking";
 import PrivacyGate from "./PrivacyGate";
 import CommunityDetail from "./CommunityDetail";
@@ -226,7 +227,7 @@ function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () 
             เข้าสู่ระบบด้วย LINE
           </Button>
         )}
-        <GovLogin onLogin={onLogin} />
+        <GovLogin />
         <Tabs
           items={[
             {
@@ -357,6 +358,7 @@ export default function App() {
     setSelected(id);
     setView("detail");
   };
+  if (window.location.pathname === "/auth/callback") return <GovCallback />;
   if (user === undefined)
     return (
       <div className="loading">
@@ -505,6 +507,7 @@ export default function App() {
                 {fontLarge ? "ก− ย่อ" : "ก+ ขยาย"}
               </Button>
             )}
+            <GovLogin link />
             <Avatar style={{ background: "#d9eeea", color: "#075c54" }}>
               {user.display_name?.[0]}
             </Avatar>
