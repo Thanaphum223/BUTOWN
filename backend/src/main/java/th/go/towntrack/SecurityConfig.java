@@ -16,6 +16,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 @Configuration
 public class SecurityConfig {
+  @Bean java.time.Clock govSsoClock(){return java.time.Clock.systemUTC();}
   @Bean
   org.springframework.security.core.session.SessionRegistry sessionRegistry() {
     return new org.springframework.security.core.session.SessionRegistryImpl();
@@ -61,6 +62,8 @@ public class SecurityConfig {
                         "/api/emergency/nearby",
                         "/api/auth/line",
                         "/api/auth/gov",
+                        "/api/auth/gov/start",
+                        "/api/auth/sso-callback",
                         "/api/public/gov-auth",
                         "/actuator/health")
                     .permitAll()
@@ -107,7 +110,7 @@ public class SecurityConfig {
     final String mode; GovSessionGuard(String mode){this.mode=mode;}
     protected void doFilterInternal(HttpServletRequest q,HttpServletResponse s,FilterChain chain)throws ServletException,IOException {
       var auth=org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-      if(mode.equals("central")&&auth!=null&&auth.isAuthenticated()&&auth.getAuthorities().stream().anyMatch(r->r.getAuthority().matches("ROLE_(ADMIN|OFFICER|LEADER|FIELD|APPROVER)"))) {
+      if(!Set.of("/api/auth/csrf","/api/auth/gov/start","/api/auth/sso-callback","/api/auth/gov","/api/auth/logout","/api/public/gov-auth").contains(q.getRequestURI())&&mode.equals("central")&&auth!=null&&auth.isAuthenticated()&&auth.getAuthorities().stream().anyMatch(r->r.getAuthority().matches("ROLE_(ADMIN|OFFICER|LEADER|FIELD|APPROVER)"))) {
         var session=q.getSession(false);Object expires=session==null?null:session.getAttribute("gov_verified_until");
         if(!(expires instanceof Long time)||time<=java.time.Instant.now().getEpochSecond()) {
           org.springframework.security.core.context.SecurityContextHolder.clearContext();if(session!=null)session.invalidate();
@@ -128,7 +131,10 @@ public class SecurityConfig {
       if (q.getMethod().equals("POST")
           && (q.getRequestURI().equals("/api/auth/login")
               || q.getRequestURI().equals("/api/auth/register")
-              || q.getRequestURI().equals("/api/auth/line"))) {
+              || q.getRequestURI().equals("/api/auth/line")
+              || q.getRequestURI().equals("/api/auth/gov/start")
+              || q.getRequestURI().equals("/api/auth/sso-callback")
+              || q.getRequestURI().equals("/api/auth/gov"))) {
         long now = System.currentTimeMillis();
         if (attempts.size() > 10000)
           attempts.entrySet().removeIf(e -> now - e.getValue().start() > 60000);
