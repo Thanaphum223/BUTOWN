@@ -112,6 +112,9 @@ public class LineController {
     request.getSession();
     sessions.removeSessionInformation(request.getSession().getId());
     request.changeSessionId();
+    request.getSession().removeAttribute("gov_verified_until");
+    request.getSession().removeAttribute("gov_verified_username");
+    request.getSession().removeAttribute(CentralGovAuthController.PENDING);
     var context = SecurityContextHolder.createEmptyContext();
     context.setAuthentication(
         UsernamePasswordAuthenticationToken.authenticated(user, null, user.getAuthorities()));

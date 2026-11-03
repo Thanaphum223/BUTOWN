@@ -16,7 +16,7 @@ export default function GovLogin({link=false}:{link?:boolean}){
   }catch(e){setError((e as Error).message);setBusy(false);}
  }
  return <Space direction="vertical" style={{width:link?'auto':'100%',marginTop:link?0:16}}>
-  <Button block={!link} icon={<SafetyCertificateOutlined/>} loading={busy} onClick={()=>void start()}>{link?'เชื่อมบัญชี Gov Center':'เข้าสู่ระบบด้วย Gov Center'}</Button>
+  <Button aria-label={link?'เชื่อมบัญชี Gov Center':'เข้าสู่ระบบด้วย Gov Center'} block={!link} icon={<SafetyCertificateOutlined/>} loading={busy} onClick={()=>void start()}>{link?'เชื่อมบัญชี Gov Center':'เข้าสู่ระบบด้วย Gov Center'}</Button>
   {error&&<Alert type="error" showIcon message={error}/>}
  </Space>;
 }

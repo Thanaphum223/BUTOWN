@@ -46,6 +46,7 @@ public class CentralGovAuthController {
   sessions.removeSessionInformation(session.getId());request.changeSessionId();sessions.registerNewSession(session.getId(),principal);
   session.removeAttribute("admin_role");session.removeAttribute("admin_department");
   var context=SecurityContextHolder.createEmptyContext();context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(principal,null,principal.getAuthorities()));SecurityContextHolder.setContext(context);
+  session.setAttribute("gov_verified_username",principal.getUsername());
   session.setAttribute("gov_verified_until",clock.instant().plusSeconds(1800).getEpochSecond());
   new HttpSessionSecurityContextRepository().saveContext(context,request,response);
   new org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository().saveToken(null,request,response);

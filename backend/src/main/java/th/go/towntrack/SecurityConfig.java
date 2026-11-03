@@ -74,6 +74,8 @@ public class SecurityConfig {
                 f.loginProcessingUrl("/api/auth/login")
                     .successHandler(
                         (q, s, a) -> {
+                          var session=q.getSession(false);
+                          if(session!=null){session.removeAttribute("gov_verified_until");session.removeAttribute("gov_verified_username");session.removeAttribute(CentralGovAuthController.PENDING);session.removeAttribute("admin_role");session.removeAttribute("admin_department");}
                           s.setCharacterEncoding("UTF-8");
                           s.setContentType("application/json");
                           s.getWriter().write("{\"ok\":true}");
@@ -112,7 +114,7 @@ public class SecurityConfig {
       var auth=org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
       if(!Set.of("/api/auth/csrf","/api/auth/gov/start","/api/auth/sso-callback","/api/auth/gov","/api/auth/logout","/api/public/gov-auth").contains(q.getRequestURI())&&mode.equals("central")&&auth!=null&&auth.isAuthenticated()&&auth.getAuthorities().stream().anyMatch(r->r.getAuthority().matches("ROLE_(ADMIN|OFFICER|LEADER|FIELD|APPROVER)"))) {
         var session=q.getSession(false);Object expires=session==null?null:session.getAttribute("gov_verified_until");
-        if(!(expires instanceof Long time)||time<=java.time.Instant.now().getEpochSecond()) {
+        if(!(expires instanceof Long time)||time<=java.time.Instant.now().getEpochSecond()||!auth.getName().equals(session.getAttribute("gov_verified_username"))) {
           org.springframework.security.core.context.SecurityContextHolder.clearContext();if(session!=null)session.invalidate();
           s.sendError(503,"Central Gov-Auth verification required");return;
         }
