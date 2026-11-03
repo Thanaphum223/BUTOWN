@@ -94,4 +94,21 @@ class GovCenterSsoIntegrationTest {
   var row=db.one("SELECT member_status,residence_status FROM iam_user_residence WHERE municipality_id=?",TOWN);assertEquals("PENDING",row.get("member_status"));assertEquals("VERIFIED",row.get("residence_status"));
   payload.set("{\"user\":{\"id\":\"iam-citizen-1\",\"name\":\"Citizen\"},\"residences\":[]}");callback(start("LOGIN",false),STATE,"next",false).andExpect(status().isOk());assertEquals(0L,((Number)db.one("SELECT count(*) n FROM iam_user_residence WHERE municipality_id=?",TOWN).get("n")).longValue());
  }
+ @Test void expiredStateAndChangedLinkAccountCannotExchangeCode()throws Exception{
+  var expired=start("LOGIN",false);expired.setAttribute(CentralGovAuthController.PENDING,new CentralGovAuthController.Pending(STATE,java.time.Instant.now().minusSeconds(1),null));callback(expired,STATE,"code",false).andExpect(status().isBadRequest());
+  var linking=start("LINK",true);linking.removeAttribute("SPRING_SECURITY_CONTEXT");callback(linking,STATE,"code",false).andExpect(status().isUnauthorized());assertEquals(0,calls.get());
+ }
+ @Test void stateRegistrationRequiresCsrfAndRejectsNullPurpose()throws Exception{
+  mvc.perform(post("/api/auth/gov/start").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("state",STATE,"purpose","LOGIN")))).andExpect(status().isForbidden());
+  mvc.perform(post("/api/auth/gov/start").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"state\":\""+STATE+"\",\"purpose\":null}")).andExpect(status().isBadRequest());
+ }
+ @Test void malformedProviderJsonFailsAsBadGateway()throws Exception{
+  payload.set("not-json");callback(start("LOGIN",false),STATE,"code",false).andExpect(status().isBadGateway());
+ }
+ @Test void sameIamIdentityCannotBeClaimedByDifferentLocalAccount()throws Exception{
+  callback(start("LOGIN",false),STATE,"first",false).andExpect(status().isOk());
+  callback(start("LINK",true),STATE,"steal",true).andExpect(status().isConflict());
+  assertNotEquals(admin,db.one("SELECT local_user_id FROM iam_user_profile WHERE municipality_id=?",TOWN).get("local_user_id"));
+ }
+
 }

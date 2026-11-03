@@ -50,6 +50,7 @@ public class GovCenterSsoClient {
    }
   }catch(ResponseStatusException e){throw e;}
   catch(InterruptedException e){Thread.currentThread().interrupt();throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"การเชื่อมต่อ Gov Center ถูกขัดจังหวะ กรุณาเข้าสู่ระบบใหม่");}
+  catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,"ข้อมูลตอบกลับ Gov Center ไม่ถูกต้อง");}
   catch(java.io.IOException e){throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"เชื่อมต่อ Gov Center ไม่สำเร็จ กรุณาเข้าสู่ระบบใหม่");}
   catch(Exception e){throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,"ข้อมูลตอบกลับ Gov Center ไม่ถูกต้อง");}
  }

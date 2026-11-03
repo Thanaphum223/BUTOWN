@@ -320,6 +320,9 @@ function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () 
   );
 }
 export default function App() {
+  return window.location.pathname === "/auth/callback" ? <GovCallback /> : <TownTrackApp />;
+}
+function TownTrackApp() {
   const screens = Grid.useBreakpoint();
   const [mobileMenu,setMobileMenu]=useState(false);
   const [showRoleControls,setShowRoleControls]=useState(false);
@@ -358,7 +361,6 @@ export default function App() {
     setSelected(id);
     setView("detail");
   };
-  if (window.location.pathname === "/auth/callback") return <GovCallback />;
   if (user === undefined)
     return (
       <div className="loading">

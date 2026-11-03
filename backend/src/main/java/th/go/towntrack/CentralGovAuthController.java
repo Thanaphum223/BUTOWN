@@ -25,7 +25,7 @@ public class CentralGovAuthController {
  @GetMapping("/api/public/gov-auth") Object config(){return client.publicConfig();}
  @PostMapping("/api/auth/gov/start") Object start(@RequestBody Map<String,String> body,HttpServletRequest request,Authentication auth){
   client.requireConfigured();String state=body.getOrDefault("state","");String purpose=body.getOrDefault("purpose","LOGIN");
-  if(state==null||!state.matches("[a-f0-9]{64}")||!List.of("LOGIN","LINK").contains(purpose))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"ข้อมูลเริ่มต้น SSO ไม่ถูกต้อง");
+  if(state==null||purpose==null||!state.matches("[a-f0-9]{64}")||!List.of("LOGIN","LINK").contains(purpose))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"ข้อมูลเริ่มต้น SSO ไม่ถูกต้อง");
   UUID link=null;
   if(purpose.equals("LINK")){
    if(auth==null||!auth.isAuthenticated()||"anonymousUser".equals(auth.getName()))throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"กรุณาเข้าสู่ระบบก่อนเชื่อมบัญชี");
