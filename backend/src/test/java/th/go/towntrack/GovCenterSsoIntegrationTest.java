@@ -38,6 +38,55 @@ class GovCenterSsoIntegrationTest {
   r.add("E_SERVICE_API_KEY",()->"isolated-provider-test-key");r.add("GOV_CALLBACK_URL",()->"https://towntrack.test/auth/callback");r.add("GOV_MUNICIPALITY_ID",TOWN::toString);
  }
  @Autowired MockMvc mvc;@Autowired Db db;@Autowired ObjectMapper json;
+ @Autowired org.springframework.security.core.session.SessionRegistry sessions;
+ @Test void authenticatedUserCanReadOnlyOwnLatestIamProfile()throws Exception{
+  mvc.perform(get("/api/auth/gov-profile")).andExpect(status().isUnauthorized());
+  mvc.perform(get("/api/auth/gov-profile").with(user("sso-local-admin").roles("ADMIN")))
+   .andExpect(status().isOk()).andExpect(jsonPath("$.linked").value(false));
+  var s=start("LOGIN",false);callback(s,STATE,"profile",false).andExpect(status().isOk());
+  mvc.perform(get("/api/auth/gov-profile").session(s)).andExpect(status().isOk())
+   .andExpect(jsonPath("$.linked").value(true)).andExpect(jsonPath("$.profile.name").value("SSO Citizen"))
+   .andExpect(jsonPath("$.profile.email").value("same-name@example.test")).andExpect(jsonPath("$.residences").isEmpty())
+   .andExpect(jsonPath("$.apiKey").doesNotExist());
+  payload.set("{\"user\":{\"id\":\"iam-citizen-1\",\"name\":\"Updated IAM name\",\"email\":\"updated@example.test\"},\"residences\":[]}");
+  var next=start("LOGIN",false);callback(next,STATE,"updated",false).andExpect(status().isOk());
+  mvc.perform(get("/api/auth/gov-profile").session(next)).andExpect(jsonPath("$.profile.name").value("Updated IAM name"));
+  mvc.perform(get("/api/auth/gov-profile").with(user("sso-local-admin").roles("ADMIN")))
+   .andExpect(jsonPath("$.linked").value(false)).andExpect(jsonPath("$.profile").doesNotExist());
+ }
+ @Test void sixthSsoLoginExpiresOldestSession()throws Exception{
+  var first=start("LOGIN",false);callback(first,STATE,"first",false).andExpect(status().isOk());
+  String firstId=first.getId();
+  for(int i=0;i<5;i++)callback(start("LOGIN",false),STATE,"next-"+i,false).andExpect(status().isOk());
+  assertTrue(sessions.getSessionInformation(firstId).isExpired());
+ }
+ @Test void changingRoleRevokesExistingSsoSession()throws Exception{
+  var s=start("LOGIN",false);callback(s,STATE,"before-promotion",false).andExpect(status().isOk());
+  var account=db.one("SELECT local_user_id FROM iam_user_profile WHERE municipality_id=?",TOWN);
+  mvc.perform(post("/api/admin/users/"+account.get("local_user_id")+"/role")
+   .with(user("sso-local-admin").roles("ADMIN")).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+   .content(json.writeValueAsString(Map.of("role","OFFICER","departmentId",dept))))
+   .andExpect(status().isOk());
+  assertTrue(sessions.getSessionInformation(s.getId()).isExpired());
+ }
+ @Test void transportRejectionIsNotReportedAsInvalidUserCode()throws Exception{
+  replyStatus.set(403);payload.set("error code: 1010");
+  callback(start("LOGIN",false),STATE,"unused-code",false).andExpect(status().isServiceUnavailable());
+  assertEquals(1,calls.get());
+ }
+ @Test void disablingAccountRevokesExistingSsoSession()throws Exception{
+  var s=start("LOGIN",false);callback(s,STATE,"before-disable",false).andExpect(status().isOk());
+  var account=db.one("SELECT local_user_id FROM iam_user_profile WHERE municipality_id=?",TOWN);
+  mvc.perform(post("/api/admin/users/"+account.get("local_user_id")+"/enabled")
+   .with(user("sso-local-admin").roles("ADMIN")).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+   .content("{\"enabled\":false}")).andExpect(status().isOk());
+  assertTrue(sessions.getSessionInformation(s.getId()).isExpired());
+ }
+ @Test void knownUsedCodeStillRequiresFreshLogin()throws Exception{
+  replyStatus.set(403);payload.set("{\"message\":\"SSO code has already been used\"}");
+  callback(start("LOGIN",false),STATE,"used-code",false).andExpect(status().isUnauthorized());
+  assertEquals(1,calls.get());
+ }
  UUID admin,dept;String address;static final AtomicInteger addresses=new AtomicInteger();
  @BeforeEach void setup()throws Exception{
   address="192.0.2."+addresses.incrementAndGet();calls.set(0);replyStatus.set(200);payload.set(json.writeValueAsString(Map.of("user",Map.of("id","iam-citizen-1","name","SSO Citizen","email","same-name@example.test","role","ADMIN","memberships",List.of()),"residences",List.of())));
@@ -90,7 +139,10 @@ class GovCenterSsoIntegrationTest {
  @Test void residenceMembershipSyncRemovesStaleLinksAndKeepsPendingUnverified()throws Exception{
   var residence=Map.of("membershipId","membership-1","role","OWNER","status","PENDING","addressSnapshot",Map.of("residenceId","residence-1","formattedAddress","Fictional test address","status","VERIFIED","municipalityId","external-town"),"residence",Map.of("status","VERIFIED"));
   payload.set(json.writeValueAsString(Map.of("user",Map.of("id","iam-citizen-1","name","Citizen"),"residences",List.of(residence))));
-  callback(start("LOGIN",false),STATE,"first",false).andExpect(status().isOk());
+  var own=start("LOGIN",false);callback(own,STATE,"first",false).andExpect(status().isOk());
+  mvc.perform(get("/api/auth/gov-profile").session(own)).andExpect(status().isOk())
+   .andExpect(jsonPath("$.residences[0].address").value("Fictional test address"))
+   .andExpect(jsonPath("$.residences[0].canUseForOfficialTransaction").value(false));
   var row=db.one("SELECT member_status,residence_status FROM iam_user_residence WHERE municipality_id=?",TOWN);assertEquals("PENDING",row.get("member_status"));assertEquals("VERIFIED",row.get("residence_status"));
   payload.set("{\"user\":{\"id\":\"iam-citizen-1\",\"name\":\"Citizen\"},\"residences\":[]}");callback(start("LOGIN",false),STATE,"next",false).andExpect(status().isOk());assertEquals(0L,((Number)db.one("SELECT count(*) n FROM iam_user_residence WHERE municipality_id=?",TOWN).get("n")).longValue());
  }

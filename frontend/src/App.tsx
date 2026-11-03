@@ -1,5 +1,6 @@
 import { MenuOutlined } from "@ant-design/icons";
 import GovLogin from "./GovLogin";
+import GovProfile from "./GovProfile";
 import GovCallback from "./GovCallback";
 import CitizenTracking from "./CitizenTracking";
 import PrivacyGate from "./PrivacyGate";
@@ -509,7 +510,7 @@ function TownTrackApp() {
                 {fontLarge ? "ก− ย่อ" : "ก+ ขยาย"}
               </Button>
             )}
-            <GovLogin link />
+            <GovProfile />
             <Avatar style={{ background: "#d9eeea", color: "#075c54" }}>
               {user.display_name?.[0]}
             </Avatar>

@@ -28,5 +28,17 @@ test('provider failure does not automatically retry one-time code',async({page})
  const seen=await boundary(page);seen.fail=true;await page.addInitScript(s=>sessionStorage.setItem('gov_sso_state',s),state);await page.goto(`/auth/callback?code=failed-code&state=${state}`);await expect(page.getByRole('alert')).toContainText('Gov Center unavailable');await expect(page.getByRole('button',{name:'เริ่มเข้าสู่ระบบใหม่',exact:true})).toBeVisible();expect(seen.callbacks).toHaveLength(1);
 });
 test('logged-in account explicitly initiates LINK rather than creating a new account',async({page})=>{
- const seen=await boundary(page,true);await page.goto('/');await page.getByRole('button',{name:'เชื่อมบัญชี Gov Center',exact:true}).click();await expect(page.getByRole('heading',{name:'IAM login test boundary'})).toBeVisible();expect(seen.starts[0].purpose).toBe('LINK');
+ const seen=await boundary(page,true);await page.route('**/api/auth/gov-profile',r=>r.fulfill({json:{linked:false,residences:[]}}));await page.goto('/');await page.getByRole('button',{name:'ข้อมูล Gov Center',exact:true}).click();await page.getByRole('button',{name:'เชื่อมบัญชี Gov Center',exact:true}).click();await expect(page.getByRole('heading',{name:'IAM login test boundary'})).toBeVisible();expect(seen.starts[0].purpose).toBe('LINK');
+});
+test('signed-in user can inspect synchronized Gov Center profile and residence status',async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ await boundary(page,true);
+ await page.route('**/api/auth/gov-profile',r=>r.fulfill({json:{linked:true,profile:{id:'iam-user-1',name:'Gov Profile Name',email:'profile@example.test'},residences:[{residenceId:'home-1',address:'บ้านทดสอบ 12',memberStatus:'PENDING',residenceStatus:'VERIFIED',canUseForOfficialTransaction:false}]}}));
+ await page.goto('/');await page.getByRole('button',{name:'ข้อมูล Gov Center',exact:true}).click();
+ await expect(page.getByText('Gov Profile Name',{exact:true})).toBeVisible();
+ await expect(page.getByText('profile@example.test',{exact:true})).toBeVisible();
+ await expect(page.getByText('บ้านทดสอบ 12',{exact:true})).toBeVisible();
+ await expect(page.getByText('ยังไม่ผ่านการยืนยันครบถ้วน',{exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+ await page.screenshot({path:'../work/screenshots/gov-profile-mobile.png',fullPage:true});
 });

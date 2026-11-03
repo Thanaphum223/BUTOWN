@@ -19,7 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 public class LineController {
-  final org.springframework.security.core.session.SessionRegistry sessions;
+  final ExternalLoginSessions sessions;
   final Db db;
   final ObjectMapper json;
   final UserDetailsService users;
@@ -29,7 +29,7 @@ public class LineController {
   final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
   public LineController(
-      org.springframework.security.core.session.SessionRegistry sessions,
+      ExternalLoginSessions sessions,
       Db d,
       ObjectMapper j,
       UserDetailsService u,
@@ -110,16 +110,15 @@ public class LineController {
     }
     var user = users.loadUserByUsername(name);
     request.getSession();
-    sessions.removeSessionInformation(request.getSession().getId());
-    request.changeSessionId();
+    var authentication = UsernamePasswordAuthenticationToken.authenticated(user, null, user.getAuthorities());
+    sessions.authenticate(authentication, request, response);
     request.getSession().removeAttribute("gov_verified_until");
     request.getSession().removeAttribute("gov_verified_username");
     request.getSession().removeAttribute(CentralGovAuthController.PENDING);
     var context = SecurityContextHolder.createEmptyContext();
     context.setAuthentication(
-        UsernamePasswordAuthenticationToken.authenticated(user, null, user.getAuthorities()));
+        authentication);
     SecurityContextHolder.setContext(context);
-    sessions.registerNewSession(request.getSession().getId(), user);
     new HttpSessionSecurityContextRepository().saveContext(context, request, response);
     new org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository()
         .saveToken(null, request, response);

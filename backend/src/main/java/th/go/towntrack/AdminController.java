@@ -15,13 +15,15 @@ public class AdminController {
   final Workflow workflow;
   final PasswordEncoder encoder;
   final ObjectMapper json;
+  final ExternalLoginSessions sessions;
 
-  public AdminController(Db d, Access a, Workflow w, PasswordEncoder e, ObjectMapper j) {
+  public AdminController(Db d, Access a, Workflow w, PasswordEncoder e, ObjectMapper j, ExternalLoginSessions sessions) {
     db = d;
     access = a;
     workflow = w;
     encoder = e;
     json = j;
+    this.sessions = sessions;
   }
 
   Map<String, Object> admin(Authentication a) {
@@ -125,6 +127,7 @@ public class AdminController {
     if (department != null)
       db.one("SELECT id FROM department WHERE id=? AND municipality_id=?", department, u.get("municipality_id"));
     db.run("UPDATE app_user SET role=?,department_id=? WHERE id=? AND municipality_id=?", role, department, id, u.get("municipality_id"));
+    sessions.revoke(target.get("username").toString());
     workflow.audit(u, null, "USER_ROLE", null, null,
         "บัญชี " + target.get("username") + " role=" + target.get("role") + "->" + role
         + " department=" + target.get("department_id") + "->" + department);
@@ -135,10 +138,11 @@ public class AdminController {
       @PathVariable UUID id, @RequestBody Map<String, Boolean> b, Authentication a) {
     var u = admin(a);
     if (u.get("id").equals(id)) throw new IllegalArgumentException();
-    db.one(
-        "SELECT id FROM app_user WHERE id=? AND municipality_id=?", id, u.get("municipality_id"));
+    var target = db.one(
+        "SELECT id,username FROM app_user WHERE id=? AND municipality_id=?", id, u.get("municipality_id"));
     if (b.get("enabled") == null) throw new IllegalArgumentException();
     db.run("UPDATE app_user SET enabled=? WHERE id=?", b.get("enabled"), id);
+    sessions.revoke(target.get("username").toString());
     workflow.audit(
         u, null, "USER_ENABLED", null, null, "บัญชี " + id + " enabled=" + b.get("enabled"));
   }

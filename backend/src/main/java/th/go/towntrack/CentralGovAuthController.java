@@ -17,11 +17,11 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 public class CentralGovAuthController {
  final GovCenterSsoClient client;final GovIdentityService identities;final UserDetailsService users;final Db db;
- final org.springframework.security.core.session.SessionRegistry sessions;
+ final ExternalLoginSessions sessions;
  final Clock clock;
  static final String PENDING="gov_sso_pending";
  record Pending(String state,Instant expires,UUID linkUser){}
- public CentralGovAuthController(GovCenterSsoClient client,GovIdentityService identities,UserDetailsService users,Db db,org.springframework.security.core.session.SessionRegistry sessions,Clock clock){this.client=client;this.identities=identities;this.users=users;this.db=db;this.sessions=sessions;this.clock=clock;}
+ public CentralGovAuthController(GovCenterSsoClient client,GovIdentityService identities,UserDetailsService users,Db db,ExternalLoginSessions sessions,Clock clock){this.client=client;this.identities=identities;this.users=users;this.db=db;this.sessions=sessions;this.clock=clock;}
  @GetMapping("/api/public/gov-auth") Object config(){return client.publicConfig();}
  @PostMapping("/api/auth/gov/start") Object start(@RequestBody Map<String,String> body,HttpServletRequest request,Authentication auth){
   client.requireConfigured();String state=body.getOrDefault("state","");String purpose=body.getOrDefault("purpose","LOGIN");
@@ -43,9 +43,10 @@ public class CentralGovAuthController {
   }
   var account=identities.sync(UUID.fromString(client.municipalityId),client.verify(body.get("code")),pending.linkUser());
   var principal=users.loadUserByUsername(account.get("username").toString());
-  sessions.removeSessionInformation(session.getId());request.changeSessionId();sessions.registerNewSession(session.getId(),principal);
+  var authentication=UsernamePasswordAuthenticationToken.authenticated(principal,null,principal.getAuthorities());
+  sessions.authenticate(authentication,request,response);
   session.removeAttribute("admin_role");session.removeAttribute("admin_department");
-  var context=SecurityContextHolder.createEmptyContext();context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(principal,null,principal.getAuthorities()));SecurityContextHolder.setContext(context);
+  var context=SecurityContextHolder.createEmptyContext();context.setAuthentication(authentication);SecurityContextHolder.setContext(context);
   session.setAttribute("gov_verified_username",principal.getUsername());
   session.setAttribute("gov_verified_until",clock.instant().plusSeconds(1800).getEpochSecond());
   new HttpSessionSecurityContextRepository().saveContext(context,request,response);

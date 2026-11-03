@@ -41,7 +41,12 @@ public class GovCenterSsoClient {
    var request=HttpRequest.newBuilder(URI.create(apiUrl+"/e-services/sso/verify-code")).timeout(Duration.ofSeconds(8)).header("Content-Type","application/json").header("x-api-key",apiKey).POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("code",code.trim())))).build();
    var response=http.send(request,HttpResponse.BodyHandlers.ofInputStream());
    try(var input=response.body()){
-    if(List.of(400,401,403,409).contains(response.statusCode()))throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"รหัส SSO ไม่ถูกต้อง หมดอายุ หรือใช้แล้ว กรุณาเข้าสู่ระบบใหม่");
+    if(List.of(400,401,403,409).contains(response.statusCode())) {
+     String error=new String(input.readNBytes(8192),java.nio.charset.StandardCharsets.UTF_8).toLowerCase(Locale.ROOT);
+     if(error.contains("invalid sso code")||error.contains("sso code has already been used")||error.contains("sso code has expired"))
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"รหัส SSO ไม่ถูกต้อง หมดอายุ หรือใช้แล้ว กรุณาเข้าสู่ระบบใหม่");
+     throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"Gov Center ปฏิเสธการเชื่อมต่อ กรุณาให้ผู้ดูแลตรวจ API Key, Service Code และสิทธิ์บริการ");
+    }
     if(response.statusCode()!=200)throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"Gov Center ไม่พร้อมใช้งาน กรุณาเริ่มเข้าสู่ระบบใหม่");
     byte[] data=input.readNBytes(1048577);if(data.length>1048576)throw new IllegalArgumentException();
     JsonNode result=json.readTree(data);
