@@ -1,0 +1,51 @@
+name: Build and deploy TownTrack
+on:
+  workflow_run:
+    workflows: ['Verify TownTrack']
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: towntrack-cloud-test
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: cloud-test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Resolve release
+        run: echo "RELEASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Build runtime images
+        run: |
+          docker build -f deploy/Dockerfile.backend -t "towntrack-backend:$RELEASE_SHA" .
+          docker build -f deploy/Dockerfile.frontend -t "towntrack-frontend:$RELEASE_SHA" .
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Transfer and deploy verified release
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          set -o pipefail
+          docker image save "towntrack-backend:$RELEASE_SHA" "towntrack-frontend:$RELEASE_SHA" |
+            gzip -1 |
+            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -i ~/.ssh/deploy_key "root@$DEPLOY_HOST" "$RELEASE_SHA"
+      - name: Check public HTTPS endpoint
+        env:
+          DEPLOY_URL: ${{ vars.DEPLOY_URL }}
+        run: curl --fail --retry 12 --retry-delay 10 --retry-all-errors "${DEPLOY_URL%/}/healthz"
+      - name: Remove temporary SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

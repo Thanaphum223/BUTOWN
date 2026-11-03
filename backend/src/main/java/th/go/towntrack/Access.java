@@ -16,10 +16,23 @@ public class Access {
 
   public Map<String, Object> user(Authentication a) {
     if (a == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-    return db.one(
+    var user = db.one(
         "SELECT id,municipality_id,department_id,username,display_name,role FROM app_user WHERE"
             + " username=? AND enabled=true",
         a.getName());
+    if ("ADMIN".equals(user.get("role"))) {
+      user = new HashMap<>(user);
+      user.put("account_role", "ADMIN");
+      var attributes = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+      if (attributes instanceof org.springframework.web.context.request.ServletRequestAttributes request) {
+        var session = request.getRequest().getSession(false);
+        if (session != null && session.getAttribute("admin_role") instanceof String role) {
+          user.put("role", role);
+          if (session.getAttribute("admin_department") != null) user.put("department_id", session.getAttribute("admin_department"));
+        }
+      }
+    }
+    return user;
   }
 
   public void role(Map<String, Object> u, String... roles) {
@@ -72,7 +85,7 @@ public class Access {
   public Map<String, Object> target(Object id, Map<String, Object> u, String role, Object dept) {
     var t =
         db.one(
-            "SELECT id,department_id FROM app_user WHERE id=? AND municipality_id=? AND role=? AND"
+            "SELECT id,department_id FROM app_user WHERE id=? AND municipality_id=? AND role IN (?,'ADMIN') AND"
                 + " enabled=true",
             Db.id(id),
             u.get("municipality_id"),

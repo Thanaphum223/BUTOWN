@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useState } from "react";
 type P = [number, number];
 type Geo = {
   point?: P;
@@ -38,7 +38,6 @@ function locate() {
   return pending;
 }
 export function GeoProvider({ children }: { children: React.ReactNode }) {
-  const initialized = useRef(false);
   const [point, setPoint] = useState<P | undefined>(cached),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -57,11 +56,6 @@ export function GeoProvider({ children }: { children: React.ReactNode }) {
       setBusy(false);
     }
   }
-  useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-    void request();
-  }, []);
   return (
     <Context.Provider value={{ point, busy, error, request }}>
       {children}

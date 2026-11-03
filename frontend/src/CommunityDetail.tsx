@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, Descriptions, Modal, Spin, Tag, Timeline, Typography } from "antd";
 import { api, statusNames, date } from "./api";
+import EvidenceGallery from "./EvidenceGallery";
 import LocationMap from "./LocationMap";
 type D = Record<string, any>;
 export default function CommunityDetail({ id, onClose }: { id?: string; onClose: () => void }) {
@@ -26,6 +27,8 @@ export default function CommunityDetail({ id, onClose }: { id?: string; onClose:
         { key: "created", label: "วันที่แจ้ง", children: date(c.created_at) },
         { key: "updated", label: "อัปเดตล่าสุด", children: date(c.updated_at) },
       ]} />
+      <Typography.Title level={5}>รูปภาพและวิดีโอหลักฐาน</Typography.Title>
+      <EvidenceGallery media={data?.media || []}/>
       {c.latitude != null && c.longitude != null && <LocationMap points={[{ id: c.id, latitude: Number(c.latitude), longitude: Number(c.longitude), status: c.status, categoryName: c.category_name }]} fitPoints />}
       <Typography.Text type="secondary">แสดงตำแหน่งโดยประมาณและความคืบหน้า โดยไม่เปิดเผยข้อมูลส่วนตัวของผู้แจ้ง</Typography.Text>
       <Typography.Title level={5}>ความคืบหน้า</Typography.Title>

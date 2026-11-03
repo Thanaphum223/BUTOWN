@@ -1,0 +1,11 @@
+{$SITE_ADDRESS} {
+    encode zstd gzip
+    handle /healthz {
+        reverse_proxy backend:8080 {
+            rewrite /actuator/health
+        }
+    }
+    handle {
+        reverse_proxy frontend:80
+    }
+}

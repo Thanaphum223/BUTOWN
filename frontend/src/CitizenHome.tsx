@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Alert, Button, Card, Empty, List, Pagination, Select, Space, Tag, Typography } from "antd";
-import { EyeOutlined, BellOutlined, CheckOutlined, LikeOutlined, TrophyOutlined, EnvironmentOutlined, FileTextOutlined, CheckCircleOutlined, ClockCircleOutlined } from "@ant-design/icons";
+import { PictureOutlined, PlayCircleOutlined, EyeOutlined, BellOutlined, CheckOutlined, LikeOutlined, TrophyOutlined, EnvironmentOutlined, FileTextOutlined, CheckCircleOutlined, ClockCircleOutlined } from "@ant-design/icons";
 import { api, statusNames } from "./api";
 import { useGeo } from "./GeoContext";
 import CommunityDetail from "./CommunityDetail";
@@ -14,6 +14,13 @@ export default function CitizenHome({ onTrack, onFollowing }: {
   const geo = useGeo();
   const [point, setPoint] = useState<[number, number] | undefined>(geo.point);
   useEffect(() => { if (geo.point) setPoint(p => p ?? geo.point); }, [geo.point]);
+  useEffect(() => {
+    if (!geo.busy && !geo.point && !point) {
+      const c=new AbortController();
+      api<{latitude:number;longitude:number}>("/municipal-center",{signal:c.signal}).then(p=>setPoint([p.latitude,p.longitude])).catch(e=>{if(!c.signal.aborted)setError(e.message);});
+      return ()=>c.abort();
+    }
+  },[geo.busy,geo.point,point]);
   const [catalog, setCatalog] = useState<D>();
   const [category, setCategory] = useState<string>();
   const [page, setPage] = useState(1);
@@ -67,7 +74,11 @@ export default function CitizenHome({ onTrack, onFollowing }: {
     {voteButton(item)}
   </div>;
   const statusTag = (item: D) => <Tag color={item.status === "CLOSED" ? "green" : item.status === "NEW" ? "orange" : "blue"}>{statusNames[item.status] || item.status}</Tag>;
-  const renderIssue = (item: D) => <Card className="community-issue" key={item.id}>
+  const renderIssue = (item: D) => <Card className="community-issue" key={item.id}
+    cover={item.cover ? <button className="issue-media-cover" onClick={()=>setDetailId(item.id)} aria-label={`ดูหลักฐาน ${item.category_name}`}>
+      {item.cover.content_type.startsWith("image/") && item.cover.has_thumbnail ? <img loading="lazy" src={`/api/media/${item.cover.id}?thumbnail=true`} alt={`หลักฐาน ${item.category_name}`} /> : <div className="issue-media-placeholder">{item.cover.content_type.startsWith("video/")?<PlayCircleOutlined/>:<PictureOutlined/>}<span>{item.cover.content_type.startsWith("video/")?"เปิดดูวิดีโอหลักฐาน":"เปิดดูรูปหลักฐาน"}</span></div>}
+      <span className="issue-media-count">{item.media_count} ไฟล์หลักฐาน</span>
+    </button> : undefined}>
     <div className="issue-top"><span className="issue-category-icon"><EnvironmentOutlined /></span>{statusTag(item)}</div>
     <Title level={4}>{item.category_name}</Title>
     <Text type="secondary">#{item.id.slice(0, 8).toUpperCase()} · {new Date(item.created_at).toLocaleDateString("th-TH")}</Text>
@@ -84,16 +95,18 @@ export default function CitizenHome({ onTrack, onFollowing }: {
       </div></div>
       <div className="community-metrics">
         {[
-          [FileTextOutlined, "ปัญหาในระยะ 5 กม.", result?.stats?.total || 0],
-          [ClockCircleOutlined, "กำลังดำเนินการ", result?.stats?.in_progress || 0],
-          [CheckCircleOutlined, "ปิดเรื่องแล้ว", result?.stats?.closed || 0],
+          [FileTextOutlined, "ปัญหาในระยะ 5 กม.", result?.stats?.total ?? "—"],
+          [LikeOutlined, "เสียงสนับสนุน", result?.stats?.votes ?? "—"],
+          [ClockCircleOutlined, "กำลังดำเนินการ", result?.stats?.in_progress ?? "—"],
+          [CheckCircleOutlined, "ปิดเรื่องแล้ว", result?.stats?.closed ?? "—"],
+          [CheckCircleOutlined, "สัดส่วนปิดเรื่อง", result?.stats?.total > 0 ? `${Math.round(Number(result?.stats?.closed) / Number(result?.stats?.total) * 100)}%` : "ไม่มีข้อมูล"],
         ].map(([Icon, label, value]) => {
           const Symbol = Icon as typeof FileTextOutlined;
           return <div key={String(label)}><span className="metric-symbol"><Symbol /></span><strong>{String(value)}</strong><span>{String(label)}</span></div>;
         })}
       </div>
       {!point && <Alert type="info" showIcon message={geo.busy ? "กำลังระบุตำแหน่ง…" : (geo.error || "เลือกจุดบนแผนที่เพื่อดูปัญหาในระยะ 5 กม.")} />}
-      {error && <Alert type="warning" showIcon message={error} style={{ margin: "16px 0" }} />}
+      {error && <Alert type="warning" showIcon message={error} action={<Button onClick={()=>setRevision(v=>v+1)}>ลองใหม่</Button>} style={{ margin: "16px 0" }} />}
       <div className="community-toolbar">
         <Space wrap><Text strong>ประเภทปัญหา</Text>
           <Select aria-label="ประเภทปัญหาที่ค้นหา" value={category || ""} style={{ minWidth: 240 }}
@@ -117,7 +130,7 @@ export default function CitizenHome({ onTrack, onFollowing }: {
         </section>
       </div>
       <section className="community-all-results">
-          <div className="row-title"><Title level={4}>ปัญหาทั้งหมดในระยะ 5 กม.</Title><Tag color="green">{result?.total || 0} เรื่อง</Tag></div>
+          <div className="row-title"><Title level={4}>ปัญหาทั้งหมดในระยะ 5 กม.</Title><Tag color="green">{result?.total ?? "—"} เรื่อง</Tag></div>
           <List grid={{ gutter: 16, xs: 1, sm: 1, md: 2, lg: 2, xl: 3 }} loading={busy} dataSource={items} locale={{ emptyText: <Empty description="ยังไม่มีปัญหาในระยะนี้" /> }} renderItem={item => <List.Item>{renderIssue(item)}</List.Item>} />
           <Pagination current={page} pageSize={12} total={Number(result?.total || 0)} showSizeChanger={false} onChange={setPage} style={{ marginTop: 16 }} />
           <Button className="my-cases-link" style={{ marginTop: 16 }} onClick={onTrack}>ดูคำร้องของฉันทั้งหมด</Button>

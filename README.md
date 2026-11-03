@@ -27,6 +27,7 @@
 - docs/ARCHITECTURE.md: โครงสร้างข้อมูล ขอบเขตสิทธิ์ กติกางาน และสมมติฐาน
 - docs/API.md และ docs/openapi.json: API และตัวอย่างการเรียก
 - docs/USER_GUIDE.md: ขั้นตอนใช้งานตามบทบาท
+- docs/GOV_REQUIREMENTS.md: ข้อกำหนด GOV ที่ปรับแล้ว การตั้งค่าบริการภายนอก และรายการตรวจรับที่ยังเหลือ
 - docs/EMERGENCY_CONTACTS.md: สายด่วนและข้อมูลสถานที่สำคัญใกล้ฉัน
 - docs/OPERATIONS.md: ติดตั้ง สำรอง กู้คืน และเชื่อม LINE
 - docs/STATUS.md: ผลทดสอบและข้อจำกัดที่ยังต้องจัดการ

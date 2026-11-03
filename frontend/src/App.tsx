@@ -1,3 +1,7 @@
+import { MenuOutlined } from "@ant-design/icons";
+import GovLogin from "./GovLogin";
+import CitizenTracking from "./CitizenTracking";
+import PrivacyGate from "./PrivacyGate";
 import CommunityDetail from "./CommunityDetail";
 import NewCase from "./NewCase";
 import { lazy } from "react";
@@ -17,6 +21,8 @@ import {
   Card,
   Col,
   Descriptions,
+  Drawer,
+  Grid,
   Empty,
   Form,
   Input,
@@ -45,6 +51,7 @@ import {
   AlertOutlined,
   DashboardOutlined,
   FileTextOutlined,
+  HistoryOutlined,
   PlusOutlined,
   BellOutlined,
   SettingOutlined,
@@ -219,6 +226,7 @@ function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () 
             เข้าสู่ระบบด้วย LINE
           </Button>
         )}
+        <GovLogin onLogin={onLogin} />
         <Tabs
           items={[
             {
@@ -311,6 +319,14 @@ function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () 
   );
 }
 export default function App() {
+  const screens = Grid.useBreakpoint();
+  const [mobileMenu,setMobileMenu]=useState(false);
+  const [showRoleControls,setShowRoleControls]=useState(false);
+  const [adminDepartments, setAdminDepartments] = useState<RowData[]>([]);
+  const [switchingRole, setSwitchingRole] = useState(false);
+  const [pendingAdminRole, setPendingAdminRole] = useState<string | null>(null);
+  const [pendingDepartment, setPendingDepartment] = useState<string>();
+  const [departmentError, setDepartmentError] = useState(false);
   const [fontLarge, setFontLarge] = useState(false);
   const [user, setUser] = useState<RowData | null>(),
     [view, setView] = useState("dashboard"),
@@ -324,6 +340,19 @@ export default function App() {
   useEffect(() => {
     void load();
   }, []);
+  useEffect(() => {
+    if (user && (user.account_role === "ADMIN" || user.role === "ADMIN"))
+      api<RowData>("/catalog").then(data => { setAdminDepartments(data.departments); setDepartmentError(false); })
+        .catch(() => { setDepartmentError(true); message.error("โหลดหน่วยงานไม่สำเร็จ กรุณารีเฟรชหน้า"); });
+  }, [user]);
+  const switchAdminRole = async (role: string, departmentId = user?.department_id) => {
+    setSwitchingRole(true);
+    try {
+      const next = await api<RowData>("/auth/admin-role", { method: "POST", body: JSON.stringify({role, departmentId}) });
+      setUser(next); setPendingAdminRole(null); setView("dashboard"); setSelected(""); setRefresh(x => x + 1);
+    } catch (e) { message.error((e as Error).message); }
+    finally { setSwitchingRole(false); }
+  };
   const open = (id: string) => {
     setSelected(id);
     setView("detail");
@@ -356,8 +385,9 @@ export default function App() {
     {
       key: "cases",
       icon: <FileTextOutlined />,
-      label: user.role === "CITIZEN" ? "คำร้องของฉัน" : "งานและคำร้อง",
+      label: user.role === "CITIZEN" ? "คำร้องของฉัน" : "คิวงาน",
     },
+    ...(user.role !== "CITIZEN" ? [{ key: "history", icon: <HistoryOutlined />, label: "ประวัติงาน" }] : []),
     ...(user.role === "CITIZEN"
       ? [
           { key: "new", icon: <PlusOutlined />, label: "แจ้งปัญหา" },
@@ -378,7 +408,20 @@ export default function App() {
     { key: "password", icon: <LockOutlined />, label: "เปลี่ยนรหัสผ่าน" },
   ];
   return (
-    <Layout
+    <PrivacyGate user={user}>
+      <Modal title={"เลือกหน่วยงานสำหรับ" + (pendingAdminRole ? roleNames[pendingAdminRole] : "บทบาท")}
+        open={pendingAdminRole !== null} onCancel={() => setPendingAdminRole(null)}
+        okText="เริ่มใช้บทบาทนี้" cancelText="ยกเลิก" confirmLoading={switchingRole}
+        okButtonProps={{disabled: !pendingDepartment || departmentError}}
+        onOk={() => pendingAdminRole && pendingDepartment && void switchAdminRole(pendingAdminRole, pendingDepartment)}>
+        <p>เลือกหน่วยงานเพื่อแสดงงานและสิทธิ์ที่ตรงกับบทบาท คุณสามารถสลับกลับผู้ดูแลระบบได้ทุกเมื่อ</p>
+        {departmentError ? <Alert type="error" message="โหลดหน่วยงานไม่สำเร็จ กรุณารีเฟรชหน้า" /> :
+          <Select aria-label="เลือกหน่วยงานเพื่อเริ่มบทบาท" style={{width:"100%"}} placeholder="เลือกหน่วยงาน"
+            value={pendingDepartment} onChange={setPendingDepartment}
+            options={adminDepartments.map(d => ({value:d.id,label:d.name}))}
+            notFoundContent="ยังไม่มีหน่วยงาน กรุณาเพิ่มในเมนูจัดการระบบ" />}
+      </Modal>
+      <Layout
       className={
         "shell " +
         (user.role === "CITIZEN" ? "citizen-shell" : "staff-shell") +
@@ -389,7 +432,9 @@ export default function App() {
         <Layout.Sider
           breakpoint="lg"
           collapsedWidth={0}
-          width={200}
+          collapsed={!screens.lg}
+          trigger={null}
+          width={232}
           theme="light"
           className="sidebar"
         >
@@ -401,7 +446,7 @@ export default function App() {
             mode="inline"
             selectedKeys={[view === "detail" ? "cases" : view]}
             items={items}
-            onClick={({ key }) => setView(key)}
+            onClick={({ key }) => {setView(key);window.scrollTo({top:0});}}
           />
           <div className="sidebar-bottom">
             <Tag color="cyan">{roleNames[user.role]}</Tag>
@@ -413,8 +458,13 @@ export default function App() {
           </div>
         </Layout.Sider>
       )}
+      <Drawer title="เมนู TownTrack" placement="left" width="min(320px, 90vw)" open={mobileMenu} onClose={()=>setMobileMenu(false)}>
+        <Menu mode="inline" selectedKeys={[view==="detail"?"cases":view]} items={items}
+          onClick={({key})=>{setView(key);setMobileMenu(false);window.scrollTo({top:0});}}/>
+      </Drawer>
       <Layout>
         <Layout.Header className="topbar">
+          {user.role!=="CITIZEN"&&!screens.lg&&<Button icon={<MenuOutlined/>} aria-label="เปิดเมนูหลัก" onClick={()=>setMobileMenu(true)}/>}
           <div className="header-identity">
             <span className="municipal-mark">ท</span>
             <div>
@@ -430,7 +480,23 @@ export default function App() {
               </small>
             </div>
           </div>
-          <Space>
+          <Space className="account-controls" wrap>
+            {(user.account_role === "ADMIN" || user.role === "ADMIN") && <>
+              {!screens.lg&&<Button aria-expanded={showRoleControls} onClick={()=>setShowRoleControls(v=>!v)}>สลับบทบาท</Button>}
+              <div className={"admin-role-controls"+(!screens.lg&&!showRoleControls?" is-hidden":"")}>
+              <Select aria-label="หน่วยงานสำหรับบทบาท" placeholder="เลือกหน่วยงาน" style={{minWidth:150}} value={user.department_id || undefined}
+                disabled={switchingRole} options={adminDepartments.map(d => ({value:d.id,label:d.name}))}
+                onChange={department => void switchAdminRole(user.role, department)} />
+              <Select aria-label="สลับบทบาทผู้ดูแลระบบ" style={{minWidth:150}} value={user.role} loading={switchingRole} disabled={switchingRole}
+                options={Object.entries(roleNames).map(([value,label]) => ({value,label}))}
+                onChange={role => {
+                  if (!["ADMIN","CITIZEN"].includes(role) && !user.department_id) {
+                    setPendingDepartment(adminDepartments.length === 1 ? adminDepartments[0].id : undefined);
+                    setPendingAdminRole(role);
+                  } else void switchAdminRole(role);
+                }} />
+              </div>
+            </>}
             {user.role === "CITIZEN" && (
               <Button
                 aria-pressed={fontLarge}
@@ -458,7 +524,7 @@ export default function App() {
           </Space>
         </Layout.Header>
         <Layout.Content className="content">
-          {view !== "dashboard" && view !== "emergency" && (
+          {user.role === "CITIZEN" && view !== "dashboard" && view !== "emergency" && (
             <Button
               icon={<HomeOutlined />}
               onClick={() => {
@@ -475,9 +541,11 @@ export default function App() {
               onTrack={() => setView("cases")}
               onFollowing={() => setView("following")}
             />
-          ) : (view === "dashboard" || view === "cases") &&
+          ) : (view === "dashboard" || view === "cases" || view === "history") &&
             user.role !== "CITIZEN" ? (
-            <StaffWorkspace user={user} dashboard={view === "dashboard"} />
+            <StaffWorkspace key={`${user.role}:${user.department_id}:${view === "history"}`} user={user} dashboard={view === "dashboard"} history={view === "history"} />
+          ) : view === "cases" && user.role === "CITIZEN" ? (
+            <CitizenTracking key="mine" open={open} />
           ) : view === "dashboard" || view === "cases" ? (
             <CaseList
               user={user}
@@ -497,9 +565,9 @@ export default function App() {
           ) : view === "detail" ? (
             <Detail id={selected} user={user} back={() => setView("cases")} />
           ) : view === "following" ? (
-            <Following open={open} />
+            <CitizenTracking key="following" initialTab="following" open={open} />
           ) : view === "notifications" ? (
-            <Notifications open={open} />
+            <Notifications open={open} citizen={user.role==="CITIZEN"} />
           ) : view === "emergency" ? (
             <EmergencyContacts />
           ) : view === "teams" ? (
@@ -547,7 +615,7 @@ export default function App() {
           ))}
         </nav>
       )}
-    </Layout>
+    </Layout></PrivacyGate>
   );
 }
 function CaseList({
@@ -788,7 +856,8 @@ function Following({ open }: { open: (id: string) => void }) {
     </>
   );
 }
-function Notifications({ open }: { open: (id: string) => void }) {
+function Notifications({ open, citizen }: { open: (id: string) => void; citizen: boolean }) {
+  const [communityId,setCommunityId]=useState<string>();
   const [refresh, setRefresh] = useState(0);
   const { data, error } = useData<RowData[]>("/notifications", refresh);
   const { message } = AntApp.useApp();
@@ -815,22 +884,23 @@ function Notifications({ open }: { open: (id: string) => void }) {
           dataSource={data}
           locale={{ emptyText: "ยังไม่มีการแจ้งเตือน" }}
           renderItem={(r) => (
-            <List.Item>
+            <List.Item className="notification-item" actions={r.complaint_id ? [<Button key="open" onClick={()=>citizen?setCommunityId(r.complaint_id):open(r.complaint_id)}>ดูคำร้อง</Button>] : undefined}>
               <List.Item.Meta
                 avatar={
                   <Badge dot={!r.read_at}>
                     <Avatar icon={<BellOutlined />} />
                   </Badge>
                 }
-                title={r.message}
+                title={String(r.message).replace(/\b[A-Z][A-Z_]+\b/g, code=>statusNames[code]||actionNames[code]||code)}
                 description={
-                  date(r.created_at) + " • #" + r.complaint_id.slice(0, 8)
+                  date(r.created_at) + (r.complaint_id ? " • #" + r.complaint_id.slice(0, 8) : "")
                 }
               />
             </List.Item>
           )}
         />
       </Card>
+      {citizen&&<CommunityDetail id={communityId} onClose={()=>setCommunityId(undefined)}/>}
     </>
   );
 }

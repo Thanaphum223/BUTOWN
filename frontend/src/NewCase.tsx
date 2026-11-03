@@ -34,6 +34,7 @@ export default function NewCase({
   onDone: (id: string) => void;
 }) {
   const geo = useGeo();
+  const submissionKey = useRef(crypto.randomUUID());
   const [form] = Form.useForm();
   const address = Form.useWatch("address", form);
   const [categories, setCategories] = useState<D[]>([]),
@@ -254,10 +255,11 @@ export default function NewCase({
         contactName: v.contactName,
         contactPhone: v.contactPhone,
       };
+      const key = submissionKey.current;
       const body = new FormData();
       body.append("complaint", new Blob([JSON.stringify(payload)], { type: "application/json" }));
       for (const file of files) body.append("files", file);
-      const result = await api<{ id: string }>("/complaints", { method: "POST", body });
+      const result = await api<{ id: string }>("/complaints", { method: "POST", body, headers: { "Idempotency-Key": key } });
       const id = result.id;
       setReceipt({
         id,
@@ -498,6 +500,7 @@ export default function NewCase({
             renderItem={(r) => (
               <List.Item
                 actions={[
+                  <Button key="vote" onClick={async()=>{try{await post(`/community/complaints/${r.id}/vote`,{});message.success("บันทึกพบเจอปัญหานี้แล้ว");}catch(e){message.error((e as Error).message);}}}>พบเจอ</Button>,
                   <Button
                     key="follow"
                     onClick={async () => {
@@ -668,7 +671,7 @@ export default function NewCase({
               <Button icon={<UploadOutlined />}>แนบภาพ วิดีโอ หรือเอกสาร</Button>
             </Upload>
             <Text type="secondary">ต้องแนบอย่างน้อย 1 ไฟล์ — {ATTACHMENT_HELP}</Text>
-            <p aria-live="polite">ขนาดรวมที่เลือก: {(files.reduce((total, f) => total + f.size, 0) / 1024 ** 2).toFixed(1)} / 1024 MB</p>
+            <p aria-live="polite">ขนาดรวมที่เลือก: {(files.reduce((total, f) => total + f.size, 0) / 1_000_000).toFixed(1)} / 1,000 MB</p>
           </Form.Item>
         </div>
         <div className="wizard-actions">

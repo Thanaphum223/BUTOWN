@@ -13,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/emergency")
 public class EmergencyContactsController {
+  @org.springframework.beans.factory.annotation.Autowired(required=false) Db db;
   private final GeocodingController geocoding;
   private final List<Map<String, Object>> verified;
   private static final Map<String, String> TYPES = Map.of(
@@ -39,6 +40,12 @@ public class EmergencyContactsController {
     double dy = radiusKm / 110.0;
     double dx = dy / Math.max(0.01, Math.cos(Math.toRadians(lat)));
     String box = String.format(Locale.ROOT, "%.6f,%.6f,%.6f,%.6f", lon-dx,lat+dy,lon+dx,lat-dy);
+    if(db!=null){
+      var registry=db.list("SELECT details::text details FROM emergency_facility WHERE type=? AND location IS NOT NULL AND ST_DWithin(location,ST_SetSRID(ST_MakePoint(?,?),4326)::geography,?) ORDER BY ST_Distance(location,ST_SetSRID(ST_MakePoint(?,?),4326)::geography) LIMIT 20",type,longitude,latitude,radiusKm*1000,longitude,latitude);
+      var entries=new ArrayList<Map<String,Object>>();
+      var mapper=new ObjectMapper();for(var row:registry)entries.add(mapper.readValue(row.get("details").toString(),new TypeReference<Map<String,Object>>(){}));
+      return mergeDirectory(Map.of("places",List.of()),latitude,longitude,radiusKm,type,entries);
+    }
     Object raw;
     try {
       raw = geocoding.call("/search?format=jsonv2&countrycodes=th&addressdetails=1&extratags=1&limit=10&bounded=1&viewbox="
@@ -55,8 +62,12 @@ public class EmergencyContactsController {
 
   @SuppressWarnings("unchecked")
   Map<String, Object> withDirectory(Map<String, Object> response, double latitude, double longitude, int radiusKm, String type) {
+    return mergeDirectory(response,latitude,longitude,radiusKm,type,verified);
+  }
+  @SuppressWarnings("unchecked")
+  Map<String,Object> mergeDirectory(Map<String,Object> response,double latitude,double longitude,int radiusKm,String type,List<Map<String,Object>> directory) {
     var places = new ArrayList<>((List<Map<String, Object>>) response.get("places"));
-    for (var entry : verified) {
+    for (var entry : directory) {
       if (!type.equals(entry.get("type")) || !(entry.get("latitude") instanceof Number lat)
           || !(entry.get("longitude") instanceof Number lon)) continue;
       double meters = distance(latitude, longitude, lat.doubleValue(), lon.doubleValue());

@@ -18,6 +18,8 @@ public class ComplaintController {
   final Workflow workflow;
   final ObjectMapper json;
   final FileController files;
+  @org.springframework.beans.factory.annotation.Autowired EvidenceMedia media;
+  @org.springframework.beans.factory.annotation.Autowired SubmissionKeys keys;
 
   public ComplaintController(Db d, Access a, Workflow w, ObjectMapper j, FileController files) {
     db = d;
@@ -48,8 +50,8 @@ public class ComplaintController {
       @NotBlank @Size(max = 200) String title,
       @NotBlank @Size(max = 20000) String description,
       @NotBlank @Size(max = 1000) String address,
-      @DecimalMin("-90") @DecimalMax("90") Double latitude,
-      @DecimalMin("-180") @DecimalMax("180") Double longitude,
+      @NotNull @DecimalMin("-90") @DecimalMax("90") Double latitude,
+      @NotNull @DecimalMin("-180") @DecimalMax("180") Double longitude,
       Map<String, String> answers,
       @Size(max = 200) String contactName,
       @Size(max = 30) @Pattern(regexp = "[0-9+() -]*") String contactPhone) {}
@@ -65,19 +67,30 @@ public class ComplaintController {
   public Object createWithEvidence(
       @Valid @RequestPart("complaint") NewComplaint b,
       @RequestPart(value = "files", required = false) List<org.springframework.web.multipart.MultipartFile> evidence,
-      Authentication a) throws Exception {
-    access.role(access.user(a), "CITIZEN");
+      Authentication a, @RequestHeader(value="Idempotency-Key", required=false) UUID key) throws Exception {
+    var submittingUser = access.user(a);
+    access.role(submittingUser, "CITIZEN");
     if (evidence == null || evidence.isEmpty() || evidence.stream().anyMatch(org.springframework.web.multipart.MultipartFile::isEmpty))
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "กรุณาแนบหลักฐานอย่างน้อย 1 ไฟล์");
     long total = 0;
     for (var file : evidence) {
       if (file.getSize() > FileController.MAX_TOTAL_BYTES - total)
-        throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "ไฟล์แนบรวมทั้งหมดต่อคำร้องต้องไม่เกิน 1 GB (1024 MB)");
+        throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "ไฟล์แนบรวมทั้งหมดต่อคำร้องต้องไม่เกิน 1 GB (1,000 MB)");
       total += file.getSize();
     }
+    var fingerprints = new ArrayList<String>();
+    for (var f : evidence) {
+      var digest = java.security.MessageDigest.getInstance("SHA-256");
+      try (var in = f.getInputStream()) { byte[] buffer=new byte[65536]; int n; while((n=in.read(buffer))!=-1)digest.update(buffer,0,n); }
+      fingerprints.add(f.getOriginalFilename()+":"+f.getSize()+":"+HexFormat.of().formatHex(digest.digest()));
+    }
+    String hash = keys.hash(Map.of("complaint", b, "files", fingerprints));
+    Object prior = keys.find(submittingUser.get("id"), "CREATE", key, hash);
+    if (prior != null) return prior;
     var result = createRecord(b, a);
     UUID id = (UUID) result.get("id");
     for (var file : evidence) files.upload(id, file, a);
+    keys.save(submittingUser.get("id"), "CREATE", key, hash, result);
     return result;
   }
 
@@ -140,7 +153,12 @@ public class ComplaintController {
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "10") int size,
       @RequestParam(defaultValue = "") String q,
-      @RequestParam(defaultValue = "") String status) {
+      @RequestParam(defaultValue = "") String status,
+      @RequestParam(required=false) UUID categoryId,
+      @RequestParam(defaultValue="") String area,
+      @RequestParam(defaultValue="newest") String sort,
+      @RequestParam(defaultValue="false") boolean activeOnly,
+      @RequestParam(defaultValue="false") boolean completedOnly) {
     if (page < 0
         || page > 1000000
         || size < 1
@@ -179,6 +197,8 @@ public class ComplaintController {
                 + " ('CLOSED','REJECTED','TERMINATED') AND c.due_at<now()) overdue"
                 + base,
             args.toArray());
+    if (completedOnly) base += " AND c.status IN ('CLOSED','REJECTED','TERMINATED')";
+    if (activeOnly) base += " AND c.status NOT IN ('CLOSED','REJECTED','TERMINATED')";
     if (!q.isBlank()) {
       base += " AND (c.title ILIKE ? OR c.id::text ILIKE ?)";
       args.add("%" + q + "%");
@@ -188,14 +208,18 @@ public class ComplaintController {
       base += " AND c.status=?";
       args.add(status);
     }
+    if(categoryId!=null){base+=" AND c.category_id=?";args.add(categoryId);}
+    if(!area.isBlank()){if(area.length()>200)throw new IllegalArgumentException();base+=" AND c.address ILIKE ?";args.add("%"+area+"%");}
+    if(!List.of("newest","oldest","votes").contains(sort))throw new IllegalArgumentException();
+    String order=sort.equals("votes")?"votes DESC,c.created_at DESC,c.id":sort.equals("oldest")?"c.created_at ASC,c.id":"c.created_at DESC,c.id";
     Object count = db.one("SELECT count(*) total" + base, args.toArray()).get("total");
     args.add(size);
     args.add((long) page * size);
     var items =
         db.list(
-            "SELECT c.id,c.title,c.status,c.created_at,c.due_at,c.version,k.name category_name"
+            "SELECT c.id,c.title,c.address,c.status,c.created_at,c.due_at,c.version,k.name category_name,(SELECT count(*) FROM complaint_vote v WHERE v.complaint_id=c.id) votes"
                 + base
-                + " ORDER BY c.created_at DESC,c.id LIMIT ? OFFSET ?",
+                + " ORDER BY "+order+" LIMIT ? OFFSET ?",
             args.toArray());
     return Map.of("items", items, "total", count, "page", page, "size", size, "stats", stats);
   }
@@ -235,9 +259,11 @@ public class ComplaintController {
                   + " uploaded_by=? ORDER BY created_at",
               id,
               u.get("id")));
+      result.put("media",media.visible(id,u));
       result.put("actions", List.of());
       return result;
     }
+    c.put("assignment_details", c.get("assignment_details").toString());
     c.put("answers", c.get("answers").toString());
     c.put("form_schema", c.get("form_schema").toString());
     result.put("complaint", c);
@@ -272,7 +298,7 @@ public class ComplaintController {
     result.put(
         "files",
         db.list(
-            "SELECT id,original_name,size_bytes,report_id,resource_id,created_at FROM attachment"
+            "SELECT id,original_name,size_bytes,uploaded_by,report_id,resource_id,resource_revision_id,evidence_stage,content_type,public_approved,public_copy_of,created_at FROM attachment"
                 + " WHERE complaint_id=? ORDER BY created_at",
             id));
     result.put(
@@ -308,8 +334,15 @@ public class ComplaintController {
   }
 
   @PostMapping("/complaints/{id}/actions")
-  public Object act(@PathVariable UUID id, @RequestBody Map<String, Object> b, Authentication a) {
-    return workflow.act(id, b, access.user(a));
+  @Transactional
+  public Object act(@PathVariable UUID id, @RequestBody Map<String, Object> b, Authentication a,
+      @RequestHeader(value="Idempotency-Key", required=false) UUID key) throws Exception {
+    var u=access.user(a); String operation="ACTION:"+id;
+    String hash=keys.hash(b); Object previous=keys.find(u.get("id"),operation,key,hash);
+    if(previous!=null)return previous;
+    var result=workflow.act(id,b,u);
+    keys.save(u.get("id"),operation,key,hash,result);
+    return result;
   }
 
   @GetMapping("/people")
@@ -317,7 +350,7 @@ public class ComplaintController {
     var u = access.user(a);
     access.role(u, "OFFICER", "LEADER", "ADMIN");
     return db.list(
-        "SELECT id,display_name,department_id FROM app_user WHERE municipality_id=? AND role=? AND"
+        "SELECT id,display_name,department_id FROM app_user WHERE municipality_id=? AND role IN (?,'ADMIN') AND"
             + " enabled=true AND (department_id=? OR ?='ADMIN') ORDER BY display_name",
         u.get("municipality_id"),
         role,
@@ -339,7 +372,7 @@ public class ComplaintController {
         + " WHERE c.municipality_id=? AND (?::uuid IS NULL OR c.category_id=?::uuid)"
         + " AND ST_DWithin(c.location,ST_SetSRID(ST_MakePoint(?,?),4326)::geography,5000)";
     Object[] scope = {u.get("municipality_id"), categoryId, categoryId, longitude, latitude};
-    var stats = db.one("SELECT count(*) total,count(*) FILTER(WHERE c.status NOT IN"
+    var stats = db.one("SELECT COALESCE(sum((SELECT count(*) FROM complaint_vote v WHERE v.complaint_id=c.id)),0) votes,count(*) total,count(*) FILTER(WHERE c.status NOT IN"
         + " ('CLOSED','REJECTED','TERMINATED')) in_progress,count(*) FILTER(WHERE c.status='CLOSED') closed"
         + base, scope);
     String fields = "SELECT (c.external_id LIKE 'mock-community-v1:%') mock,c.id,c.category_id,k.name category_name,c.status,c.created_at,"
@@ -356,6 +389,7 @@ public class ComplaintController {
         + " AND EXISTS(SELECT 1 FROM complaint_vote v WHERE v.complaint_id=c.id)"
         + " ORDER BY votes DESC,c.created_at DESC,c.id LIMIT 5",
         u.get("id"), u.get("id"), u.get("municipality_id"), categoryId, categoryId, longitude, latitude);
+    media.decorate(items,u);media.decorate(top,u);
     return Map.of("items", items, "top", top, "total", stats.get("total"), "stats", stats);
   }
 
@@ -369,7 +403,7 @@ public class ComplaintController {
         + "(c.external_id LIKE 'mock-community-v1:%') mock"
         + " FROM complaint c JOIN category k ON k.id=c.category_id WHERE c.id=? AND c.municipality_id=?",
         id, u.get("municipality_id"));
-    return Map.of("complaint", c, "history", db.list(
+    return Map.of("complaint", c, "media", media.visible(id,u), "history", db.list(
         "SELECT from_status,to_status,created_at FROM audit_event WHERE complaint_id=? AND to_status IS NOT NULL ORDER BY created_at", id));
   }
 

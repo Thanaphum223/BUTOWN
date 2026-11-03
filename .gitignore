@@ -8,3 +8,5 @@ work/
 private-files/
 *.log
 *.tsbuildinfo
+
+/frontend/public/pdfjs/

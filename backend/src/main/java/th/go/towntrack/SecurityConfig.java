@@ -46,7 +46,8 @@ public class SecurityConfig {
 
   @Bean
   SecurityFilterChain security(
-      HttpSecurity h, org.springframework.security.core.session.SessionRegistry sessions)
+      HttpSecurity h, org.springframework.security.core.session.SessionRegistry sessions,
+      @org.springframework.beans.factory.annotation.Value("${GOV_AUTH_MODE:local}") String govMode)
       throws Exception {
     h.authorizeHttpRequests(
             a ->
@@ -56,8 +57,11 @@ public class SecurityConfig {
                         "/api/auth/register",
                         "/api/public/municipalities",
                         "/api/public/line",
+                        "/api/public/map-config",
                         "/api/emergency/nearby",
                         "/api/auth/line",
+                        "/api/auth/gov",
+                        "/api/public/gov-auth",
                         "/actuator/health")
                     .permitAll()
                     .anyRequest()
@@ -94,8 +98,24 @@ public class SecurityConfig {
             x ->
                 x.contentSecurityPolicy(
                     c -> c.policyDirectives("default-src 'none'; frame-ancestors 'none'")))
-        .addFilterBefore(new LoginLimit(), UsernamePasswordAuthenticationFilter.class);
+        .addFilterBefore(new LoginLimit(), UsernamePasswordAuthenticationFilter.class)
+        .addFilterAfter(new GovSessionGuard(govMode), org.springframework.security.web.context.SecurityContextHolderFilter.class);
     return h.build();
+  }
+
+  static class GovSessionGuard extends OncePerRequestFilter {
+    final String mode; GovSessionGuard(String mode){this.mode=mode;}
+    protected void doFilterInternal(HttpServletRequest q,HttpServletResponse s,FilterChain chain)throws ServletException,IOException {
+      var auth=org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+      if(mode.equals("central")&&auth!=null&&auth.isAuthenticated()&&auth.getAuthorities().stream().anyMatch(r->r.getAuthority().matches("ROLE_(ADMIN|OFFICER|LEADER|FIELD|APPROVER)"))) {
+        var session=q.getSession(false);Object expires=session==null?null:session.getAttribute("gov_verified_until");
+        if(!(expires instanceof Long time)||time<=java.time.Instant.now().getEpochSecond()) {
+          org.springframework.security.core.context.SecurityContextHolder.clearContext();if(session!=null)session.invalidate();
+          s.sendError(503,"Central Gov-Auth verification required");return;
+        }
+      }
+      chain.doFilter(q,s);
+    }
   }
 
   static class LoginLimit extends OncePerRequestFilter {

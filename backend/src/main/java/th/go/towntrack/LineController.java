@@ -52,7 +52,7 @@ public class LineController {
     return Map.of("enabled", !channel.isBlank() && !liff.isBlank() && town != null, "liffId", liff);
   }
 
-  @PostMapping("/api/auth/line")
+  @PostMapping({"/api/auth/line","/api/auth/liff-verify"})
   @Transactional
   public Object login(
       @RequestBody Map<String, Object> b, HttpServletRequest request, HttpServletResponse response)

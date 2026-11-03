@@ -28,6 +28,23 @@ class TownTrackIntegrationTest {
   UUID town, dept, cat, wf;
   Map<String, UUID> users = new HashMap<>();
 
+  @Test
+  void adminCanSwitchEveryRoleWithoutChangingAccountRole() throws Exception {
+    var session = new org.springframework.mock.web.MockHttpSession();
+    for (var role : List.of("CITIZEN","OFFICER","LEADER","FIELD","APPROVER","ADMIN")) {
+      mvc.perform(as(post("/api/auth/admin-role").session(session).with(csrf())
+          .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("role",role,"departmentId",dept))),"ADMIN"))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.role").value(role)).andExpect(jsonPath("$.account_role").value("ADMIN"));
+      mvc.perform(as(get("/api/auth/me").session(session),"ADMIN")).andExpect(jsonPath("$.role").value(role));
+    }
+    assertEquals("ADMIN",db.one("SELECT role FROM app_user WHERE id=?",users.get("ADMIN")).get("role"));
+    mvc.perform(as(post("/api/auth/admin-role").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+      .content("{\"role\":\"ADMIN\"}"),"CITIZEN")).andExpect(status().isForbidden());
+    var foreignDepartment=UUID.randomUUID();
+    mvc.perform(as(post("/api/auth/admin-role").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+      .content(json.writeValueAsString(Map.of("role","FIELD","departmentId",foreignDepartment))),"ADMIN")).andExpect(status().isNotFound());
+  }
+
   @BeforeEach
   void fixture() {
     town = UUID.randomUUID();
@@ -75,6 +92,123 @@ class TownTrackIntegrationTest {
         "address", "Test street", "latitude", 13.75, "longitude", 100.5)).with(csrf()), "CITIZEN"))
         .andExpect(status().isOk()).andReturn();
     return UUID.fromString(json.readTree(result.getResponse().getContentAsString()).get("id").asText());
+  }
+
+  @Test
+  void activeQueueExcludesFinishedCasesBeforeCountingAndPagination() throws Exception {
+    for (String state : List.of("CLOSED", "REJECTED", "TERMINATED", "NEW")) {
+      UUID id = create();
+      db.run("UPDATE complaint SET status=? WHERE id=?", state, id);
+    }
+    mvc.perform(as(get("/api/complaints?activeOnly=true&size=1"), "ADMIN"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(1))
+        .andExpect(jsonPath("$.items.length()").value(1))
+        .andExpect(jsonPath("$.items[0].status").value("NEW"));
+    mvc.perform(as(get("/api/complaints?activeOnly=true&status=CLOSED"), "ADMIN"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(0));
+    mvc.perform(as(get("/api/complaints?completedOnly=true"), "ADMIN"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(3));
+    mvc.perform(as(get("/api/complaints?completedOnly=true&status=NEW"), "ADMIN"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(0));
+    mvc.perform(as(get("/api/complaints?completedOnly=true&size=1&page=1"), "OFFICER"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(3))
+        .andExpect(jsonPath("$.items.length()").value(1));
+    for (String role : List.of("LEADER", "FIELD", "APPROVER")) {
+      mvc.perform(as(get("/api/complaints?completedOnly=true"), role))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(0));
+    }
+    mvc.perform(as(get("/api/complaints"), "ADMIN"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(4));
+  }
+
+  @Test
+  void evidencePreviewRequiresOwnershipOrApprovedCopyAndSupportsRanges() throws Exception {
+    UUID complaint=create();
+    var image=new java.awt.image.BufferedImage(8,8,java.awt.image.BufferedImage.TYPE_INT_RGB);
+    var bytes=new java.io.ByteArrayOutputStream();javax.imageio.ImageIO.write(image,"png",bytes);
+    var response=mvc.perform(as(multipart("/api/complaints/"+complaint+"/files").file(new MockMultipartFile("file","private.png","image/png",bytes.toByteArray())).with(csrf()),"CITIZEN"))
+      .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    UUID file=UUID.fromString(json.readTree(response).get("id").asText());
+    db.run("INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role) VALUES(?,?,?,'unused','Peer','CITIZEN')",UUID.randomUUID(),town,"mediaPeer");
+    mvc.perform(as(get("/api/media/"+file).header("Range","bytes=0-9"),"CITIZEN"))
+      .andExpect(status().isPartialContent()).andExpect(header().string("Content-Type","image/png")).andExpect(header().string("Content-Range",org.hamcrest.Matchers.startsWith("bytes 0-9/")));
+    mvc.perform(get("/api/media/"+file).with(user("mediaPeer").roles("CITIZEN"))).andExpect(status().isForbidden());
+    mvc.perform(get("/api/community/complaints/"+complaint).with(user("mediaPeer").roles("CITIZEN"))).andExpect(jsonPath("$.media.length()").value(0));
+    mvc.perform(as(get("/api/media/"+file+"?thumbnail=true"),"CITIZEN")).andExpect(status().isOk()).andExpect(header().string("Content-Type","image/jpeg"));
+    var publish=mvc.perform(as(multipart("/api/complaints/"+complaint+"/shared-media").file(new MockMultipartFile("file","redacted.png","image/png",bytes.toByteArray()))
+      .param("sourceId",file.toString()).param("confirmedClean","true").with(csrf()),"OFFICER"))
+      .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    UUID copy=UUID.fromString(json.readTree(publish).get("id").asText());
+    assertNotEquals(copy,file);
+    mvc.perform(get("/api/media/"+copy).with(user("mediaPeer").roles("CITIZEN"))).andExpect(status().isOk());
+    mvc.perform(get("/api/community/complaints/"+complaint).with(user("mediaPeer").roles("CITIZEN"))).andExpect(jsonPath("$.media.length()").value(1));
+    mvc.perform(as(delete("/api/complaints/"+complaint+"/shared-media/"+copy).with(csrf()),"OFFICER")).andExpect(status().isOk());
+    mvc.perform(get("/api/media/"+copy).with(user("mediaPeer").roles("CITIZEN"))).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void citizensCannotPublishOtherEvidence() throws Exception {
+    UUID complaint=create();UUID source=(UUID)db.one("SELECT id FROM attachment WHERE complaint_id=?",complaint).get("id");
+    mvc.perform(as(multipart("/api/complaints/"+complaint+"/shared-media").file(new MockMultipartFile("file","copy.png","image/png",new byte[]{1,2}))
+      .param("sourceId",source.toString()).param("confirmedClean","true").with(csrf()),"CITIZEN")).andExpect(status().isForbidden());
+    mvc.perform(as(multipart("/api/complaints/"+complaint+"/shared-media").file(new MockMultipartFile("file","copy.png","image/png",new byte[]{1,2}))
+      .param("sourceId",source.toString()).param("confirmedClean","false").with(csrf()),"OFFICER")).andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void decimalGigabyteLimitMatchesSrs() {
+    assertEquals(1_000_000_000L,FileController.MAX_TOTAL_BYTES);
+  }
+
+  @Test
+  void privacyAcknowledgementIsVersionedAndSeparateFromGps() throws Exception {
+    mvc.perform(as(get("/api/privacy"),"CITIZEN")).andExpect(status().isOk()).andExpect(jsonPath("$.acknowledged").value(false));
+    for(int n=0;n<3;n++)mvc.perform(as(post("/api/users/pdpa-consent").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"version\":\"local-test-v1\"}"),"CITIZEN")).andExpect(status().isOk());
+    mvc.perform(as(get("/api/privacy"),"CITIZEN")).andExpect(jsonPath("$.acknowledged").value(true));
+    mvc.perform(as(post("/api/users/pdpa-consent").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"version\":\"old\"}"),"CITIZEN")).andExpect(status().isConflict());
+  }
+
+  @Test
+  void citizenTrackingUsesFiveItemsPerPage() throws Exception {
+    for(int i=0;i<11;i++)create();
+    mvc.perform(as(get("/api/citizen/tracking?tab=mine&page=0"),"CITIZEN")).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(5)).andExpect(jsonPath("$.total").value(11));
+    mvc.perform(as(get("/api/citizen/tracking?tab=mine&page=1"),"CITIZEN")).andExpect(jsonPath("$.items.length()").value(5));
+    mvc.perform(as(get("/api/citizen/tracking?tab=mine&page=2"),"CITIZEN")).andExpect(jsonPath("$.items.length()").value(1));
+    mvc.perform(as(get("/api/citizen/tracking?tab=following"),"CITIZEN")).andExpect(jsonPath("$.items.length()").value(0));
+    mvc.perform(as(get("/api/citizen/tracking"),"OFFICER")).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void complaintIdempotencyReturnsOriginalAndRejectsChangedPayload() throws Exception {
+    var body=new HashMap<String,Object>();body.put("categoryId",cat);body.put("title","Duplicate protected");body.put("description","Details");body.put("address","Street");body.put("latitude",13.75);body.put("longitude",100.5);
+    String key=UUID.randomUUID().toString();String first=null;
+    for(int i=0;i<3;i++){
+      var result=mvc.perform(as(complaintRequest(body).header("Idempotency-Key",key).with(csrf()),"CITIZEN")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+      if(first==null)first=result;else assertEquals(json.readTree(first),json.readTree(result));
+    }
+    assertEquals(1,db.list("SELECT id FROM complaint WHERE municipality_id=?",town).size());
+    body.put("title","Changed");mvc.perform(as(complaintRequest(body).header("Idempotency-Key",key).with(csrf()),"CITIZEN")).andExpect(status().isConflict());
+  }
+
+  @Test
+  void reportRequiresBeforeAndAfterForLatestRevision() throws Exception {
+    UUID id=create();assign(id);action(id,"FIELD","START",Map.of()).andExpect(status().isOk());
+    mvc.perform(multipart("/api/complaints/"+id+"/files").file(new MockMultipartFile("file","proof.pdf","application/pdf","%PDF-1.4 proof".getBytes())).with(user("testFIELD").roles("FIELD")).with(csrf())).andExpect(status().isOk());
+    action(id,"FIELD","REPORT",Map.of("content","Missing photos")).andExpect(status().isBadRequest());
+    evidence(id,"FIELD");action(id,"FIELD","REPORT",Map.of("content","Complete")).andExpect(status().isOk());
+    db.run("UPDATE attachment SET evidence_stage='GENERAL' WHERE complaint_id=? AND evidence_stage='AFTER'",id);
+    action(id,"LEADER","FORWARD_REPORT",Map.of()).andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void preAssignmentResourceApprovalReturnsToTeamPlanning() throws Exception {
+    UUID id=create();action(id,"OFFICER","TRIAGE",Map.of("leaderId",users.get("LEADER"))).andExpect(status().isOk());
+    action(id,"LEADER","REQUEST_RESOURCE",Map.of("workflow_origin","POST_ACCEPT")).andExpect(status().isOk());
+    assertEquals("PRE_ASSIGN",workflow.resource(id).get("workflow_origin"));
+    evidence(id,"LEADER");action(id,"LEADER","PROPOSE",Map.of("proposal","Equipment","amount",100,"durationDays",1)).andExpect(status().isOk());
+    action(id,"OFFICER","SEND_APPROVAL",Map.of("approverIds",List.of(users.get("APPROVER")))).andExpect(status().isOk());
+    action(id,"APPROVER","APPROVE",Map.of()).andExpect(status().isOk());assertEquals("TRIAGED",state(id));
+    action(id,"LEADER","ASSIGN",Map.of("assigneeId",users.get("FIELD"))).andExpect(status().isOk());
   }
 
   @Test
@@ -211,6 +345,15 @@ class TownTrackIntegrationTest {
   }
 
   void evidence(UUID id, String role) throws Exception {
+    if(role.equals("FIELD")) {
+      for(String stage: List.of("BEFORE","AFTER")) {
+        var image=new java.awt.image.BufferedImage(2,2,java.awt.image.BufferedImage.TYPE_INT_RGB);
+        var bytes=new java.io.ByteArrayOutputStream();javax.imageio.ImageIO.write(image,"png",bytes);
+        mvc.perform(multipart("/api/complaints/"+id+"/files").file(new MockMultipartFile("file",stage+".png","image/png",bytes.toByteArray()))
+          .param("evidenceStage",stage).with(user("test"+role).roles(role)).with(csrf())).andExpect(status().isOk());
+      }
+      return;
+    }
     mvc.perform(
             multipart("/api/complaints/" + id + "/files")
                 .file(
@@ -258,6 +401,74 @@ class TownTrackIntegrationTest {
   }
 
   @Test
+  void resourceLineItemsAreStoredAndTotalIsCalculatedOnServer() throws Exception {
+    UUID id=create();assign(id);
+    action(id,"FIELD","REQUEST_RESOURCE",Map.of()).andExpect(status().isOk());
+    evidence(id,"LEADER");
+    action(id,"LEADER","PROPOSE",Map.of("proposal","Materials","amount",999,"durationDays",2,
+      "lineItems",List.of(Map.of("name","Sand","amount","12.50"),Map.of("name","Cement","amount","11.25"))))
+      .andExpect(status().isOk());
+    var revision=db.one("SELECT v.amount,v.line_items::text items FROM resource_revision v JOIN resource_request r ON r.id=v.resource_id WHERE r.complaint_id=?",id);
+    assertEquals(new java.math.BigDecimal("23.75"),revision.get("amount"));
+    var items=json.readTree((String)revision.get("items"));
+    assertEquals(2,items.size());assertEquals("Sand",items.get(0).get("name").asText());
+    assertEquals(new java.math.BigDecimal("12.50"),items.get(0).get("amount").decimalValue().setScale(2));
+  }
+
+  @Test
+  void invalidResourceItemsCannotCreateRevision() throws Exception {
+    UUID id=create();assign(id);
+    action(id,"FIELD","REQUEST_RESOURCE",Map.of()).andExpect(status().isOk());evidence(id,"LEADER");
+    var invalid=List.of(List.of(),List.of(Map.of("name"," ","amount",1)),
+      List.of(Map.of("name","Sand","amount",-1)),List.of(Map.of("name","Sand","amount","0.001")),
+      List.of(Map.of("name","Sand","amount",600000000000L),Map.of("name","Cement","amount",600000000000L)),
+      java.util.Collections.nCopies(51,Map.of("name","Sand","amount",1)));
+    for(var items:invalid)action(id,"LEADER","PROPOSE",Map.of("proposal","Materials","durationDays",2,"lineItems",items))
+      .andExpect(status().isBadRequest());
+    assertEquals(0L,((Number)db.one("SELECT count(*) n FROM resource_revision v JOIN resource_request r ON r.id=v.resource_id WHERE r.complaint_id=?",id).get("n")).longValue());
+  }
+
+  @Test
+  void resourceDocumentsAreReadableByReviewerAndAssignedApproverOnly() throws Exception {
+    UUID id=create();requestResource(id);
+    var file=db.one("SELECT id,resource_revision_id FROM attachment WHERE complaint_id=? AND resource_id IS NOT NULL",id);
+    assertNotNull(file.get("resource_revision_id"));
+    for(var role:List.of("LEADER","OFFICER","APPROVER","ADMIN"))
+      mvc.perform(as(get("/api/files/"+file.get("id")),role)).andExpect(status().isOk())
+        .andExpect(content().contentType("application/pdf"))
+        .andExpect(header().string("Cache-Control","private, no-store"))
+        .andExpect(content().bytes("%PDF-1.4 test".getBytes()));
+    mvc.perform(as(get("/api/files/"+file.get("id")),"CITIZEN")).andExpect(status().isForbidden());
+    UUID other=UUID.randomUUID();db.run("INSERT INTO municipality(id,name) VALUES(?,'Other town')",other);
+    db.run("UPDATE app_user SET department_id=NULL,municipality_id=? WHERE id=?",other,users.get("ADMIN"));
+    mvc.perform(as(get("/api/files/"+file.get("id")),"ADMIN")).andExpect(status().isNotFound());
+  }
+
+  @Test
+  void revisedResourceDocumentsStayLinkedToTheirSubmittedRevision() throws Exception {
+    UUID id=create();assign(id);action(id,"FIELD","REQUEST_RESOURCE",Map.of()).andExpect(status().isOk());
+    evidence(id,"LEADER");
+    action(id,"LEADER","PROPOSE",Map.of("proposal","First","amount",1,"durationDays",1)).andExpect(status().isOk());
+    var first=db.one("SELECT id,resource_revision_id FROM attachment WHERE complaint_id=? AND resource_id IS NOT NULL",id);
+    action(id,"OFFICER","RETURN_RESOURCE",Map.of()).andExpect(status().isOk());
+    evidence(id,"LEADER");
+    action(id,"LEADER","PROPOSE",Map.of("proposal","Second","amount",2,"durationDays",2)).andExpect(status().isOk());
+    var files=db.list("SELECT resource_revision_id FROM attachment WHERE complaint_id=? AND resource_id IS NOT NULL",id);
+    assertEquals(2,files.size());assertEquals(2,files.stream().map(f->f.get("resource_revision_id")).distinct().count());
+    assertEquals(first.get("resource_revision_id"),db.one("SELECT resource_revision_id FROM attachment WHERE id=?",first.get("id")).get("resource_revision_id"));
+    var response=mvc.perform(as(get("/api/complaints/"+id),"OFFICER")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    assertTrue(json.readTree(response).get("files").toString().contains(first.get("resource_revision_id").toString()));
+  }
+
+  @Test
+  void missingPrivateDocumentReturnsNotFound() throws Exception {
+    UUID id=create();
+    var file=db.one("SELECT id FROM attachment WHERE complaint_id=? LIMIT 1",id);
+    db.run("UPDATE attachment SET storage_key=? WHERE id=?",UUID.randomUUID()+".pdf",file.get("id"));
+    mvc.perform(as(get("/api/files/"+file.get("id")),"OFFICER")).andExpect(status().isNotFound());
+  }
+
+  @Test
   void resourceDeniedTerminatesEntireComplaint() throws Exception {
     UUID id = create();
     requestResource(id);
@@ -298,6 +509,7 @@ class TownTrackIntegrationTest {
     action(id, "LEADER", "PROPOSE", Map.of("proposal", "first", "amount", 100, "durationDays", 1))
         .andExpect(status().isOk());
     action(id, "OFFICER", "RETURN_RESOURCE", Map.of()).andExpect(status().isOk());
+    evidence(id, "LEADER");
     action(
             id,
             "LEADER",
@@ -697,6 +909,18 @@ class TownTrackIntegrationTest {
         .with(user("testCITIZEN")).with(csrf())).andExpect(status().isPayloadTooLarge());
     assertEquals(FileController.MAX_TOTAL_BYTES,
         ((Number) db.one("SELECT SUM(size_bytes) size FROM attachment WHERE complaint_id=?", id).get("size")).longValue());
+  }
+
+  @Test
+  void uploadQuotaIncludesEarlierRevisionsAndOtherUploaders() throws Exception {
+    UUID id=create();
+    requestResource(id);
+    long used=((Number)db.one("SELECT SUM(size_bytes) used FROM attachment WHERE complaint_id=?",id).get("used")).longValue();
+    var linked=db.one("SELECT id FROM attachment WHERE complaint_id=? AND resource_id IS NOT NULL LIMIT 1",id);
+    db.run("UPDATE attachment SET size_bytes=size_bytes+? WHERE id=?",FileController.MAX_TOTAL_BYTES-used,linked.get("id"));
+    mvc.perform(as(multipart("/api/complaints/"+id+"/files")
+      .file(new MockMultipartFile("file","extra.pdf","application/pdf","%PDF-1.4 test".getBytes())).with(csrf()),"ADMIN"))
+      .andExpect(status().isPayloadTooLarge());
   }
 
   @Test
