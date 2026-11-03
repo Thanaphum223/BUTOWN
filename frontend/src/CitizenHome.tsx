@@ -1,26 +1,47 @@
 import { useEffect, useState } from "react";
 import { Alert, Button, Card, Empty, List, Pagination, Select, Space, Tag, Typography } from "antd";
-import { PictureOutlined, PlayCircleOutlined, EyeOutlined, BellOutlined, CheckOutlined, LikeOutlined, TrophyOutlined, EnvironmentOutlined, FileTextOutlined, CheckCircleOutlined, ClockCircleOutlined } from "@ant-design/icons";
+import {
+  PictureOutlined,
+  PlayCircleOutlined,
+  EyeOutlined,
+  BellOutlined,
+  CheckOutlined,
+  LikeOutlined,
+  TrophyOutlined,
+  EnvironmentOutlined,
+  FileTextOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+} from "@ant-design/icons";
 import { api, statusNames } from "./api";
 import { useGeo } from "./GeoContext";
 import CommunityDetail from "./CommunityDetail";
 import LocationMap from "./LocationMap";
 type D = Record<string, any>;
 const { Title, Text } = Typography;
-export default function CitizenHome({ onTrack, onFollowing }: {
+export default function CitizenHome({
+  onTrack,
+  onFollowing,
+}: {
   onTrack: () => void;
   onFollowing: () => void;
 }) {
   const geo = useGeo();
   const [point, setPoint] = useState<[number, number] | undefined>(geo.point);
-  useEffect(() => { if (geo.point) setPoint(p => p ?? geo.point); }, [geo.point]);
+  useEffect(() => {
+    if (geo.point) setPoint((p) => p ?? geo.point);
+  }, [geo.point]);
   useEffect(() => {
     if (!geo.busy && !geo.point && !point) {
-      const c=new AbortController();
-      api<{latitude:number;longitude:number}>("/municipal-center",{signal:c.signal}).then(p=>setPoint([p.latitude,p.longitude])).catch(e=>{if(!c.signal.aborted)setError(e.message);});
-      return ()=>c.abort();
+      const c = new AbortController();
+      api<{ latitude: number; longitude: number }>("/municipal-center", { signal: c.signal })
+        .then((p) => setPoint([p.latitude, p.longitude]))
+        .catch((e) => {
+          if (!c.signal.aborted) setError(e.message);
+        });
+      return () => c.abort();
     }
-  },[geo.busy,geo.point,point]);
+  }, [geo.busy, geo.point, point]);
   const [catalog, setCatalog] = useState<D>();
   const [category, setCategory] = useState<string>();
   const [page, setPage] = useState(1);
@@ -33,107 +54,306 @@ export default function CitizenHome({ onTrack, onFollowing }: {
   const [error, setError] = useState("");
   useEffect(() => {
     const controller = new AbortController();
-    api<D>("/catalog", { signal: controller.signal }).then(setCatalog).catch(e => {
-      if (!controller.signal.aborted) setError(e.message);
-    });
+    api<D>("/catalog", { signal: controller.signal })
+      .then(setCatalog)
+      .catch((e) => {
+        if (!controller.signal.aborted) setError(e.message);
+      });
     return () => controller.abort();
   }, []);
   useEffect(() => {
     if (!point) return;
     const controller = new AbortController();
-    setBusy(true); setError("");
-    api<D>(`/community/complaints?latitude=${point[0]}&longitude=${point[1]}&page=${page - 1}&size=12${category ? `&categoryId=${category}` : ""}`, { signal: controller.signal })
-      .then(setResult).catch(e => { if (!controller.signal.aborted) setError(e.message); })
-      .finally(() => { if (!controller.signal.aborted) setBusy(false); });
+    setBusy(true);
+    setError("");
+    api<D>(
+      `/community/complaints?latitude=${point[0]}&longitude=${point[1]}&page=${page - 1}&size=12${category ? `&categoryId=${category}` : ""}`,
+      { signal: controller.signal },
+    )
+      .then(setResult)
+      .catch((e) => {
+        if (!controller.signal.aborted) setError(e.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setBusy(false);
+      });
     return () => controller.abort();
   }, [page, category, point?.[0], point?.[1], revision]);
   const items: D[] = result?.items || [];
   async function vote(item: D) {
     setVoting(item.id);
     try {
-      await api(`/community/complaints/${item.id}/vote`, { method: item.voted ? "DELETE" : "POST" });
-      setRevision(v => v + 1);
-    } catch (e) { setError((e as Error).message); }
-    finally { setVoting(undefined); }
+      await api(`/community/complaints/${item.id}/vote`, {
+        method: item.voted ? "DELETE" : "POST",
+      });
+      setRevision((v) => v + 1);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setVoting(undefined);
+    }
   }
-  const voteButton = (item: D) => <Button disabled={busy || !!voting || !!followingId} icon={<LikeOutlined />} loading={voting === item.id}
-    type={item.voted ? "primary" : "default"} aria-pressed={!!item.voted}
-    aria-label={`${item.voted ? "ยกเลิกโหวต" : "โหวต"} ${item.category_name} #${item.id.slice(0, 8)}`}
-    onClick={() => void vote(item)}>{item.votes} โหวต</Button>;
-  const issueActions = (item: D) => <div className="community-issue-actions">
-    <Button icon={<EyeOutlined />} onClick={() => setDetailId(item.id)}>ดูรายละเอียด</Button>
-    <Button disabled={busy || !!voting || !!followingId} icon={item.following ? <CheckOutlined /> : <BellOutlined />} type={item.following ? "primary" : "default"} loading={followingId === item.id}
-      aria-pressed={!!item.following} onClick={async () => {
-        setFollowingId(item.id);
-        try {
-          await api(item.following ? `/complaints/${item.id}/follow` : `/community/complaints/${item.id}/follow`, { method: item.following ? "DELETE" : "POST" });
-          setRevision(v => v + 1);
-        } catch (e) { setError((e as Error).message); }
-        finally { setFollowingId(undefined); }
-      }}>{item.following ? "ติดตามแล้ว" : "ติดตาม"}</Button>
-    {voteButton(item)}
-  </div>;
-  const statusTag = (item: D) => <Tag color={item.status === "CLOSED" ? "green" : item.status === "NEW" ? "orange" : "blue"}>{statusNames[item.status] || item.status}</Tag>;
-  const renderIssue = (item: D) => <Card className="community-issue" key={item.id}
-    cover={item.cover ? <button className="issue-media-cover" onClick={()=>setDetailId(item.id)} aria-label={`ดูหลักฐาน ${item.category_name}`}>
-      {item.cover.content_type.startsWith("image/") && item.cover.has_thumbnail ? <img loading="lazy" src={`/api/media/${item.cover.id}?thumbnail=true`} alt={`หลักฐาน ${item.category_name}`} /> : <div className="issue-media-placeholder">{item.cover.content_type.startsWith("video/")?<PlayCircleOutlined/>:<PictureOutlined/>}<span>{item.cover.content_type.startsWith("video/")?"เปิดดูวิดีโอหลักฐาน":"เปิดดูรูปหลักฐาน"}</span></div>}
-      <span className="issue-media-count">{item.media_count} ไฟล์หลักฐาน</span>
-    </button> : undefined}>
-    <div className="issue-top"><span className="issue-category-icon"><EnvironmentOutlined /></span>{statusTag(item)}</div>
-    <Title level={4}>{item.category_name}</Title>
-    <Text type="secondary">#{item.id.slice(0, 8).toUpperCase()} · {new Date(item.created_at).toLocaleDateString("th-TH")}</Text>
-    <div className="issue-card-footer">{item.mock ? <Tag>MOCK · ข้อมูลจำลอง</Tag> : <span />}</div>
-    {issueActions(item)}
-  </Card>;
+  const voteButton = (item: D) => (
+    <Button
+      disabled={busy || !!voting || !!followingId}
+      icon={<LikeOutlined />}
+      loading={voting === item.id}
+      type={item.voted ? "primary" : "default"}
+      aria-pressed={!!item.voted}
+      aria-label={`${item.voted ? "ยกเลิกโหวต" : "โหวต"} ${item.category_name} #${item.id.slice(0, 8)}`}
+      onClick={() => void vote(item)}
+    >
+      {item.votes} โหวต
+    </Button>
+  );
+  const issueActions = (item: D) => (
+    <div className="community-issue-actions">
+      <Button icon={<EyeOutlined />} onClick={() => setDetailId(item.id)}>
+        ดูรายละเอียด
+      </Button>
+      <Button
+        disabled={busy || !!voting || !!followingId}
+        icon={item.following ? <CheckOutlined /> : <BellOutlined />}
+        type={item.following ? "primary" : "default"}
+        loading={followingId === item.id}
+        aria-pressed={!!item.following}
+        onClick={async () => {
+          setFollowingId(item.id);
+          try {
+            await api(
+              item.following
+                ? `/complaints/${item.id}/follow`
+                : `/community/complaints/${item.id}/follow`,
+              { method: item.following ? "DELETE" : "POST" },
+            );
+            setRevision((v) => v + 1);
+          } catch (e) {
+            setError((e as Error).message);
+          } finally {
+            setFollowingId(undefined);
+          }
+        }}
+      >
+        {item.following ? "ติดตามแล้ว" : "ติดตาม"}
+      </Button>
+      {voteButton(item)}
+    </div>
+  );
+  const statusTag = (item: D) => (
+    <Tag color={item.status === "CLOSED" ? "green" : item.status === "NEW" ? "orange" : "blue"}>
+      {statusNames[item.status] || item.status}
+    </Tag>
+  );
+  const renderIssue = (item: D) => (
+    <Card
+      className="community-issue"
+      key={item.id}
+      cover={
+        item.cover ? (
+          <button
+            className="issue-media-cover"
+            onClick={() => setDetailId(item.id)}
+            aria-label={`ดูหลักฐาน ${item.category_name}`}
+          >
+            {item.cover.content_type.startsWith("image/") && item.cover.has_thumbnail ? (
+              <img
+                loading="lazy"
+                src={`/api/media/${item.cover.id}?thumbnail=true`}
+                alt={`หลักฐาน ${item.category_name}`}
+              />
+            ) : (
+              <div className="issue-media-placeholder">
+                {item.cover.content_type.startsWith("video/") ? (
+                  <PlayCircleOutlined />
+                ) : (
+                  <PictureOutlined />
+                )}
+                <span>
+                  {item.cover.content_type.startsWith("video/")
+                    ? "เปิดดูวิดีโอหลักฐาน"
+                    : "เปิดดูรูปหลักฐาน"}
+                </span>
+              </div>
+            )}
+            <span className="issue-media-count">{item.media_count} ไฟล์หลักฐาน</span>
+          </button>
+        ) : undefined
+      }
+    >
+      <div className="issue-top">
+        <span className="issue-category-icon">
+          <EnvironmentOutlined />
+        </span>
+        {statusTag(item)}
+      </div>
+      <Title level={4}>{item.category_name}</Title>
+      <Text type="secondary">
+        #{item.id.slice(0, 8).toUpperCase()} ·{" "}
+        {new Date(item.created_at).toLocaleDateString("th-TH")}
+      </Text>
+      <div className="issue-card-footer">
+        {item.mock ? <Tag>MOCK · ข้อมูลจำลอง</Tag> : <span />}
+      </div>
+      {issueActions(item)}
+    </Card>
+  );
   return (
     <div className="community-home">
       <CommunityDetail id={detailId} onClose={() => setDetailId(undefined)} />
-      <div className="page-heading community-heading"><div>
-        <Text className="eyebrow">ชุมชน · TOWNTRACK</Text>
-        <Title level={2}>ปัญหาในระยะ 5 กม.</Title>
-        <p className="community-lead">เรื่องที่ประชาชนแจ้งในเขตเทศบาล ภายในรัศมี 5 กม. จากจุดที่เลือก</p>
-      </div></div>
+      <div className="page-heading community-heading">
+        <div>
+          <Text className="eyebrow">ชุมชน · TOWNTRACK</Text>
+          <Title level={2}>ปัญหาในระยะ 5 กม.</Title>
+          <p className="community-lead">
+            เรื่องที่ประชาชนแจ้งในเขตเทศบาล ภายในรัศมี 5 กม. จากจุดที่เลือก
+          </p>
+        </div>
+      </div>
       <div className="community-metrics">
         {[
           [FileTextOutlined, "ปัญหาในระยะ 5 กม.", result?.stats?.total ?? "—"],
           [LikeOutlined, "เสียงสนับสนุน", result?.stats?.votes ?? "—"],
           [ClockCircleOutlined, "กำลังดำเนินการ", result?.stats?.in_progress ?? "—"],
           [CheckCircleOutlined, "ปิดเรื่องแล้ว", result?.stats?.closed ?? "—"],
-          [CheckCircleOutlined, "สัดส่วนปิดเรื่อง", result?.stats?.total > 0 ? `${Math.round(Number(result?.stats?.closed) / Number(result?.stats?.total) * 100)}%` : "ไม่มีข้อมูล"],
+          [
+            CheckCircleOutlined,
+            "สัดส่วนปิดเรื่อง",
+            result?.stats?.total > 0
+              ? `${Math.round((Number(result?.stats?.closed) / Number(result?.stats?.total)) * 100)}%`
+              : "ไม่มีข้อมูล",
+          ],
         ].map(([Icon, label, value]) => {
           const Symbol = Icon as typeof FileTextOutlined;
-          return <div key={String(label)}><span className="metric-symbol"><Symbol /></span><strong>{String(value)}</strong><span>{String(label)}</span></div>;
+          return (
+            <div key={String(label)}>
+              <span className="metric-symbol">
+                <Symbol />
+              </span>
+              <strong>{String(value)}</strong>
+              <span>{String(label)}</span>
+            </div>
+          );
         })}
       </div>
-      {!point && <Alert type="info" showIcon message={geo.busy ? "กำลังระบุตำแหน่ง…" : (geo.error || "เลือกจุดบนแผนที่เพื่อดูปัญหาในระยะ 5 กม.")} />}
-      {error && <Alert type="warning" showIcon message={error} action={<Button onClick={()=>setRevision(v=>v+1)}>ลองใหม่</Button>} style={{ margin: "16px 0" }} />}
+      {!point && (
+        <Alert
+          type="info"
+          showIcon
+          message={
+            geo.busy ? "กำลังระบุตำแหน่ง…" : geo.error || "เลือกจุดบนแผนที่เพื่อดูปัญหาในระยะ 5 กม."
+          }
+        />
+      )}
+      {error && (
+        <Alert
+          type="warning"
+          showIcon
+          message={error}
+          action={<Button onClick={() => setRevision((v) => v + 1)}>ลองใหม่</Button>}
+          style={{ margin: "16px 0" }}
+        />
+      )}
       <div className="community-toolbar">
-        <Space wrap><Text strong>ประเภทปัญหา</Text>
-          <Select aria-label="ประเภทปัญหาที่ค้นหา" value={category || ""} style={{ minWidth: 240 }}
-            options={[{ value: "", label: "ทุกประเภทปัญหา" }, ...(catalog?.categories || []).map((c: D) => ({ value: c.id, label: c.name }))]}
-            onChange={value => { setCategory(value || undefined); setPage(1); }} />
+        <Space wrap>
+          <Text strong>ประเภทปัญหา</Text>
+          <Select
+            aria-label="ประเภทปัญหาที่ค้นหา"
+            value={category || ""}
+            style={{ minWidth: 240 }}
+            options={[
+              { value: "", label: "ทุกประเภทปัญหา" },
+              ...(catalog?.categories || []).map((c: D) => ({ value: c.id, label: c.name })),
+            ]}
+            onChange={(value) => {
+              setCategory(value || undefined);
+              setPage(1);
+            }}
+          />
         </Space>
         <Button onClick={onFollowing}>เรื่องที่ติดตาม</Button>
       </div>
       <div className="community-explorer">
-        <Card className="community-map-panel" title="ปัญหาบนแผนที่" extra={<Tag color="green">รัศมี 5 กม.</Tag>}>
-          <LocationMap value={point} radiusMeters={5000} onChange={p => { setPoint(p); setPage(1); }} points={items.filter(i => i.latitude != null && i.longitude != null).map(i => ({ id: i.id, latitude: Number(i.latitude), longitude: Number(i.longitude), status: i.status, categoryName: i.category_name }))} />
+        <Card
+          className="community-map-panel"
+          title="ปัญหาบนแผนที่"
+          extra={<Tag color="green">รัศมี 5 กม.</Tag>}
+        >
+          <LocationMap
+            value={point}
+            radiusMeters={5000}
+            onChange={(p) => {
+              setPoint(p);
+              setPage(1);
+            }}
+            points={items
+              .filter((i) => i.latitude != null && i.longitude != null)
+              .map((i) => ({
+                id: i.id,
+                latitude: Number(i.latitude),
+                longitude: Number(i.longitude),
+                status: i.status,
+                categoryName: i.category_name,
+              }))}
+          />
           <Text type="secondary">แสดงตำแหน่งโดยประมาณเพื่อรักษาความเป็นส่วนตัวของผู้แจ้ง</Text>
         </Card>
         <section className="community-results">
-          <div className="ranking-heading"><div><Text className="eyebrow">เสียงจากชุมชน</Text><Title level={4}><TrophyOutlined /> 5 ปัญหาที่มีโหวตสูงสุด</Title></div><Tag>TOP 5</Tag></div>
-          <List loading={busy} dataSource={result?.top || []} locale={{ emptyText: "ยังไม่มีปัญหาที่ได้รับโหวตในระยะ 5 กม." }} renderItem={(item: D, index: number) => <List.Item className="ranking-row">
-            <span className={"ranking-number rank-" + (index + 1)}>{index + 1}</span>
-            <div className="ranking-copy"><strong><button className="community-detail-link" onClick={() => setDetailId(item.id)}>{item.category_name}</button></strong><div>{statusTag(item)}{item.mock && <span className="mock-label">MOCK</span>}</div></div>
-            {issueActions(item)}
-          </List.Item>} />
+          <div className="ranking-heading">
+            <div>
+              <Text className="eyebrow">เสียงจากชุมชน</Text>
+              <Title level={4}>
+                <TrophyOutlined /> 5 ปัญหาที่มีโหวตสูงสุด
+              </Title>
+            </div>
+            <Tag>TOP 5</Tag>
+          </div>
+          <List
+            loading={busy}
+            dataSource={result?.top || []}
+            locale={{ emptyText: "ยังไม่มีปัญหาที่ได้รับโหวตในระยะ 5 กม." }}
+            renderItem={(item: D, index: number) => (
+              <List.Item className="ranking-row">
+                <span className={"ranking-number rank-" + (index + 1)}>{index + 1}</span>
+                <div className="ranking-copy">
+                  <strong>
+                    <button className="community-detail-link" onClick={() => setDetailId(item.id)}>
+                      {item.category_name}
+                    </button>
+                  </strong>
+                  <div>
+                    {statusTag(item)}
+                    {item.mock && <span className="mock-label">MOCK</span>}
+                  </div>
+                </div>
+                {issueActions(item)}
+              </List.Item>
+            )}
+          />
         </section>
       </div>
       <section className="community-all-results">
-          <div className="row-title"><Title level={4}>ปัญหาทั้งหมดในระยะ 5 กม.</Title><Tag color="green">{result?.total ?? "—"} เรื่อง</Tag></div>
-          <List grid={{ gutter: 16, xs: 1, sm: 1, md: 2, lg: 2, xl: 3 }} loading={busy} dataSource={items} locale={{ emptyText: <Empty description="ยังไม่มีปัญหาในระยะนี้" /> }} renderItem={item => <List.Item>{renderIssue(item)}</List.Item>} />
-          <Pagination current={page} pageSize={12} total={Number(result?.total || 0)} showSizeChanger={false} onChange={setPage} style={{ marginTop: 16 }} />
-          <Button className="my-cases-link" style={{ marginTop: 16 }} onClick={onTrack}>ดูคำร้องของฉันทั้งหมด</Button>
+        <div className="row-title">
+          <Title level={4}>ปัญหาทั้งหมดในระยะ 5 กม.</Title>
+          <Tag color="green">{result?.total ?? "—"} เรื่อง</Tag>
+        </div>
+        <List
+          grid={{ gutter: 16, xs: 1, sm: 1, md: 2, lg: 2, xl: 3 }}
+          loading={busy}
+          dataSource={items}
+          locale={{ emptyText: <Empty description="ยังไม่มีปัญหาในระยะนี้" /> }}
+          renderItem={(item) => <List.Item>{renderIssue(item)}</List.Item>}
+        />
+        <Pagination
+          current={page}
+          pageSize={12}
+          total={Number(result?.total || 0)}
+          showSizeChanger={false}
+          onChange={setPage}
+          style={{ marginTop: 16 }}
+        />
+        <Button className="my-cases-link" style={{ marginTop: 16 }} onClick={onTrack}>
+          ดูคำร้องของฉันทั้งหมด
+        </Button>
       </section>
     </div>
   );

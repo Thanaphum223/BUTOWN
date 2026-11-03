@@ -52,7 +52,7 @@ public class LineController {
     return Map.of("enabled", !channel.isBlank() && !liff.isBlank() && town != null, "liffId", liff);
   }
 
-  @PostMapping({"/api/auth/line","/api/auth/liff-verify"})
+  @PostMapping({"/api/auth/line", "/api/auth/liff-verify"})
   @Transactional
   public Object login(
       @RequestBody Map<String, Object> b, HttpServletRequest request, HttpServletResponse response)
@@ -110,14 +110,14 @@ public class LineController {
     }
     var user = users.loadUserByUsername(name);
     request.getSession();
-    var authentication = UsernamePasswordAuthenticationToken.authenticated(user, null, user.getAuthorities());
+    var authentication =
+        UsernamePasswordAuthenticationToken.authenticated(user, null, user.getAuthorities());
     sessions.authenticate(authentication, request, response);
     request.getSession().removeAttribute("gov_verified_until");
     request.getSession().removeAttribute("gov_verified_username");
     request.getSession().removeAttribute(CentralGovAuthController.PENDING);
     var context = SecurityContextHolder.createEmptyContext();
-    context.setAuthentication(
-        authentication);
+    context.setAuthentication(authentication);
     SecurityContextHolder.setContext(context);
     new HttpSessionSecurityContextRepository().saveContext(context, request, response);
     new org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository()

@@ -16,19 +16,23 @@ public class Access {
 
   public Map<String, Object> user(Authentication a) {
     if (a == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-    var user = db.one(
-        "SELECT id,municipality_id,department_id,username,display_name,role FROM app_user WHERE"
-            + " username=? AND enabled=true",
-        a.getName());
+    var user =
+        db.one(
+            "SELECT id,municipality_id,department_id,username,display_name,role FROM app_user WHERE"
+                + " username=? AND enabled=true",
+            a.getName());
     if ("ADMIN".equals(user.get("role"))) {
       user = new HashMap<>(user);
       user.put("account_role", "ADMIN");
-      var attributes = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
-      if (attributes instanceof org.springframework.web.context.request.ServletRequestAttributes request) {
+      var attributes =
+          org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+      if (attributes
+          instanceof org.springframework.web.context.request.ServletRequestAttributes request) {
         var session = request.getRequest().getSession(false);
         if (session != null && session.getAttribute("admin_role") instanceof String role) {
           user.put("role", role);
-          if (session.getAttribute("admin_department") != null) user.put("department_id", session.getAttribute("admin_department"));
+          if (session.getAttribute("admin_department") != null)
+            user.put("department_id", session.getAttribute("admin_department"));
         }
       }
     }

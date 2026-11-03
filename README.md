@@ -15,6 +15,9 @@
 - ดูรหัสผ่านเฉพาะในเครื่องด้วย ./scripts/show-local-access.ps1 (ไม่ควรส่งไฟล์รหัสผ่านหรือบันทึกหน้าจอที่มีรหัสผ่านต่อ)
 - บัญชีตัวอย่างเกิดจาก DEMO_PASSWORD เฉพาะการพัฒนา ห้ามกำหนดตัวแปรนี้ใน Production
 
+## ความสะอาดของโค้ดและความปลอดภัย
+ดู docs/CODE_QUALITY_SECURITY.md สำหรับคำสั่งจัดรูปแบบอัตโนมัติ ชุดทดสอบทั้งหมด และขอบเขตความปลอดภัยที่ตรวจแล้ว
+
 ## Build และทดสอบ
 ต้องมี JDK 21, Maven 3.9+, Node 24 และ PostgreSQL/PostGIS
 - Backend: cd backend แล้ว mvn verify (กำหนด DB_URL, DB_USER, DB_PASSWORD, BOOTSTRAP_PASSWORD ก่อน)

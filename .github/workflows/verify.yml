@@ -29,6 +29,7 @@ jobs:
       FILE_ROOT: /tmp/towntrack-ci-files
     steps:
       - uses: actions/checkout@v4
+      - run: python3 scripts/check-source-hygiene.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -41,8 +42,12 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: mvn -B -f backend/pom.xml verify
-      - run: npm ci && npm run build && npx playwright install --with-deps chromium
+      - run: npm ci && npm run format:check && npm run build && npx playwright install --with-deps chromium
         working-directory: frontend
+      - name: Verify production proxy security
+        run: |
+          docker build -f deploy/Dockerfile.frontend -t towntrack-proxy-check .
+          python3 scripts/test-proxy-security.py --image towntrack-proxy-check
       - name: Start test services
         run: |
           mkdir -p work
@@ -52,7 +57,7 @@ jobs:
             if curl -fsS http://127.0.0.1:8080/actuator/health && curl -fsS http://127.0.0.1:5173/; then break; fi
             sleep 2
           done
-      - run: npx playwright test cloud-smoke.spec.ts gov-sso.spec.ts --max-failures=1
+      - run: npm test -- --max-failures=1
         working-directory: frontend
       - uses: actions/upload-artifact@v4
         if: always()

@@ -10,7 +10,9 @@ import org.springframework.web.server.ResponseStatusException;
 public class Workflow {
   final Db db;
   final Access access;
-  @org.springframework.beans.factory.annotation.Autowired com.fasterxml.jackson.databind.ObjectMapper json;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  com.fasterxml.jackson.databind.ObjectMapper json;
 
   public Workflow(Db d, Access a) {
     db = d;
@@ -124,16 +126,32 @@ public class Workflow {
             action);
     access.role(u, (String) tr.get("role"));
     String to = (String) tr.get("to_status");
-    if (List.of("FORWARD_REPORT","VERIFY","CLOSE").contains(action)) {
-      var latest=db.one("SELECT id FROM field_report WHERE complaint_id=? ORDER BY created_at DESC,revision DESC LIMIT 1",id);
-      Object reportId=latest.get("id");
-      var evidence=db.one("SELECT count(*) FILTER(WHERE evidence_stage='BEFORE') before_count,count(*) FILTER(WHERE evidence_stage='AFTER') after_count FROM attachment WHERE report_id=? AND content_type LIKE 'image/%'",reportId);
-      if (((Number)evidence.get("before_count")).longValue()==0 || ((Number)evidence.get("after_count")).longValue()==0)
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"ต้องมีภาพ BEFORE และ AFTER ของรายงานฉบับล่าสุดก่อนตรวจผ่านหรือปิดเรื่อง");
-      if (List.of("VERIFY","CLOSE").contains(action) && db.list("SELECT id FROM review WHERE report_id=? AND decision='FORWARD_REPORT'",reportId).isEmpty())
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"รายงานฉบับล่าสุดยังไม่ผ่านหัวหน้าผู้ลงพื้นที่");
-      if (action.equals("CLOSE") && db.list("SELECT id FROM review WHERE report_id=? AND decision='VERIFY'",reportId).isEmpty())
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"รายงานฉบับล่าสุดยังไม่ผ่านการตรวจรับของเจ้าหน้าที่");
+    if (List.of("FORWARD_REPORT", "VERIFY", "CLOSE").contains(action)) {
+      var latest =
+          db.one(
+              "SELECT id FROM field_report WHERE complaint_id=? ORDER BY created_at DESC,revision DESC LIMIT 1",
+              id);
+      Object reportId = latest.get("id");
+      var evidence =
+          db.one(
+              "SELECT count(*) FILTER(WHERE evidence_stage='BEFORE') before_count,count(*) FILTER(WHERE evidence_stage='AFTER') after_count FROM attachment WHERE report_id=? AND content_type LIKE 'image/%'",
+              reportId);
+      if (((Number) evidence.get("before_count")).longValue() == 0
+          || ((Number) evidence.get("after_count")).longValue() == 0)
+        throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST,
+            "ต้องมีภาพ BEFORE และ AFTER ของรายงานฉบับล่าสุดก่อนตรวจผ่านหรือปิดเรื่อง");
+      if (List.of("VERIFY", "CLOSE").contains(action)
+          && db.list(
+                  "SELECT id FROM review WHERE report_id=? AND decision='FORWARD_REPORT'", reportId)
+              .isEmpty())
+        throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST, "รายงานฉบับล่าสุดยังไม่ผ่านหัวหน้าผู้ลงพื้นที่");
+      if (action.equals("CLOSE")
+          && db.list("SELECT id FROM review WHERE report_id=? AND decision='VERIFY'", reportId)
+              .isEmpty())
+        throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST, "รายงานฉบับล่าสุดยังไม่ผ่านการตรวจรับของเจ้าหน้าที่");
     }
     switch (action) {
       case "TRIAGE" -> {
@@ -145,11 +163,30 @@ public class Workflow {
             leader.get("id"),
             leader.get("department_id"),
             id);
-        Map<String,Object> details=new LinkedHashMap<>();
-        for(String key:List.of("operationMethod","urgency","appointment","workScope","precautions","coordinator")) {
-          Object value=b.get(key);if(value!=null) {if(!(value instanceof String text)||text.length()>4000)throw new IllegalArgumentException();details.put(key,text);}
+        Map<String, Object> details = new LinkedHashMap<>();
+        for (String key :
+            List.of(
+                "operationMethod",
+                "urgency",
+                "appointment",
+                "workScope",
+                "precautions",
+                "coordinator")) {
+          Object value = b.get(key);
+          if (value != null) {
+            if (!(value instanceof String text) || text.length() > 4000)
+              throw new IllegalArgumentException();
+            details.put(key, text);
+          }
         }
-        try {db.run("UPDATE complaint SET assignment_details=?::jsonb WHERE id=?",json.writeValueAsString(details),id);}catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalArgumentException();}
+        try {
+          db.run(
+              "UPDATE complaint SET assignment_details=?::jsonb WHERE id=?",
+              json.writeValueAsString(details),
+              id);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+          throw new IllegalArgumentException();
+        }
         notifyUser(leader.get("id"), id, "มีคำร้องรอจัดทีม");
       }
       case "ASSIGN" -> {
@@ -186,9 +223,14 @@ public class Workflow {
         notifyUser(target.get("id"), id, "มีงานลงพื้นที่รอรับงาน");
       }
       case "ACCEPT", "DECLINE", "START", "REQUEST_RESOURCE", "REPORT" -> {
-        if(action.equals("REQUEST_RESOURCE") && from.equals("TRIAGED")) {
-          db.run("INSERT INTO resource_request(id,complaint_id,requested_by,workflow_origin) VALUES(?,?,?,'PRE_ASSIGN')",UUID.randomUUID(),id,u.get("id"));
-          notifyUser(c.get("officer_id"),id,"หัวหน้าผู้ลงพื้นที่เริ่มจัดทำข้อเสนอทรัพยากรก่อนจัดทีม");
+        if (action.equals("REQUEST_RESOURCE") && from.equals("TRIAGED")) {
+          db.run(
+              "INSERT INTO resource_request(id,complaint_id,requested_by,workflow_origin) VALUES(?,?,?,'PRE_ASSIGN')",
+              UUID.randomUUID(),
+              id,
+              u.get("id"));
+          notifyUser(
+              c.get("officer_id"), id, "หัวหน้าผู้ลงพื้นที่เริ่มจัดทำข้อเสนอทรัพยากรก่อนจัดทีม");
           break;
         }
         var w = active(id);
@@ -232,9 +274,14 @@ public class Workflow {
                 .isEmpty())
               throw new ResponseStatusException(
                   HttpStatus.BAD_REQUEST, "กรุณาแนบหลักฐานก่อนส่งรายงาน");
-            var stages=db.one("SELECT count(*) FILTER(WHERE evidence_stage='BEFORE') b,count(*) FILTER(WHERE evidence_stage='AFTER') a FROM attachment WHERE complaint_id=? AND uploaded_by=? AND report_id IS NULL AND resource_id IS NULL AND content_type LIKE 'image/%'",id,u.get("id"));
-            if(((Number)stages.get("b")).longValue()==0 || ((Number)stages.get("a")).longValue()==0)
-              throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"กรุณาแนบภาพก่อนทำ BEFORE และหลังทำ AFTER ให้ครบ");
+            var stages =
+                db.one(
+                    "SELECT count(*) FILTER(WHERE evidence_stage='BEFORE') b,count(*) FILTER(WHERE evidence_stage='AFTER') a FROM attachment WHERE complaint_id=? AND uploaded_by=? AND report_id IS NULL AND resource_id IS NULL AND content_type LIKE 'image/%'",
+                    id, u.get("id"));
+            if (((Number) stages.get("b")).longValue() == 0
+                || ((Number) stages.get("a")).longValue() == 0)
+              throw new ResponseStatusException(
+                  HttpStatus.BAD_REQUEST, "กรุณาแนบภาพก่อนทำ BEFORE และหลังทำ AFTER ให้ครบ");
             db.run(
                 "INSERT INTO"
                     + " field_report(id,complaint_id,work_order_id,revision,content,submitted_by)"
@@ -257,31 +304,48 @@ public class Workflow {
       }
       case "PROPOSE" -> {
         var r = resource(id);
-        if (db.list("SELECT id FROM attachment WHERE complaint_id=? AND uploaded_by=? AND report_id IS NULL AND resource_id IS NULL AND content_type='application/pdf' AND size_bytes<=15000000",id,u.get("id")).isEmpty())
-          throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"กรุณาแนบเอกสารคำขอ PDF ขนาดไม่เกิน 15 MB");
+        if (db.list(
+                "SELECT id FROM attachment WHERE complaint_id=? AND uploaded_by=? AND report_id IS NULL AND resource_id IS NULL AND content_type='application/pdf' AND size_bytes<=15000000",
+                id,
+                u.get("id"))
+            .isEmpty())
+          throw new ResponseStatusException(
+              HttpStatus.BAD_REQUEST, "กรุณาแนบเอกสารคำขอ PDF ขนาดไม่เกิน 15 MB");
         String proposal = text(b, "proposal", 20000);
-        var lineItems = new ArrayList<Map<String,Object>>();
+        var lineItems = new ArrayList<Map<String, Object>>();
         java.math.BigDecimal itemTotal = java.math.BigDecimal.ZERO;
         if (b.containsKey("lineItems")) {
-          if (!(b.get("lineItems") instanceof List<?> items) || items.isEmpty() || items.size()>50)
+          if (!(b.get("lineItems") instanceof List<?> items)
+              || items.isEmpty()
+              || items.size() > 50)
             throw new IllegalArgumentException("กรุณาระบุรายการทรัพยากร 1–50 รายการ");
           for (var entry : items) {
-            if (!(entry instanceof Map<?,?> item) || !(item.get("name") instanceof String name)
-                || name.isBlank() || name.trim().length()>200)
+            if (!(entry instanceof Map<?, ?> item)
+                || !(item.get("name") instanceof String name)
+                || name.isBlank()
+                || name.trim().length() > 200)
               throw new IllegalArgumentException("กรุณาระบุชื่อรายการทรัพยากรให้ครบ");
             java.math.BigDecimal price;
-            try { price=new java.math.BigDecimal(String.valueOf(item.get("amount"))); }
-            catch(Exception e) { throw new IllegalArgumentException("กรุณาระบุราคาของทุกรายการ"); }
-            if(price.signum()<0 || price.scale()>2 || price.compareTo(new java.math.BigDecimal("999999999999.99"))>0)
+            try {
+              price = new java.math.BigDecimal(String.valueOf(item.get("amount")));
+            } catch (Exception e) {
+              throw new IllegalArgumentException("กรุณาระบุราคาของทุกรายการ");
+            }
+            if (price.signum() < 0
+                || price.scale() > 2
+                || price.compareTo(new java.math.BigDecimal("999999999999.99")) > 0)
               throw new IllegalArgumentException("ราคาต้องไม่ติดลบและมีทศนิยมไม่เกินสองตำแหน่ง");
-            itemTotal=itemTotal.add(price);
-            lineItems.add(Map.of("name",name.trim(),"amount",price));
+            itemTotal = itemTotal.add(price);
+            lineItems.add(Map.of("name", name.trim(), "amount", price));
           }
         }
         java.math.BigDecimal amount;
         int days;
         try {
-          amount = b.containsKey("lineItems") ? itemTotal : new java.math.BigDecimal(String.valueOf(b.get("amount")));
+          amount =
+              b.containsKey("lineItems")
+                  ? itemTotal
+                  : new java.math.BigDecimal(String.valueOf(b.get("amount")));
           days = Integer.parseInt(String.valueOf(b.get("durationDays")));
         } catch (Exception e) {
           throw new IllegalArgumentException();
@@ -397,7 +461,9 @@ public class Workflow {
               case "APPROVE" -> to.equals("READY") ? "APPROVED" : "PENDING";
               default -> "DENIED";
             };
-        if(action.equals("APPROVE") && "PRE_ASSIGN".equals(r.get("workflow_origin"))) to="TRIAGED";
+        if (action.equals("APPROVE")
+            && to.equals("READY")
+            && "PRE_ASSIGN".equals(r.get("workflow_origin"))) to = "TRIAGED";
         db.run(
             "UPDATE resource_request SET status=?,version=version+1 WHERE id=?",
             state,

@@ -56,10 +56,6 @@ export function GeoProvider({ children }: { children: React.ReactNode }) {
       setBusy(false);
     }
   }
-  return (
-    <Context.Provider value={{ point, busy, error, request }}>
-      {children}
-    </Context.Provider>
-  );
+  return <Context.Provider value={{ point, busy, error, request }}>{children}</Context.Provider>;
 }
 export const useGeo = () => useContext(Context);

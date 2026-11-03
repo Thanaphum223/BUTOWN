@@ -17,7 +17,13 @@ public class AdminController {
   final ObjectMapper json;
   final ExternalLoginSessions sessions;
 
-  public AdminController(Db d, Access a, Workflow w, PasswordEncoder e, ObjectMapper j, ExternalLoginSessions sessions) {
+  public AdminController(
+      Db d,
+      Access a,
+      Workflow w,
+      PasswordEncoder e,
+      ObjectMapper j,
+      ExternalLoginSessions sessions) {
     db = d;
     access = a;
     workflow = w;
@@ -112,9 +118,14 @@ public class AdminController {
 
   @PostMapping("/users/{id}/role")
   @Transactional
-  public void assignRole(@PathVariable UUID id, @RequestBody Map<String, Object> b, Authentication a) {
+  public void assignRole(
+      @PathVariable UUID id, @RequestBody Map<String, Object> b, Authentication a) {
     var u = admin(a);
-    var target = db.one("SELECT id,username,role,department_id FROM app_user WHERE id=? AND municipality_id=? FOR UPDATE", id, u.get("municipality_id"));
+    var target =
+        db.one(
+            "SELECT id,username,role,department_id FROM app_user WHERE id=? AND municipality_id=? FOR UPDATE",
+            id,
+            u.get("municipality_id"));
     String role = Workflow.text(b, "role", 20);
     if (!List.of("ADMIN", "OFFICER", "LEADER", "FIELD", "APPROVER", "CITIZEN").contains(role))
       throw new IllegalArgumentException();
@@ -125,12 +136,33 @@ public class AdminController {
     if (!List.of("ADMIN", "CITIZEN").contains(role) && department == null)
       throw new IllegalArgumentException("กรุณาเลือกหน่วยงานสำหรับบุคลากร");
     if (department != null)
-      db.one("SELECT id FROM department WHERE id=? AND municipality_id=?", department, u.get("municipality_id"));
-    db.run("UPDATE app_user SET role=?,department_id=? WHERE id=? AND municipality_id=?", role, department, id, u.get("municipality_id"));
+      db.one(
+          "SELECT id FROM department WHERE id=? AND municipality_id=?",
+          department,
+          u.get("municipality_id"));
+    db.run(
+        "UPDATE app_user SET role=?,department_id=? WHERE id=? AND municipality_id=?",
+        role,
+        department,
+        id,
+        u.get("municipality_id"));
     sessions.revoke(target.get("username").toString());
-    workflow.audit(u, null, "USER_ROLE", null, null,
-        "บัญชี " + target.get("username") + " role=" + target.get("role") + "->" + role
-        + " department=" + target.get("department_id") + "->" + department);
+    workflow.audit(
+        u,
+        null,
+        "USER_ROLE",
+        null,
+        null,
+        "บัญชี "
+            + target.get("username")
+            + " role="
+            + target.get("role")
+            + "->"
+            + role
+            + " department="
+            + target.get("department_id")
+            + "->"
+            + department);
   }
 
   @PostMapping("/users/{id}/enabled")
@@ -138,8 +170,11 @@ public class AdminController {
       @PathVariable UUID id, @RequestBody Map<String, Boolean> b, Authentication a) {
     var u = admin(a);
     if (u.get("id").equals(id)) throw new IllegalArgumentException();
-    var target = db.one(
-        "SELECT id,username FROM app_user WHERE id=? AND municipality_id=?", id, u.get("municipality_id"));
+    var target =
+        db.one(
+            "SELECT id,username FROM app_user WHERE id=? AND municipality_id=?",
+            id,
+            u.get("municipality_id"));
     if (b.get("enabled") == null) throw new IllegalArgumentException();
     db.run("UPDATE app_user SET enabled=? WHERE id=?", b.get("enabled"), id);
     sessions.revoke(target.get("username").toString());

@@ -17,11 +17,16 @@ public class ExternalLoginSessions {
     this.registry = registry;
     var concurrency = new ConcurrentSessionControlAuthenticationStrategy(registry);
     concurrency.setMaximumSessions(5);
-    strategy = new CompositeSessionAuthenticationStrategy(List.of(concurrency,
-        new ChangeSessionIdAuthenticationStrategy(), new RegisterSessionAuthenticationStrategy(registry)));
+    strategy =
+        new CompositeSessionAuthenticationStrategy(
+            List.of(
+                concurrency,
+                new ChangeSessionIdAuthenticationStrategy(),
+                new RegisterSessionAuthenticationStrategy(registry)));
   }
 
-  public void authenticate(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
+  public void authenticate(
+      Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
     String oldId = request.getSession().getId();
     strategy.onAuthentication(authentication, request, response);
     if (!oldId.equals(request.getSession().getId())) registry.removeSessionInformation(oldId);

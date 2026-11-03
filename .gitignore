@@ -10,3 +10,5 @@ private-files/
 *.tsbuildinfo
 
 /frontend/public/pdfjs/
+__pycache__/
+*.py[cod]

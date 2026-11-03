@@ -91,12 +91,7 @@ export default function Teams() {
           )}
         />
       </Card>
-      <Modal
-        title="สร้างทีมลงพื้นที่"
-        open={open}
-        onCancel={() => setOpen(false)}
-        footer={null}
-      >
+      <Modal title="สร้างทีมลงพื้นที่" open={open} onCancel={() => setOpen(false)} footer={null}>
         <Form
           form={form}
           layout="vertical"
@@ -113,18 +108,10 @@ export default function Teams() {
             }
           }}
         >
-          <Form.Item
-            name="name"
-            label="ชื่อทีม"
-            rules={[{ required: true, max: 200 }]}
-          >
+          <Form.Item name="name" label="ชื่อทีม" rules={[{ required: true, max: 200 }]}>
             <Input />
           </Form.Item>
-          <Form.Item
-            name="memberIds"
-            label="สมาชิกทีม"
-            rules={[{ required: true }]}
-          >
+          <Form.Item name="memberIds" label="สมาชิกทีม" rules={[{ required: true }]}>
             <Select
               mode="multiple"
               options={people.map((p) => ({
