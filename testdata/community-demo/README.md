@@ -31,3 +31,30 @@ runs at application startup and no migration seeds production automatically.
 
 Refresh the citizen home page around the test center. Top five scores are
 38, 31, 27, 23 and 19. Open a complaint to preview its photo and play its MP4.
+
+## All workflow statuses
+
+After the base community fixture, generate an additional set with one complaint
+per standard status (18 cases). Specify an existing enabled **test** administrator
+with a department; the fixture assigns that account as officer, leader, field
+representative and approver, so its existing role switcher can inspect each queue.
+It does not grant permissions, change passwords or edit account settings.
+
+```sh
+python3 scripts/seed-workflow-demo.py --municipality UUID --actor TEST_ADMIN_UUID --output work/workflow-demo
+```
+
+Use the same backup, scan, file-copy and SQL-application steps as above. The
+fixture checks every transition against the actual category workflow and fails
+if it differs from the expected standard workflow. It is additive and repeatable.
+Each complaint has a coherent audit path. Later steps include the corresponding
+work order, resource revision and PDF, approval assignment, review records and
+field report with separate BEFORE/AFTER images. Resource quantities and prices
+are fictional. Existing community cases are preserved.
+
+The statuses are NEW, TRIAGED, ASSIGNED, ACCEPTED, RESOURCE_DRAFT,
+RESOURCE_CHECK, RESOURCE_REVISION, RESOURCE_APPROVAL, READY, IN_PROGRESS,
+LEADER_REVIEW, FIELD_REVISION, OFFICER_REVIEW, LEADER_REVISION, RESOLVED,
+CLOSED, TERMINATED and REJECTED. The latter three belong in completed history;
+the other 15 remain active queue cases. Subsequent real test actions can change
+these states; reapplying the fixture never resets them.
