@@ -35,11 +35,8 @@ export default function GovLogin({
       const state = url.searchParams.get("state");
       if (!state || !/^[a-f0-9]{64}$/.test(state))
         throw new Error("สร้างคำขอเข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่");
-      // Gov's LINE return preserves callback query parameters, but drops top-level state.
-      // Carry the same session-bound nonce in both places; never relax callback validation.
-      const callback = new URL(config!.callbackUrl);
-      callback.searchParams.set("state", state);
-      url.searchParams.set("callback", callback.toString());
+      // Keep the registered callback exact. State travels separately and must be
+      // echoed by Gov; a locally stored nonce cannot replace that provider echo.
       await post("/auth/gov/start", { state, purpose: link ? "LINK" : "LOGIN" });
       window.location.assign(url.toString());
     } catch (e) {

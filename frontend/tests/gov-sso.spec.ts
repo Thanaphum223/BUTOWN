@@ -85,14 +85,18 @@ test("SSO button registers matching state before redirect without token entry", 
   await expect(page.getByRole("heading", { name: "IAM login test boundary" })).toBeVisible();
   const url = new URL(page.url());
   expect(url.searchParams.get("service")).toBe("towntrack-test");
+  expect(url.searchParams.get("callback")).toBe("http://127.0.0.1:5173/auth/callback");
   const callback = new URL(url.searchParams.get("callback")!);
-  expect(callback.origin + callback.pathname).toBe("http://127.0.0.1:5173/auth/callback");
-  expect(callback.searchParams.get("state")).toBe(url.searchParams.get("state"));
+  expect(callback.toString()).toBe("http://127.0.0.1:5173/auth/callback");
+  expect(callback.search).toBe("");
+  expect(callback.hash).toBe("");
+  expect(url.searchParams.get("state")).toMatch(/^[a-f0-9]{64}$/);
   expect(seen.starts).toHaveLength(1);
   expect(seen.starts[0].state).toBe(url.searchParams.get("state"));
   expect(seen.starts[0].purpose).toBe("LOGIN");
-  // The deployed Gov flow appends code/service but does not copy its top-level state.
-  // State must survive inside the callback itself, with the original server binding.
+  // The documented provider contract returns code and echoes the outer state.
+  // The registered callback itself must stay exact; never put a nonce in that URI.
+  callback.searchParams.set("state", url.searchParams.get("state")!);
   callback.searchParams.set("code", "gov-after-line-code");
   callback.searchParams.set("service", "towntrack-test");
   await page.goto(callback.toString());
@@ -181,6 +185,8 @@ test("SSO start prevents concurrent local login and recovers on start failure", 
 });
 test("callback rejects missing or mismatched state without exchange", async ({ page }) => {
   const seen = await boundary(page);
+  // Stored state cannot substitute for a provider echo: that would permit login CSRF.
+  await page.addInitScript((s) => sessionStorage.setItem("gov_sso_state", s), state);
   await page.goto("/auth/callback?code=sample-one-use-code");
   await expect(page.getByRole("alert")).toContainText("เริ่มเข้าสู่ระบบใหม่");
   expect(seen.callbacks).toHaveLength(0);
