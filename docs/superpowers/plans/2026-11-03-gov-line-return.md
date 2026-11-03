@@ -34,6 +34,7 @@
 - Modify: frontend/src/govSso.ts, frontend/src/GovLogin.tsx, frontend/src/GovCallback.tsx, frontend/src/App.tsx, frontend/src/main.tsx
 - Create: frontend/src/govCallbackReturn.ts
 - Modify: frontend/tests/gov-sso.spec.ts, deploy/nginx.conf, scripts/test-proxy-security.py, README.md
+- Modify: backend/src/main/java/th/go/towntrack/GovCenterSsoClient.java and backend/src/test/java/th/go/towntrack/GovCenterSsoIntegrationTest.java (live contract diagnosis: successful verification returns 201, documented 200)
 
 **Interfaces:**
 - Consumes: GovConfig; GovSsoClient.getLoginUrl()/verifyState(); existing POST /api/auth/gov/start and /api/auth/sso-callback.
@@ -45,3 +46,7 @@
 - [ ] **Step 4: Run npm build and full npm test; build frontend image and run proxy-security test.** Expected: all green; callback status 200, no-store/no-referrer, no credentials in logs. Unchanged backend is covered by CI's full suite.
 - [ ] **Step 5: Commit, fresh security review, fix important findings with regressions, PR and deploy to the authorized test site after checks.** Expected: CI/CD successful and live build matches reviewed commit.
 - [ ] **Step 6: Perform real authorized LINE sign-in.** Expected: registered callback receives scoped code and matching nonce, server verification succeeds, TownTrack user/session/profile visible. Verify local logout, replay rejection and no new credentials leaked into logs. If the provider contract fails, diagnose the observed boundary and roll back unsafe changes; never invent success or weaken auth.
+
+## Live contract finding
+
+On 2026-11-04 (Asia/Bangkok), the real Gov callback returned a service code and matching nonce. A safe HTTP-status-only diagnostic on our backend proved that successful Gov verification returns HTTP 201; the prior client incorrectly rejected it because it required 200. Add a regression reproducing 201→503, then accept only 200/201 with unchanged user-schema, state, CSRF, role and session validation.

@@ -6,7 +6,7 @@ TownTrack is an E-Service. Gov authenticates the person; TownTrack retains its o
 
 ## Verified code contract
 
-Gov issues a single-use code and returns it to the registered TownTrack `/auth/callback`, with the initiating state. The browser sends this code and state to TownTrack. The backend consumes the server-bound state once and calls `POST https://api-auth.govcenter.co/e-services/sso/verify-code` with `{code}` and the server-only `x-api-key`. Only the verified response supplies the IAM identity and residence data. The browser must never supply a trusted identity, role, API key or central access token.
+Gov issues a single-use code and returns it to the registered TownTrack `/auth/callback`, with the initiating state. The browser sends this code and state to TownTrack. The backend consumes the server-bound state once and calls `POST https://api-auth.govcenter.co/e-services/sso/verify-code` with `{code}` and the server-only `x-api-key`. The live endpoint returns HTTP 201 on successful verification, while the published OpenAPI lists HTTP 200. TownTrack accepts these two success statuses and validates the same required user schema for both; other statuses never authenticate. Only the verified response supplies the IAM identity and residence data. The browser must never supply a trusted identity, role, API key or central access token.
 
 New identities receive CITIZEN. Existing local accounts are linked only by an explicit authenticated LINK operation. Local roles, passwords and department assignments remain authoritative; never merge accounts by matching a name/email.
 

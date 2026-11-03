@@ -12,6 +12,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Component
 public class GovCenterSsoClient {
+  private static final org.slf4j.Logger LOG =
+      org.slf4j.LoggerFactory.getLogger(GovCenterSsoClient.class);
   static final String API_URL = "https://api-auth.govcenter.co";
   static final String AUTH_URL = "https://auth.govcenter.co";
   final String serviceCode, apiKey, callbackUrl;
@@ -97,6 +99,10 @@ public class GovCenterSsoClient {
               .build();
       var response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
       try (var input = response.body()) {
+        // Gov's live POST returns 201; its published OpenAPI also specifies 200.
+        boolean verifiedStatus = response.statusCode() == 200 || response.statusCode() == 201;
+        if (!verifiedStatus)
+          LOG.warn("Gov SSO verification returned HTTP {}", response.statusCode());
         if (List.of(400, 401, 403, 409).contains(response.statusCode())) {
           String error =
               new String(input.readNBytes(8192), java.nio.charset.StandardCharsets.UTF_8)
@@ -111,7 +117,7 @@ public class GovCenterSsoClient {
               HttpStatus.SERVICE_UNAVAILABLE,
               "Gov Center ปฏิเสธการเชื่อมต่อ กรุณาให้ผู้ดูแลตรวจ API Key, Service Code และสิทธิ์บริการ");
         }
-        if (response.statusCode() != 200)
+        if (!verifiedStatus)
           throw new ResponseStatusException(
               HttpStatus.SERVICE_UNAVAILABLE,
               "Gov Center ไม่พร้อมใช้งาน กรุณาเริ่มเข้าสู่ระบบใหม่");
