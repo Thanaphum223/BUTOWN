@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 @AutoConfigureMockMvc
 @Transactional
 class GovCenterSsoIntegrationTest {
-  static final UUID TOWN = UUID.fromString("a4173016-49b9-41b1-8184-684397347012");
+  UUID TOWN;
   static final String STATE = "1234567890abcdef".repeat(4);
   static final AtomicReference<String> payload = new AtomicReference<>(),
       sentCode = new AtomicReference<>(),
@@ -58,17 +58,15 @@ class GovCenterSsoIntegrationTest {
 
   @DynamicPropertySource
   static void config(DynamicPropertyRegistry r) {
-    r.add("IAM_API_URL", () -> "http://127.0.0.1:" + iam.getAddress().getPort());
-    r.add("IAM_GOV_FRONTEND_URL", () -> "https://auth.govcenter.co");
     r.add("E_SERVICE_CODE", () -> "towntrack-test");
     r.add("E_SERVICE_API_KEY", () -> "isolated-provider-test-key");
     r.add("GOV_CALLBACK_URL", () -> "https://towntrack.test/auth/callback");
-    r.add("GOV_MUNICIPALITY_ID", TOWN::toString);
   }
 
   @Autowired MockMvc mvc;
   @Autowired Db db;
   @Autowired ObjectMapper json;
+  @Autowired GovCenterSsoClient provider;
   @Autowired org.springframework.security.core.session.SessionRegistry sessions;
 
   @Test
@@ -250,6 +248,41 @@ class GovCenterSsoIntegrationTest {
 
   @BeforeEach
   void setup() throws Exception {
+    var transport = java.net.http.HttpClient.newHttpClient();
+    var intercepted = org.mockito.Mockito.mock(java.net.http.HttpClient.class);
+    org.mockito.Mockito.when(
+            intercepted.send(
+                org.mockito.ArgumentMatchers.any(java.net.http.HttpRequest.class),
+                org.mockito.ArgumentMatchers
+                    .<java.net.http.HttpResponse.BodyHandler<java.io.InputStream>>any()))
+        .thenAnswer(
+            invocation -> {
+              java.net.http.HttpRequest original = invocation.getArgument(0);
+              assertEquals(
+                  "https://api-auth.govcenter.co/e-services/sso/verify-code",
+                  original.uri().toString());
+              var redirected =
+                  java.net.http.HttpRequest.newBuilder(
+                          java.net.URI.create(
+                              "http://127.0.0.1:"
+                                  + iam.getAddress().getPort()
+                                  + original.uri().getPath()))
+                      .method(
+                          original.method(),
+                          original
+                              .bodyPublisher()
+                              .orElse(java.net.http.HttpRequest.BodyPublishers.noBody()));
+              original
+                  .headers()
+                  .map()
+                  .forEach(
+                      (name, values) -> values.forEach(value -> redirected.header(name, value)));
+              return transport.send(
+                  redirected.build(),
+                  invocation
+                      .<java.net.http.HttpResponse.BodyHandler<java.io.InputStream>>getArgument(1));
+            });
+    org.springframework.test.util.ReflectionTestUtils.setField(provider, "http", intercepted);
     beforeReply.set(() -> {});
     address = "192.0.2." + addresses.incrementAndGet();
     calls.set(0);
@@ -271,7 +304,7 @@ class GovCenterSsoIntegrationTest {
                     List.of()),
                 "residences",
                 List.of())));
-    db.run("INSERT INTO municipality(id,name) VALUES(?,'SSO test town')", TOWN);
+    TOWN = (UUID) db.one("SELECT id FROM municipality ORDER BY id LIMIT 1").get("id");
     dept = UUID.randomUUID();
     admin = UUID.randomUUID();
     db.run("INSERT INTO department(id,municipality_id,name) VALUES(?,?,'Engineering')", dept, TOWN);
@@ -315,6 +348,64 @@ class GovCenterSsoIntegrationTest {
             .content(json.writeValueAsString(Map.of("state", state, "code", code)));
     if (loggedIn) request.with(user("sso-local-admin").roles("ADMIN"));
     return mvc.perform(request);
+  }
+
+  @Test
+  void anonymousLoginRejectsAmbiguousLocalMunicipalityBeforeCallingProvider() throws Exception {
+    db.run("INSERT INTO municipality(id,name) VALUES(?,'Another local town')", UUID.randomUUID());
+    var session = new MockHttpSession();
+    mvc.perform(
+            post("/api/auth/gov/start")
+                .session(session)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("state", STATE, "purpose", "LOGIN"))))
+        .andExpect(status().isServiceUnavailable());
+    assertNull(session.getAttribute(CentralGovAuthController.PENDING));
+    assertEquals(0, calls.get());
+  }
+
+  @Test
+  void explicitLinkUsesAuthenticatedAccountsMunicipalityEvenWithMultipleTowns() throws Exception {
+    db.run("INSERT INTO municipality(id,name) VALUES(?,'Another local town')", UUID.randomUUID());
+    callback(start("LINK", true), STATE, "link-multiple-towns", true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.user.role").value("ADMIN"));
+    assertEquals(
+        TOWN,
+        db.one("SELECT municipality_id FROM iam_user_profile WHERE local_user_id=?", admin)
+            .get("municipality_id"));
+  }
+
+  @Test
+  void pendingLoginKeepsItsMunicipalityWhenAnotherTownIsAdded() throws Exception {
+    var pending = start("LOGIN", false);
+    var another = UUID.randomUUID();
+    db.run("INSERT INTO municipality(id,name) VALUES(?,'Another local town')", another);
+    callback(pending, STATE, "bound-town", false).andExpect(status().isOk());
+    assertEquals(
+        TOWN,
+        db.one("SELECT municipality_id FROM iam_user_profile WHERE iam_user_id='iam-citizen-1'")
+            .get("municipality_id"));
+  }
+
+  @Test
+  void accountMovingMunicipalityCannotCompletePendingLink() throws Exception {
+    var pending = start("LINK", true);
+    var another = UUID.randomUUID();
+    db.run("INSERT INTO municipality(id,name) VALUES(?,'Another local town')", another);
+    db.run("UPDATE app_user SET municipality_id=?,department_id=NULL WHERE id=?", another, admin);
+    callback(pending, STATE, "wrong-town", true).andExpect(status().isUnauthorized());
+    assertEquals(0, calls.get());
+  }
+
+  @Test
+  void govSessionMetadataCannotAuthenticateAnAnonymousUser() throws Exception {
+    var session = new MockHttpSession();
+    session.setAttribute("gov_verified_username", "sso-local-admin");
+    session.setAttribute(
+        "gov_verified_until", java.time.Instant.now().plusSeconds(600).getEpochSecond());
+    mvc.perform(get("/api/auth/me").session(session)).andExpect(status().isUnauthorized());
   }
 
   @Test
@@ -453,7 +544,8 @@ class GovCenterSsoIntegrationTest {
     var expired = start("LOGIN", false);
     expired.setAttribute(
         CentralGovAuthController.PENDING,
-        new CentralGovAuthController.Pending(STATE, java.time.Instant.now().minusSeconds(1), null));
+        new CentralGovAuthController.Pending(
+            STATE, java.time.Instant.now().minusSeconds(1), null, TOWN, false));
     callback(expired, STATE, "code", false).andExpect(status().isBadRequest());
     var linking = start("LINK", true);
     linking.removeAttribute("SPRING_SECURITY_CONTEXT");

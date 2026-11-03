@@ -12,20 +12,24 @@ an untracked `.env` in the repository. Never paste secrets into chat, commit `.e
 or expose the API key in VITE_*/NEXT_PUBLIC_* variables.
 
 ```dotenv
-GOV_AUTH_MODE=local
-IAM_API_URL=https://api-auth.govcenter.co
-IAM_GOV_FRONTEND_URL=https://auth.govcenter.co
 E_SERVICE_CODE=your-registered-service-code
 E_SERVICE_API_KEY=your-one-secret-api-key
 GOV_CALLBACK_URL=https://your-towntrack-host/auth/callback
-GOV_MUNICIPALITY_ID=your-local-municipality-uuid
 ```
 
 `E_SERVICE_API_KEY` is the only secret key required. `E_SERVICE_CODE` is a public
 service identifier, NOT a second key. Obtain the code associated with that key
 from the provider; do not derive/guess it. Client ID/Client Secret/introspection
-settings from the previous integration are no longer used. The local municipality
-UUID comes from TownTrack, not an arbitrary browser input or IAM system role.
+settings from the previous integration are no longer used. These are the only three
+Gov environment settings. Official auth/API endpoints are fixed to the guide's
+`https://auth.govcenter.co` and `https://api-auth.govcenter.co`.
+
+TownTrack resolves its own municipality from its database when starting LOGIN.
+There must be exactly one local municipality; zero/multiple municipalities fail
+clearly instead of choosing one silently. Explicit LINK uses the authenticated
+local account's municipality, even when there are multiple local municipalities.
+The chosen municipality is bound to the pending request, never taken from a
+browser claim or the central user's municipality identifier.
 
 Website URL is the TownTrack origin. Configure TownTrack's callback with `/auth/callback`;
 if the provider has a separate redirect allowlist, confirm this exact URL is permitted.
@@ -35,16 +39,15 @@ not complete service registration or confirm that the callback is permitted.
 
 ## Safe rollout
 
-1. Configure the key, code, callback and municipality while `GOV_AUTH_MODE=local`.
+1. Configure only the key, registered service code and approved callback URL.
 2. Recreate the backend to load the environment; do not print the environment:
    `docker compose --env-file .env --env-file release.env up -d --force-recreate backend`.
 3. Sign into the existing account with its normal password. Open **ข้อมูล Gov Center**
    (the account icon in the header), then **เชื่อมบัญชี Gov Center**.
    Verify with Gov Center. This binds the authenticated local account to the returned
    stable IAM user ID. Role, password, enabled flag and department are preserved.
-4. Test a fresh SSO login and existing administrator access before considering
-   `GOV_AUTH_MODE=central`. Central enforcement rejects unverified staff sessions;
-   enabling it before linking the administrator can lock out that administrator.
+4. Test a fresh SSO login and existing administrator access. Local credentials remain
+   available; local roles and permissions apply equally to local and Gov sessions.
 5. Provision other staff roles through TownTrack administration, as before.
 
 A first SSO login without a prior identity link creates a new CITIZEN account.
@@ -55,7 +58,7 @@ different account. Disabled accounts cannot sign in through SSO.
 
 ## Protocol and residence data
 
-- Frontend login URL: `{IAM_GOV_FRONTEND_URL}/auth/login?service=...&callback=...&state=...`.
+- Frontend login URL: `https://auth.govcenter.co/auth/login?service=...&callback=...&state=...`.
 - CSRF-protected `POST /api/auth/gov/start` binds the cryptographic state and optional
   authenticated LINK target to the session for ten minutes.
 - Callback receives `code`/`state`; frontend clears them from the address bar and

@@ -2,6 +2,10 @@
 
 Reference: https://library.govcenter.co/sso, checked 2026-11-03. This describes the documented one-time-code flow implemented by TownTrack. It does not claim that the live provider has completed a successful callback.
 
+## Configuration
+
+Set only `E_SERVICE_API_KEY`, `E_SERVICE_CODE` and `GOV_CALLBACK_URL`. The official Gov auth/API URLs are constants. Anonymous LOGIN uses the single local municipality from TownTrack's database; if zero/multiple municipalities exist, it rejects the request without guessing. Explicit LINK uses the authenticated local account's municipality. The selected municipality is bound to pending state and rechecked when linking. The public `mode: local` field is compatibility metadata, not an environment switch.
+
 ## Request and response boundaries
 
 | Sender → receiver | Method / destination | Values | Purpose |
