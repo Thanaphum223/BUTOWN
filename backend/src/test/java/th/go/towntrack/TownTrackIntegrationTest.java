@@ -707,6 +707,85 @@ class TownTrackIntegrationTest {
   }
 
   @Test
+  void municipalityCommunityScopeFindsExistingDistantCasesWithoutWideningTenantOrPrivateAccess()
+      throws Exception {
+    create();
+    UUID farAway = create();
+    db.run(
+        "UPDATE complaint SET location=ST_SetSRID(ST_MakePoint(101.5,14.75),4326)::geography,status='CLOSED',reporter_id=? WHERE id=?",
+        users.get("OFFICER"),
+        farAway);
+    db.run(
+        "INSERT INTO complaint_vote(complaint_id,user_id) VALUES(?,?)",
+        farAway,
+        users.get("CITIZEN"));
+    mvc.perform(as(get("/api/community/complaints?latitude=13.75&longitude=100.5"), "CITIZEN"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(1))
+        .andExpect(jsonPath("$.municipalityTotal").value(2));
+    var response =
+        mvc.perform(as(get("/api/community/complaints?scope=municipality"), "CITIZEN"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.total").value(2))
+            .andExpect(jsonPath("$.municipalityTotal").value(2))
+            .andExpect(jsonPath("$.items.length()").value(2))
+            .andExpect(jsonPath("$.stats.closed").value(1))
+            .andExpect(jsonPath("$.top[0].id").value(farAway.toString()))
+            .andExpect(jsonPath("$.top[0].votes").value(1))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertFalse(response.contains("Private citizen details"));
+    assertFalse(response.contains("reporter_id"));
+    assertFalse(response.contains("Test street"));
+    mvc.perform(as(get("/api/community/complaints?scope=municipality&page=1&size=1"), "CITIZEN"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(2))
+        .andExpect(jsonPath("$.items.length()").value(1));
+    mvc.perform(
+            as(
+                get("/api/community/complaints?scope=municipality&categoryId=" + UUID.randomUUID()),
+                "CITIZEN"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(0))
+        .andExpect(jsonPath("$.municipalityTotal").value(0))
+        .andExpect(jsonPath("$.top.length()").value(0));
+    UUID otherTown = UUID.randomUUID();
+    db.run("INSERT INTO municipality(id,name) VALUES(?,'Other town')", otherTown);
+    db.run(
+        "INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role) VALUES(?,?,?,'unused','Other','CITIZEN')",
+        UUID.randomUUID(),
+        otherTown,
+        "otherScopeCitizen");
+    mvc.perform(
+            get("/api/community/complaints?scope=municipality&municipalityId=" + town)
+                .with(user("otherScopeCitizen").roles("CITIZEN")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(0))
+        .andExpect(jsonPath("$.municipalityTotal").value(0))
+        .andExpect(jsonPath("$.items.length()").value(0))
+        .andExpect(jsonPath("$.top.length()").value(0));
+    mvc.perform(as(get("/api/community/complaints?scope=municipality"), "OFFICER"))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void communityScopeRejectsInvalidOrIncompleteSearchInputs() throws Exception {
+    for (String query :
+        List.of(
+            "scope=all&latitude=13.75&longitude=100.5",
+            "scope=nearby",
+            "latitude=13.75",
+            "latitude=NaN&longitude=100.5",
+            "latitude=91&longitude=100.5",
+            "scope=municipality&latitude=Infinity",
+            "scope=municipality&size=101",
+            "scope=municipality&page=-1"))
+      mvc.perform(as(get("/api/community/complaints?" + query), "CITIZEN"))
+          .andExpect(status().isBadRequest());
+  }
+
+  @Test
   void complaintCannotBeSubmittedWithoutEvidence() throws Exception {
     var body =
         Map.of(

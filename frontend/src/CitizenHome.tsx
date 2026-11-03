@@ -1,5 +1,17 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, Card, Empty, List, Pagination, Select, Space, Tag, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  Empty,
+  List,
+  Pagination,
+  Radio,
+  Select,
+  Space,
+  Tag,
+  Typography,
+} from "antd";
 import {
   PictureOutlined,
   PlayCircleOutlined,
@@ -27,6 +39,8 @@ export default function CitizenHome({
   onFollowing: () => void;
 }) {
   const geo = useGeo();
+  const [area, setArea] = useState<"nearby" | "municipality">("nearby");
+  const municipal = area === "municipality";
   const [point, setPoint] = useState<[number, number] | undefined>(geo.point);
   useEffect(() => {
     if (geo.point) setPoint((p) => p ?? geo.point);
@@ -62,12 +76,12 @@ export default function CitizenHome({
     return () => controller.abort();
   }, []);
   useEffect(() => {
-    if (!point) return;
+    if (!municipal && !point) return;
     const controller = new AbortController();
     setBusy(true);
     setError("");
     api<D>(
-      `/community/complaints?latitude=${point[0]}&longitude=${point[1]}&page=${page - 1}&size=12${category ? `&categoryId=${category}` : ""}`,
+      `/community/complaints?scope=${area}${!municipal && point ? `&latitude=${point[0]}&longitude=${point[1]}` : ""}&page=${page - 1}&size=12${category ? `&categoryId=${category}` : ""}`,
       { signal: controller.signal },
     )
       .then(setResult)
@@ -78,7 +92,13 @@ export default function CitizenHome({
         if (!controller.signal.aborted) setBusy(false);
       });
     return () => controller.abort();
-  }, [page, category, point?.[0], point?.[1], revision]);
+  }, [page, category, area, point?.[0], point?.[1], revision]);
+  function changeArea(next: "nearby" | "municipality") {
+    setArea(next);
+    setPage(1);
+    setResult(undefined);
+    setRevision((v) => v + 1);
+  }
   const items: D[] = result?.items || [];
   async function vote(item: D) {
     setVoting(item.id);
@@ -203,15 +223,35 @@ export default function CitizenHome({
       <div className="page-heading community-heading">
         <div>
           <Text className="eyebrow">ชุมชน · TOWNTRACK</Text>
-          <Title level={2}>ปัญหาในระยะ 5 กม.</Title>
+          <Title level={2}>{municipal ? "ปัญหาทั้งเทศบาล" : "ปัญหาในระยะ 5 กม."}</Title>
           <p className="community-lead">
-            เรื่องที่ประชาชนแจ้งในเขตเทศบาล ภายในรัศมี 5 กม. จากจุดที่เลือก
+            {municipal
+              ? "เรื่องที่ประชาชนแจ้งในเทศบาลที่คุณใช้งาน รวมทุกพื้นที่และทุกสถานะ"
+              : "เรื่องที่ประชาชนแจ้งในเขตเทศบาล ภายในรัศมี 5 กม. จากจุดที่เลือก"}
           </p>
         </div>
       </div>
+      <div className="community-area-control">
+        <Radio.Group
+          aria-label="พื้นที่ค้นหาปัญหา"
+          optionType="button"
+          buttonStyle="solid"
+          value={area}
+          onChange={(e) => changeArea(e.target.value)}
+          options={[
+            { value: "nearby", label: "ใกล้จุดที่เลือก (5 กม.)" },
+            { value: "municipality", label: "ทั้งเทศบาล" },
+          ]}
+        />
+        <Text type="secondary">เลือกพื้นที่เพื่อดูสถิติ รายการ และโหวตในขอบเขตเดียวกัน</Text>
+      </div>
       <div className="community-metrics">
         {[
-          [FileTextOutlined, "ปัญหาในระยะ 5 กม.", result?.stats?.total ?? "—"],
+          [
+            FileTextOutlined,
+            municipal ? "ปัญหาทั้งเทศบาล" : "ปัญหาในระยะ 5 กม.",
+            result?.stats?.total ?? "—",
+          ],
           [LikeOutlined, "เสียงสนับสนุน", result?.stats?.votes ?? "—"],
           [ClockCircleOutlined, "กำลังดำเนินการ", result?.stats?.in_progress ?? "—"],
           [CheckCircleOutlined, "ปิดเรื่องแล้ว", result?.stats?.closed ?? "—"],
@@ -220,7 +260,7 @@ export default function CitizenHome({
             "สัดส่วนปิดเรื่อง",
             result?.stats?.total > 0
               ? `${Math.round((Number(result?.stats?.closed) / Number(result?.stats?.total)) * 100)}%`
-              : "ไม่มีข้อมูล",
+              : "—",
           ],
         ].map(([Icon, label, value]) => {
           const Symbol = Icon as typeof FileTextOutlined;
@@ -235,12 +275,32 @@ export default function CitizenHome({
           );
         })}
       </div>
-      {!point && (
+      {!municipal && !point && (
         <Alert
           type="info"
           showIcon
           message={
             geo.busy ? "กำลังระบุตำแหน่ง…" : geo.error || "เลือกจุดบนแผนที่เพื่อดูปัญหาในระยะ 5 กม."
+          }
+        />
+      )}
+      {!municipal && !busy && !error && result?.total === 0 && (
+        <Alert
+          className="community-empty-area"
+          type="info"
+          showIcon
+          message="ไม่พบเรื่องในรัศมี 5 กม. จากจุดที่เลือก"
+          description={
+            Number(result.municipalityTotal) > 0
+              ? `ยังมี ${result.municipalityTotal} เรื่องในพื้นที่อื่นของเทศบาล สำหรับประเภทปัญหาที่เลือก`
+              : "ลองเปลี่ยนจุดบนแผนที่หรือเลือกประเภทปัญหาอื่น"
+          }
+          action={
+            Number(result.municipalityTotal) > 0 ? (
+              <Button onClick={() => changeArea("municipality")}>
+                ดูทั้งเทศบาล ({result.municipalityTotal} เรื่อง)
+              </Button>
+            ) : undefined
           }
         />
       )}
@@ -267,6 +327,7 @@ export default function CitizenHome({
             onChange={(value) => {
               setCategory(value || undefined);
               setPage(1);
+              setResult(undefined);
             }}
           />
         </Space>
@@ -276,14 +337,15 @@ export default function CitizenHome({
         <Card
           className="community-map-panel"
           title="ปัญหาบนแผนที่"
-          extra={<Tag color="green">รัศมี 5 กม.</Tag>}
+          extra={<Tag color="green">{municipal ? "ทั้งเทศบาล" : "รัศมี 5 กม."}</Tag>}
         >
           <LocationMap
-            value={point}
-            radiusMeters={5000}
+            value={municipal ? undefined : point}
+            radiusMeters={municipal ? undefined : 5000}
+            fitPoints={municipal}
             onChange={(p) => {
               setPoint(p);
-              setPage(1);
+              changeArea("nearby");
             }}
             points={items
               .filter((i) => i.latitude != null && i.longitude != null)
@@ -295,7 +357,10 @@ export default function CitizenHome({
                 categoryName: i.category_name,
               }))}
           />
-          <Text type="secondary">แสดงตำแหน่งโดยประมาณเพื่อรักษาความเป็นส่วนตัวของผู้แจ้ง</Text>
+          <Text type="secondary">
+            {municipal ? "แสดงตำแหน่งของรายการในหน้านี้ · " : ""}
+            แสดงตำแหน่งโดยประมาณเพื่อรักษาความเป็นส่วนตัวของผู้แจ้ง
+          </Text>
         </Card>
         <section className="community-results">
           <div className="ranking-heading">
@@ -310,7 +375,11 @@ export default function CitizenHome({
           <List
             loading={busy}
             dataSource={result?.top || []}
-            locale={{ emptyText: "ยังไม่มีปัญหาที่ได้รับโหวตในระยะ 5 กม." }}
+            locale={{
+              emptyText: municipal
+                ? "ยังไม่มีปัญหาที่ได้รับโหวตในเทศบาล"
+                : "ยังไม่มีปัญหาที่ได้รับโหวตในระยะ 5 กม.",
+            }}
             renderItem={(item: D, index: number) => (
               <List.Item className="ranking-row">
                 <span className={"ranking-number rank-" + (index + 1)}>{index + 1}</span>
@@ -333,14 +402,26 @@ export default function CitizenHome({
       </div>
       <section className="community-all-results">
         <div className="row-title">
-          <Title level={4}>ปัญหาทั้งหมดในระยะ 5 กม.</Title>
+          <Title level={4}>
+            {municipal ? "รายการปัญหาทั้งเทศบาล" : "ปัญหาทั้งหมดในระยะ 5 กม."}
+          </Title>
           <Tag color="green">{result?.total ?? "—"} เรื่อง</Tag>
         </div>
         <List
           grid={{ gutter: 16, xs: 1, sm: 1, md: 2, lg: 2, xl: 3 }}
           loading={busy}
           dataSource={items}
-          locale={{ emptyText: <Empty description="ยังไม่มีปัญหาในระยะนี้" /> }}
+          locale={{
+            emptyText: (
+              <Empty
+                description={
+                  municipal
+                    ? "ยังไม่มีเรื่องในเทศบาลสำหรับประเภทปัญหาที่เลือก"
+                    : "ยังไม่มีปัญหาในระยะนี้ ลองเปลี่ยนพื้นที่ค้นหาด้านบน"
+                }
+              />
+            ),
+          }}
           renderItem={(item) => <List.Item>{renderIssue(item)}</List.Item>}
         />
         <Pagination

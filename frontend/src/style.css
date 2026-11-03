@@ -744,9 +744,11 @@ a:focus-visible {
   background: white;
   border: 1px solid #dce7e2;
   border-radius: 14px;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 14px;
+  gap: 8px 12px;
+  min-width: 0;
 }
 .community-metrics strong {
   font-size: 30px;
@@ -754,8 +756,29 @@ a:focus-visible {
   line-height: 1.3;
 }
 .community-metrics > div > span:last-child {
+  grid-column: 1 / -1;
   font-size: 14px;
   color: var(--municipal-muted);
+  overflow-wrap: anywhere;
+}
+.community-area-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+.community-area-control .ant-radio-button-wrapper {
+  height: auto;
+  min-height: 40px;
+  white-space: normal;
+}
+.community-empty-area {
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.community-empty-area .ant-alert-action {
+  margin-left: 0;
 }
 .metric-symbol {
   color: #47856c;
@@ -1097,6 +1120,14 @@ a:focus-visible {
   }
   .community-toolbar > .ant-btn {
     width: 100%;
+  }
+  .community-empty-area {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+  .community-empty-area .ant-alert-action {
+    grid-column: 2;
   }
   .community-explorer {
     gap: 18px;
