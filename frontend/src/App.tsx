@@ -1,4 +1,3 @@
-import { automaticGovSession, pauseGovReuse } from "./govSession";
 import { MenuOutlined } from "@ant-design/icons";
 import GovLogin from "./GovLogin";
 import GovProfile from "./GovProfile";
@@ -305,15 +304,7 @@ function TownTrackApp() {
   const load = () =>
     api<RowData>("/auth/me")
       .then(setUser)
-      .catch(async () => {
-        if (await automaticGovSession()) {
-          try {
-            setUser(await api<RowData>("/auth/me"));
-            return;
-          } catch {}
-        }
-        setUser(null);
-      });
+      .catch(() => setUser(null));
   useEffect(() => {
     void load();
   }, []);
@@ -588,7 +579,6 @@ function TownTrackApp() {
                 onClick={async () => {
                   try {
                     await api("/auth/logout", { method: "POST" });
-                    pauseGovReuse();
                     setUser(null);
                   } catch (e) {
                     message.error((e as Error).message);

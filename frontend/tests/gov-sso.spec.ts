@@ -82,7 +82,6 @@ test("SSO button registers matching state before redirect without token entry", 
   const seen = await boundary(page);
   await page.goto("/");
   await page.getByRole("button", { name: "เข้าสู่ระบบด้วย Gov Center", exact: true }).click();
-  await page.getByRole("button", { name: "เข้าสู่ระบบบัญชีกลาง", exact: true }).click();
   await expect(page.getByRole("heading", { name: "IAM login test boundary" })).toBeVisible();
   const url = new URL(page.url());
   expect(url.searchParams.get("service")).toBe("towntrack-test");
@@ -91,31 +90,16 @@ test("SSO button registers matching state before redirect without token entry", 
   expect(seen.starts[0].state).toBe(url.searchParams.get("state"));
   expect(seen.starts[0].purpose).toBe("LOGIN");
 });
-test("existing central code signs into TownTrack automatically without visiting central dashboard", async ({
-  page,
-}) => {
+test("opening TownTrack never calls undocumented central session endpoint", async ({ page }) => {
   const seen = await boundary(page);
-  await page.route("https://auth.govcenter.co/auth/session?*", (r) => {
-    seen.sessionChecks++;
-    return r.fulfill({
-      json: {
-        loggedIn: true,
-        code: "central-once-code",
-        user: { id: "untrusted-browser-claim", role: "ADMIN" },
-      },
-      headers: {
-        "access-control-allow-origin": "http://127.0.0.1:5173",
-        "access-control-allow-credentials": "true",
-      },
-    });
-  });
   await page.goto("/");
-  await expect(page.getByText("SSO Test User", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "เข้าสู่ระบบด้วย Gov Center", exact: true }),
+  ).toBeVisible();
+  expect(seen.sessionChecks).toBe(0);
+  expect(seen.starts).toHaveLength(0);
+  expect(seen.callbacks).toHaveLength(0);
   expect(new URL(page.url()).origin).toBe("http://127.0.0.1:5173");
-  expect(seen.sessionChecks).toBe(1);
-  expect(seen.starts).toHaveLength(1);
-  expect(seen.starts[0].purpose).toBe("REUSE");
-  expect(seen.callbacks).toEqual([{ code: "central-once-code", state: seen.starts[0].state }]);
 });
 test("central profile or opaque token cannot authenticate and unavailable session never auto redirects", async ({
   page,
@@ -148,7 +132,7 @@ test("existing local session never checks central server", async ({ page }) => {
   await expect(page.getByText("SSO Test User", { exact: true })).toBeVisible();
   expect(seen.sessionChecks).toBe(0);
 });
-test("logout pauses automatic central reuse in this tab", async ({ page }) => {
+test("logout stays local without silently signing in again", async ({ page }) => {
   const seen = await boundary(page, true);
   await page.route("**/api/auth/logout", (r) => {
     seen.signedIn = false;
@@ -166,7 +150,7 @@ test("logout pauses automatic central reuse in this tab", async ({ page }) => {
   expect(seen.sessionChecks).toBe(0);
   expect(seen.callbacks).toHaveLength(0);
 });
-test("explicit central check prevents a concurrent local login until it finishes", async ({
+test("SSO start prevents concurrent local login and recovers on start failure", async ({
   page,
 }) => {
   await boundary(page);
@@ -176,16 +160,9 @@ test("explicit central check prevents a concurrent local login until it finishes
   ).toBeVisible();
   let finish!: () => void;
   const waiting = new Promise<void>((resolve) => (finish = resolve));
-  await page.route("https://auth.govcenter.co/auth/session?*", async (r) => {
+  await page.route("**/api/auth/gov/start", async (r) => {
     await waiting;
-    await r.fulfill({
-      status: 404,
-      json: {},
-      headers: {
-        "access-control-allow-origin": "http://127.0.0.1:5173",
-        "access-control-allow-credentials": "true",
-      },
-    });
+    await r.fulfill({ status: 503, json: { message: "SSO start unavailable" } });
   });
   await page.getByRole("button", { name: "เข้าสู่ระบบด้วย Gov Center", exact: true }).click();
   await expect(page.getByRole("button", { name: /เข้าสู่ระบบ$/ })).toBeDisabled();

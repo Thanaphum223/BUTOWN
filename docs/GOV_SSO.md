@@ -10,19 +10,21 @@ Gov issues a single-use code and returns it to the registered TownTrack `/auth/c
 
 New identities receive CITIZEN. Existing local accounts are linked only by an explicit authenticated LINK operation. Local roles, passwords and department assignments remain authoritative; never merge accounts by matching a name/email.
 
-## Reusing an existing central login
+## Login initiation and existing central login
 
-TownTrack first checks its own session. Without one it makes one bounded optional credentialed request to `/auth/session?service=<E_SERVICE_CODE>` on `IAM_GOV_FRONTEND_URL`, a helper endpoint present in installed gov-sso-login1.4.0. If the provider returns an explicit single-use `code`, TownTrack exchanges it through the same server-side verification contract with purpose REUSE, then enters TownTrack. It does not use the package's undocumented session-token exchange endpoint, accept a browser profile, or automatically redirect to the central dashboard.
+TownTrack first checks its own `/api/auth/me` session. If absent, it shows the sign-in screen. One click on the Gov Center button calls `GovSsoClient.getLoginUrl()` and records the generated state with TownTrack's CSRF-protected `/api/auth/gov/start` before navigating to the documented Gov login URL. LINK uses the same flow from an authenticated local account. Failed start stays on TownTrack and restores the local form.
 
-This optional endpoint is **not confirmed supported by the linked public guide or the deployed provider**. The real provider returned404 on 2026-11-03. Missing endpoints, HTML, redirects, CORS failures and missing codes therefore leave the user on TownTrack. The explicit central-login button remains available as a fallback; that uses the documented login redirect flow. Logout pauses automatic reuse in the current tab, and concurrent logout cannot be undone by a delayed callback. One-use exchanges are never automatically retried.
+The guide documents the one-time-code redirect/verify flow, not a browser `/auth/session` endpoint. TownTrack therefore does not call that endpoint, use an opaque session token, or inspect another origin's cookies. Gov Center controls reuse of its existing login when this documented authorization flow starts. A provider session should return an E-Service code to `/auth/callback`; landing on Gov's own dashboard without a callback is not a successful TownTrack login.
 
-The automatic branch is covered by simulated provider boundaries and real backend HTTP/DB integration tests. Those tests do not prove live silent SSO. Central cookies may also be limited by SameSite/third-party-cookie policies even if a credentialed endpoint is implemented.
+After a verified callback, TownTrack creates its own HttpOnly session, refreshes CSRF and navigates to its own `/#dashboard`. It never explicitly navigates to `auth.govcenter.co/dashboard`. Logout remains on TownTrack until the user initiates sign-in again. One-use exchanges are never automatically retried.
+
+The reference screenshots illustrate the authorization concept. They do not replace Gov Center's documented API with `/connect/authorize`, `/connect/token` or `/connect/userinfo`. The service API key stays on the backend; the verified `user` and `residences` arrive together from `verify-code`.
 
 ## Provider information still needed for live acceptance
 
 - Confirm TownTrack's exact registered service code and the user's service access; the current public code is `town-track`.
 - Confirm the registered callback `https://towntrack.201.79.98.199.sslip.io/auth/callback` is honored after central authentication, rather than sending this E-Service request to `/dashboard`.
-- Either make the documented login flow reuse the current central login and return a code, or supply a supported session-to-E-Service-code endpoint, response contract and credentialed CORS policy for TownTrack's origin.
+- Verify that the documented login flow returns a fresh code and the original state, including when the user already has a central login.
 - Complete one real login and prove verified user data reaches TownTrack, then verify the same IAM identity reuses its existing local account.
 
 No local change can read another origin's HttpOnly cookie or turn an API key into a user's authenticated session. Keep keys in the server environment and out of Git/frontend storage. Do not enable mandatory central authentication until live acceptance succeeds and an administrator account is safely linked.
