@@ -17,6 +17,31 @@ export function govClient(config: GovConfig) {
     ssoCallbackPath: "/auth/sso-callback",
   });
 }
+export function govLineLogin(config: GovConfig) {
+  const callback = new URL(config.callbackUrl);
+  if (callback.origin !== window.location.origin || callback.search || callback.hash)
+    throw new Error("กรุณาเข้า TownTrack ด้วยโดเมนที่ลงทะเบียน SSO ไว้");
+  const sdkUrl = new URL(govClient(config).getLoginUrl());
+  const state = sdkUrl.searchParams.get("state");
+  if (!state || !/^[a-f0-9]{64}$/.test(state))
+    throw new Error("สร้างคำขอเข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่");
+  // Gov's published LINE helper accepts callback/service inside LINE state.
+  // Put our transaction nonce on the return URL so Gov preserves it unchanged.
+  callback.searchParams.set("state", state);
+  const govState = new URLSearchParams({
+    callback: callback.toString(),
+    service: config.serviceCode,
+  });
+  const url = new URL("https://access.line.me/oauth2/v2.1/authorize");
+  url.search = new URLSearchParams({
+    response_type: "code",
+    client_id: "2008946775",
+    redirect_uri: "https://api-auth.govcenter.co/auth/line/callback",
+    state: govState.toString(),
+    scope: "profile openid email",
+  }).toString();
+  return { url: url.toString(), state };
+}
 export function useGovConfig() {
   const [config, setConfig] = useState<GovConfig>(),
     [error, setError] = useState("");

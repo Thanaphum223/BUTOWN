@@ -55,7 +55,10 @@ for i in range(40):
             headers = json.loads(docker('exec', a, 'python', '-c', probe))
             callbacks = """import urllib.request,json
 paths=['/?code=tt-synthetic-root-code','/auth/callback?code=tt-synthetic-canonical-code','/auth/callback/?code=tt-synthetic-trailing-code']
-print(json.dumps([urllib.request.urlopen('http://gateway'+path,timeout=5).status for path in paths]))
+responses=[urllib.request.urlopen('http://gateway'+path,timeout=5) for path in paths]
+assert all('no-store' in r.headers.get('Cache-Control','') for r in responses), 'Callback must not be cached'
+assert all(r.headers.get('Referrer-Policy')=='no-referrer' for r in responses), 'Callback may leak its query to referrers'
+print(json.dumps([r.status for r in responses]))
 urllib.request.urlopen('http://gateway/log-check-visible',timeout=5).read()
 """
             statuses = json.loads(docker('exec', a, 'python', '-c', callbacks))

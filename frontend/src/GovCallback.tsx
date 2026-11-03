@@ -2,22 +2,27 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Card, Spin, Typography } from "antd";
 import { post, refreshCsrf } from "./api";
 import { govClient, useGovConfig } from "./govSso";
-export default function GovCallback() {
+import type { GovCallbackReturn } from "./govCallbackReturn";
+export default function GovCallback({ returned }: { returned: GovCallbackReturn }) {
   const { config, error: loadError } = useGovConfig();
   const started = useRef(false);
   const [error, setError] = useState("");
   useEffect(() => {
     if (!config || started.current) return;
     started.current = true;
-    const params = new URLSearchParams(window.location.search),
-      code = params.get("code"),
-      state = params.get("state");
-    window.history.replaceState({}, "", window.location.pathname);
+    const { code, state, service } = returned;
     void (async () => {
       try {
         if (!config.configured)
           throw new Error("ยังไม่ได้ตั้งค่า Gov Center SSO กรุณาเริ่มเข้าสู่ระบบใหม่");
-        if (!code?.trim() || !state || !govClient(config).verifyState(state))
+        if (returned.error) throw new Error(returned.error);
+        if (
+          !code?.trim() ||
+          !state ||
+          !/^[a-f0-9]{64}$/.test(state) ||
+          (service !== null && service !== config.serviceCode) ||
+          !govClient(config).verifyState(state)
+        )
           throw new Error("การตรวจสอบความปลอดภัยไม่สำเร็จ กรุณาเริ่มเข้าสู่ระบบใหม่");
         const result = await post("/auth/sso-callback", { code: code.trim(), state });
         if (!result?.success) throw new Error("ยืนยันตัวตนไม่สำเร็จ กรุณาเริ่มเข้าสู่ระบบใหม่");
@@ -29,7 +34,7 @@ export default function GovCallback() {
         setError((e as Error).message);
       }
     })();
-  }, [config]);
+  }, [config, returned]);
   return (
     <main className="content" style={{ maxWidth: 520, margin: "10vh auto" }}>
       <Card>

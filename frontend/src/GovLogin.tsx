@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert, Button, Space } from "antd";
 import { SafetyCertificateOutlined } from "@ant-design/icons";
 import { post } from "./api";
-import { govClient, useGovConfig } from "./govSso";
+import { govLineLogin, useGovConfig } from "./govSso";
 export default function GovLogin({
   link = false,
   disabled = false,
@@ -29,16 +29,9 @@ export default function GovLogin({
     onBusyChange?.(true);
     setError("");
     try {
-      if (new URL(config!.callbackUrl).origin !== window.location.origin)
-        throw new Error("กรุณาเข้า TownTrack ด้วยโดเมนที่ลงทะเบียน SSO ไว้");
-      const url = new URL(govClient(config!).getLoginUrl());
-      const state = url.searchParams.get("state");
-      if (!state || !/^[a-f0-9]{64}$/.test(state))
-        throw new Error("สร้างคำขอเข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่");
-      // Keep the registered callback exact. State travels separately and must be
-      // echoed by Gov; a locally stored nonce cannot replace that provider echo.
+      const { url, state } = govLineLogin(config!);
       await post("/auth/gov/start", { state, purpose: link ? "LINK" : "LOGIN" });
-      window.location.assign(url.toString());
+      window.location.assign(url);
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);

@@ -2,6 +2,7 @@ import { MenuOutlined } from "@ant-design/icons";
 import GovLogin from "./GovLogin";
 import GovProfile from "./GovProfile";
 import GovCallback from "./GovCallback";
+import type { GovCallbackReturn } from "./govCallbackReturn";
 import CitizenTracking from "./CitizenTracking";
 import PrivacyGate from "./PrivacyGate";
 import CommunityDetail from "./CommunityDetail";
@@ -283,17 +284,8 @@ function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () 
     </div>
   );
 }
-export default function App() {
-  const { pathname, search } = window.location;
-  const query = new URLSearchParams(search);
-  const govCallback =
-    pathname === "/auth/callback" ||
-    pathname === "/auth/callback/" ||
-    (pathname === "/" &&
-      query.has("code") &&
-      query.get("lineLogin") !== "1" &&
-      !query.has("liff.state"));
-  return govCallback ? <GovCallback /> : <TownTrackApp />;
+export default function App({ govReturn }: { govReturn: GovCallbackReturn | null }) {
+  return govReturn ? <GovCallback returned={govReturn} /> : <TownTrackApp />;
 }
 function TownTrackApp() {
   const screens = Grid.useBreakpoint();
