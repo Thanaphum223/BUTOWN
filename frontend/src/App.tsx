@@ -284,7 +284,16 @@ function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () 
   );
 }
 export default function App() {
-  return window.location.pathname === "/auth/callback" ? <GovCallback /> : <TownTrackApp />;
+  const { pathname, search } = window.location;
+  const query = new URLSearchParams(search);
+  const govCallback =
+    pathname === "/auth/callback" ||
+    pathname === "/auth/callback/" ||
+    (pathname === "/" &&
+      query.has("code") &&
+      query.get("lineLogin") !== "1" &&
+      !query.has("liff.state"));
+  return govCallback ? <GovCallback /> : <TownTrackApp />;
 }
 function TownTrackApp() {
   const screens = Grid.useBreakpoint();

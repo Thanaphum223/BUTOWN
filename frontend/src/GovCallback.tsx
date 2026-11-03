@@ -22,7 +22,9 @@ export default function GovCallback() {
         const result = await post("/auth/sso-callback", { code: code.trim(), state });
         if (!result?.success) throw new Error("ยืนยันตัวตนไม่สำเร็จ กรุณาเริ่มเข้าสู่ระบบใหม่");
         await refreshCsrf();
-        window.location.replace("/#dashboard");
+        // Root callbacks have already cleared their query. A hash-only navigation
+        // would keep this callback component mounted instead of loading the app.
+        window.location.replace("/");
       } catch (e) {
         setError((e as Error).message);
       }

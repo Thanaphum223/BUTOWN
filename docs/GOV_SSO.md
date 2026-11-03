@@ -12,13 +12,23 @@ New identities receive CITIZEN. Existing local accounts are linked only by an ex
 
 ## Login initiation and existing central login
 
-TownTrack first checks its own `/api/auth/me` session. If absent, it shows the sign-in screen. One click on the Gov Center button calls `GovSsoClient.getLoginUrl()` and records the generated state with TownTrack's CSRF-protected `/api/auth/gov/start` before navigating to the documented Gov login URL. LINK uses the same flow from an authenticated local account. Failed start stays on TownTrack and restores the local form.
+TownTrack first checks its own `/api/auth/me` session. If absent, it shows the sign-in screen. One click on the Gov Center button calls `GovSsoClient.getLoginUrl()` and embeds that same generated state into the callback query and records it with TownTrack's CSRF-protected `/api/auth/gov/start` before navigating to the documented Gov login URL. LINK uses the same flow from an authenticated local account. Failed start stays on TownTrack and restores the local form.
 
 The guide documents the one-time-code redirect/verify flow, not a browser `/auth/session` endpoint. TownTrack therefore does not call that endpoint, use an opaque session token, or inspect another origin's cookies. Gov Center controls reuse of its existing login when this documented authorization flow starts. A provider session should return an E-Service code to `/auth/callback`; landing on Gov's own dashboard without a callback is not a successful TownTrack login.
 
-After a verified callback, TownTrack creates its own HttpOnly session, refreshes CSRF and navigates to its own `/#dashboard`. It never explicitly navigates to `auth.govcenter.co/dashboard`. Logout remains on TownTrack until the user initiates sign-in again. One-use exchanges are never automatically retried.
+After a verified callback, TownTrack creates its own HttpOnly session, refreshes CSRF and reloads its own `/` (whose default view is the dashboard). It never explicitly navigates to `auth.govcenter.co/dashboard`. Logout remains on TownTrack until the user initiates sign-in again. One-use exchanges are never automatically retried.
 
 The reference screenshots illustrate the authorization concept. They do not replace Gov Center's documented API with `/connect/authorize`, `/connect/token` or `/connect/userinfo`. The service API key stays on the backend; the verified `user` and `residences` arrive together from `verify-code`.
+
+## Observed LINE return behavior and domain restriction (2026-11-03)
+
+A fresh real LINE login completed authentication but ended on `https://auth.govcenter.co/dashboard`. Before LINE authentication, its authorization request already carried the central callback with `/dashboard`, instead of TownTrack's requested callback. This is not evidence that the TownTrack callback ran and failed.
+
+The public Gov LoginForm script `https://auth.govcenter.co/_next/static/chunks/39e2ec54ec4bec6a.js?dpl=e954af0` normalizes callback/redirect values against an external-host list of `govcenter.co`, `gov.co`, their subdomains and loopbacks. It rejects `towntrack.201.79.98.199.sslip.io` and falls back to `/dashboard`. Changing TownTrack's callback path from `/auth/callback` to `/` does not change this host rejection. A registered Website URL by itself does not override this observed frontend filter. Ask Gov to approve the exact TownTrack hostname in the supported redirect validation, or provide a TownTrack domain that the provider approves. Do not bypass the filter, weaken validation or use an unrelated allowed host.
+
+That same LoginForm and the public Gov callback script `https://auth.govcenter.co/_next/static/chunks/278ced2a7c939247.js?dpl=e954af0` append code/service/is_new_user to a new URL constructed from the callback, but do not copy the initial top-level state. TownTrack now includes its existing random state in the callback query as well as the outer login query, so it survives the documented code return without trusting a browser profile or dropping state validation. The callback still has to match both browser storage and the initiating server session.
+
+TownTrack accepts `/auth/callback`, `/auth/callback/` and a root Website URL carrying a code. The root receiver excludes direct LINE/LIFF login markers and still rejects missing/invalid state. It clears the credential query, verifies the code once, refreshes CSRF and reloads `/` fully; a hash-only navigation at the root would otherwise leave the callback screen mounted. All three landing paths suppress frontend access logs to keep codes out of request logs. This root compatibility is not a workaround for the upstream hostname restriction.
 
 ## Provider information still needed for live acceptance
 

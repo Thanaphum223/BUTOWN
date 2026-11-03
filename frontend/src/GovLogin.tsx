@@ -31,10 +31,17 @@ export default function GovLogin({
     try {
       if (new URL(config!.callbackUrl).origin !== window.location.origin)
         throw new Error("กรุณาเข้า TownTrack ด้วยโดเมนที่ลงทะเบียน SSO ไว้");
-      const url = govClient(config!).getLoginUrl();
-      const state = new URL(url).searchParams.get("state");
+      const url = new URL(govClient(config!).getLoginUrl());
+      const state = url.searchParams.get("state");
+      if (!state || !/^[a-f0-9]{64}$/.test(state))
+        throw new Error("สร้างคำขอเข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่");
+      // Gov's LINE return preserves callback query parameters, but drops top-level state.
+      // Carry the same session-bound nonce in both places; never relax callback validation.
+      const callback = new URL(config!.callbackUrl);
+      callback.searchParams.set("state", state);
+      url.searchParams.set("callback", callback.toString());
       await post("/auth/gov/start", { state, purpose: link ? "LINK" : "LOGIN" });
-      window.location.assign(url);
+      window.location.assign(url.toString());
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);

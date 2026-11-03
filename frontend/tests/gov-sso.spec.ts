@@ -85,10 +85,20 @@ test("SSO button registers matching state before redirect without token entry", 
   await expect(page.getByRole("heading", { name: "IAM login test boundary" })).toBeVisible();
   const url = new URL(page.url());
   expect(url.searchParams.get("service")).toBe("towntrack-test");
-  expect(url.searchParams.get("callback")).toBe("http://127.0.0.1:5173/auth/callback");
+  const callback = new URL(url.searchParams.get("callback")!);
+  expect(callback.origin + callback.pathname).toBe("http://127.0.0.1:5173/auth/callback");
+  expect(callback.searchParams.get("state")).toBe(url.searchParams.get("state"));
   expect(seen.starts).toHaveLength(1);
   expect(seen.starts[0].state).toBe(url.searchParams.get("state"));
   expect(seen.starts[0].purpose).toBe("LOGIN");
+  // The deployed Gov flow appends code/service but does not copy its top-level state.
+  // State must survive inside the callback itself, with the original server binding.
+  callback.searchParams.set("code", "gov-after-line-code");
+  callback.searchParams.set("service", "towntrack-test");
+  await page.goto(callback.toString());
+  await expect(page.getByText("SSO Test User", { exact: true })).toBeVisible();
+  expect(seen.callbacks).toEqual([{ code: "gov-after-line-code", state: seen.starts[0].state }]);
+  expect(new URL(page.url()).origin).toBe("http://127.0.0.1:5173");
 });
 test("opening TownTrack never calls undocumented central session endpoint", async ({ page }) => {
   const seen = await boundary(page);
@@ -179,16 +189,37 @@ test("callback rejects missing or mismatched state without exchange", async ({ p
   await expect(page.getByRole("alert")).toContainText("เริ่มเข้าสู่ระบบใหม่");
   expect(seen.callbacks).toHaveLength(0);
 });
-test("valid callback exchanges once in StrictMode then loads authenticated session", async ({
+for (const callbackPath of ["/auth/callback", "/auth/callback/", "/"]) {
+  test(`valid callback at ${callbackPath} exchanges once then loads TownTrack session`, async ({
+    page,
+  }) => {
+    const seen = await boundary(page);
+    await page.addInitScript((s) => sessionStorage.setItem("gov_sso_state", s), state);
+    await page.goto(`${callbackPath}?code=sample-code&state=${state}`);
+    await expect(page.getByText("SSO Test User", { exact: true })).toBeVisible();
+    expect(seen.callbacks).toEqual([{ code: "sample-code", state }]);
+    expect(seen.checksAtExchange).toEqual([0]);
+    expect(page.url()).not.toContain("sample-code");
+  });
+}
+test("Website URL callback rejects missing state instead of silently showing login", async ({
   page,
 }) => {
   const seen = await boundary(page);
+  await page.goto("/?code=untrusted-code");
+  await expect(page.getByRole("alert")).toContainText("เริ่มเข้าสู่ระบบใหม่");
+  expect(seen.callbacks).toHaveLength(0);
+  expect(seen.authChecks).toBe(0);
+  expect(page.url()).not.toContain("untrusted-code");
+});
+test("direct LINE return is not mistaken for a Gov callback", async ({ page }) => {
+  const seen = await boundary(page);
   await page.addInitScript((s) => sessionStorage.setItem("gov_sso_state", s), state);
-  await page.goto(`/auth/callback?code=sample-code&state=${state}`);
-  await expect(page.getByText("SSO Test User", { exact: true })).toBeVisible();
-  expect(seen.callbacks).toEqual([{ code: "sample-code", state }]);
-  expect(seen.checksAtExchange).toEqual([0]);
-  expect(page.url()).not.toContain("sample-code");
+  await page.goto(`/?lineLogin=1&code=line-code&state=${state}`);
+  await expect(
+    page.getByRole("button", { name: "เข้าสู่ระบบด้วย Gov Center", exact: true }),
+  ).toBeVisible();
+  expect(seen.callbacks).toHaveLength(0);
 });
 test("provider failure does not automatically retry one-time code", async ({ page }) => {
   const seen = await boundary(page);

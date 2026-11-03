@@ -53,6 +53,17 @@ for i in range(40):
   time.sleep(.1)
 '''
             headers = json.loads(docker('exec', a, 'python', '-c', probe))
+            callbacks = """import urllib.request,json
+paths=['/?code=tt-synthetic-root-code','/auth/callback?code=tt-synthetic-canonical-code','/auth/callback/?code=tt-synthetic-trailing-code']
+print(json.dumps([urllib.request.urlopen('http://gateway'+path,timeout=5).status for path in paths]))
+urllib.request.urlopen('http://gateway/log-check-visible',timeout=5).read()
+"""
+            statuses = json.loads(docker('exec', a, 'python', '-c', callbacks))
+            assert statuses == [200, 200, 200], 'Callback landing page unavailable'
+            logs = docker('logs', frontend)
+            assert 'log-check-visible' in logs, 'Access-log assertion has no positive control'
+            assert 'tt-synthetic-' not in logs, 'SSO callback code reached frontend access logs'
+            result['callback_queries_not_logged'] = True
             flood = '''import concurrent.futures,json,urllib.request,urllib.error
 host=__import__('sys').argv[1];forge=__import__('sys').argv[2]=='yes'
 def get(i):
