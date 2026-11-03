@@ -1,3 +1,4 @@
+import { automaticGovSession, pauseGovReuse } from './govSession';
 import { MenuOutlined } from "@ant-design/icons";
 import GovLogin from "./GovLogin";
 import GovProfile from "./GovProfile";
@@ -160,6 +161,7 @@ function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () 
   const { data: towns } = useData<RowData[]>("/public/municipalities");
   const { message } = AntApp.useApp();
   async function login(v: RowData) {
+    if (busy) return;
     setBusy(true);
     setError("");
     try {
@@ -177,6 +179,7 @@ function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () 
     }
   }
   async function register(v: RowData) {
+    if (busy) return;
     setBusy(true);
     setError("");
     try {
@@ -228,14 +231,14 @@ function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () 
             เข้าสู่ระบบด้วย LINE
           </Button>
         )}
-        <GovLogin />
+        <GovLogin disabled={busy} onBusyChange={setBusy} />
         <Tabs
           items={[
             {
               key: "login",
               label: "เข้าสู่ระบบ",
               children: (
-                <Form layout="vertical" onFinish={login}>
+                <Form layout="vertical" disabled={busy} onFinish={login}>
                   <Form.Item
                     label="ชื่อผู้ใช้"
                     name="username"
@@ -269,7 +272,7 @@ function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () 
               key: "register",
               label: "สมัครบัญชีประชาชน",
               children: (
-                <Form layout="vertical" onFinish={register}>
+                <Form layout="vertical" disabled={busy} onFinish={register}>
                   <Form.Item
                     label="เทศบาล"
                     name="municipalityId"
@@ -341,7 +344,12 @@ function TownTrackApp() {
   const load = () =>
     api<RowData>("/auth/me")
       .then(setUser)
-      .catch(() => setUser(null));
+      .catch(async () => {
+        if (await automaticGovSession()) {
+          try { setUser(await api<RowData>("/auth/me")); return; } catch {}
+        }
+        setUser(null);
+      });
   useEffect(() => {
     void load();
   }, []);
@@ -521,6 +529,7 @@ function TownTrackApp() {
               onClick={async () => {
                 try {
                   await api("/auth/logout", { method: "POST" });
+                  pauseGovReuse();
                   setUser(null);
                 } catch (e) {
                   message.error((e as Error).message);

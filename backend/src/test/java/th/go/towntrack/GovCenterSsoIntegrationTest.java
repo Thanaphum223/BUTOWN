@@ -26,11 +26,12 @@ class GovCenterSsoIntegrationTest {
  static final UUID TOWN=UUID.fromString("a4173016-49b9-41b1-8184-684397347012");
  static final String STATE="1234567890abcdef".repeat(4);
  static final AtomicReference<String> payload=new AtomicReference<>(), sentCode=new AtomicReference<>(), sentKey=new AtomicReference<>();
+ static final AtomicReference<Runnable> beforeReply=new AtomicReference<>(()->{});
  static final AtomicInteger calls=new AtomicInteger(), replyStatus=new AtomicInteger(200);
  static final HttpServer iam;
  static { try {
   iam=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
-  iam.createContext("/e-services/sso/verify-code",e->{calls.incrementAndGet();sentCode.set(new String(e.getRequestBody().readAllBytes(),StandardCharsets.UTF_8));sentKey.set(e.getRequestHeaders().getFirst("x-api-key"));byte[] bytes=payload.get().getBytes(StandardCharsets.UTF_8);e.sendResponseHeaders(replyStatus.get(),bytes.length);e.getResponseBody().write(bytes);e.close();});iam.start();
+  iam.createContext("/e-services/sso/verify-code",e->{calls.incrementAndGet();sentCode.set(new String(e.getRequestBody().readAllBytes(),StandardCharsets.UTF_8));sentKey.set(e.getRequestHeaders().getFirst("x-api-key"));byte[] bytes=payload.get().getBytes(StandardCharsets.UTF_8);beforeReply.get().run();e.sendResponseHeaders(replyStatus.get(),bytes.length);e.getResponseBody().write(bytes);e.close();});iam.start();
  }catch(Exception e){throw new ExceptionInInitializerError(e);} }
  @DynamicPropertySource static void config(DynamicPropertyRegistry r){
   r.add("IAM_API_URL",()->"http://127.0.0.1:"+iam.getAddress().getPort());
@@ -87,9 +88,49 @@ class GovCenterSsoIntegrationTest {
   callback(start("LOGIN",false),STATE,"used-code",false).andExpect(status().isUnauthorized());
   assertEquals(1,calls.get());
  }
+ @Test void reuseCreatesVerifiedLocalSessionButCannotReplaceAnAuthenticatedAccount()throws Exception{
+  var s=start("REUSE",false);callback(s,STATE,"central-reuse-code",false).andExpect(status().isOk());
+  mvc.perform(get("/api/auth/me").session(s)).andExpect(status().isOk()).andExpect(jsonPath("$.role").value("CITIZEN"));
+  int before=calls.get();var pending=start("REUSE",false);
+  callback(pending,STATE,"do-not-exchange",true).andExpect(status().isConflict());assertEquals(before,calls.get());
+ }
+ @Test void delayedExchangeCannotRestoreLoggedOutSession()throws Exception{
+  var s=start("LOGIN",false);beforeReply.set(s::invalidate);
+  callback(s,STATE,"delayed-logout",false).andExpect(status().isConflict());
+  assertEquals(0L,((Number)db.one("SELECT count(*) n FROM iam_user_profile WHERE municipality_id=?",TOWN).get("n")).longValue());
+ }
+ @Test void delayedExchangeCannotReplaceRotatedLocalLogin()throws Exception{
+  var s=start("LOGIN",false);beforeReply.set(s::changeSessionId);
+  callback(s,STATE,"delayed-local-login",false).andExpect(status().isConflict());
+  assertEquals(0L,((Number)db.one("SELECT count(*) n FROM iam_user_profile WHERE municipality_id=?",TOWN).get("n")).longValue());
+ }
+ @Test void logoutWaitsForFinalContextSaveAndLeavesNoAuthenticatedSession()throws Exception{
+  var logout=new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CompletableFuture<MvcResult>>();
+  var session=new MockHttpSession(){
+   @Override public void setAttribute(String name,Object value){
+    super.setAttribute(name,value);
+    if(name.equals("gov_verified_until")){
+     var entered=new java.util.concurrent.CountDownLatch(1);
+     logout.set(java.util.concurrent.CompletableFuture.supplyAsync(()->{
+      entered.countDown();
+      try{return mvc.perform(post("/api/auth/logout").session(this).with(csrf())).andReturn();}
+      catch(Exception e){throw new RuntimeException(e);}
+     }));
+     try{assertTrue(entered.await(2,java.util.concurrent.TimeUnit.SECONDS));}
+     catch(InterruptedException e){throw new RuntimeException(e);}
+     assertThrows(java.util.concurrent.TimeoutException.class,()->logout.get().get(150,java.util.concurrent.TimeUnit.MILLISECONDS));
+    }
+   }
+  };
+  mvc.perform(post("/api/auth/gov/start").session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+    .content(json.writeValueAsString(Map.of("state",STATE,"purpose","LOGIN")))).andExpect(status().isOk());
+  var result=callback(session,STATE,"finalize-logout",false).andExpect(status().isOk()).andReturn();
+  assertEquals(204,logout.get().get(3,java.util.concurrent.TimeUnit.SECONDS).getResponse().getStatus());
+  assertTrue(session.isInvalid());assertNull(result.getRequest().getSession(false));
+ }
  UUID admin,dept;String address;static final AtomicInteger addresses=new AtomicInteger();
  @BeforeEach void setup()throws Exception{
-  address="192.0.2."+addresses.incrementAndGet();calls.set(0);replyStatus.set(200);payload.set(json.writeValueAsString(Map.of("user",Map.of("id","iam-citizen-1","name","SSO Citizen","email","same-name@example.test","role","ADMIN","memberships",List.of()),"residences",List.of())));
+  beforeReply.set(()->{});address="192.0.2."+addresses.incrementAndGet();calls.set(0);replyStatus.set(200);payload.set(json.writeValueAsString(Map.of("user",Map.of("id","iam-citizen-1","name","SSO Citizen","email","same-name@example.test","role","ADMIN","memberships",List.of()),"residences",List.of())));
   db.run("INSERT INTO municipality(id,name) VALUES(?,'SSO test town')",TOWN);dept=UUID.randomUUID();admin=UUID.randomUUID();
   db.run("INSERT INTO department(id,municipality_id,name) VALUES(?,?,'Engineering')",dept,TOWN);
   db.run("INSERT INTO app_user(id,municipality_id,department_id,username,password_hash,display_name,role) VALUES(?,?,?,'sso-local-admin','unchanged-password-hash','Existing administrator','ADMIN')",admin,TOWN,dept);

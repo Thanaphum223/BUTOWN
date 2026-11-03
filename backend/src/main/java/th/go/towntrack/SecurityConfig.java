@@ -75,7 +75,7 @@ public class SecurityConfig {
                     .successHandler(
                         (q, s, a) -> {
                           var session=q.getSession(false);
-                          if(session!=null){session.removeAttribute("gov_verified_until");session.removeAttribute("gov_verified_username");session.removeAttribute(CentralGovAuthController.PENDING);session.removeAttribute("admin_role");session.removeAttribute("admin_department");}
+                          if(session!=null){session.removeAttribute("gov_verified_until");session.removeAttribute("gov_verified_username");session.removeAttribute(CentralGovAuthController.PENDING);session.removeAttribute(CentralGovAuthController.EXCHANGING);session.removeAttribute("admin_role");session.removeAttribute("admin_department");}
                           s.setCharacterEncoding("UTF-8");
                           s.setContentType("application/json");
                           s.getWriter().write("{\"ok\":true}");
@@ -103,9 +103,20 @@ public class SecurityConfig {
             x ->
                 x.contentSecurityPolicy(
                     c -> c.policyDirectives("default-src 'none'; frame-ancestors 'none'")))
+        .addFilterBefore(new SerializedLogout(), org.springframework.security.web.authentication.logout.LogoutFilter.class)
         .addFilterBefore(new LoginLimit(), UsernamePasswordAuthenticationFilter.class)
         .addFilterAfter(new GovSessionGuard(govMode), org.springframework.security.web.context.SecurityContextHolderFilter.class);
     return h.build();
+  }
+
+  // Logout must not invalidate between an external login's final check and context save.
+  static class SerializedLogout extends OncePerRequestFilter {
+    @Override protected void doFilterInternal(HttpServletRequest q,HttpServletResponse s,FilterChain chain)throws ServletException,IOException {
+      var session=q.getSession(false);
+      if(session!=null&&q.getMethod().equals("POST")&&q.getRequestURI().equals("/api/auth/logout")){
+        synchronized(org.springframework.web.util.WebUtils.getSessionMutex(session)){chain.doFilter(q,s);}
+      }else chain.doFilter(q,s);
+    }
   }
 
   static class GovSessionGuard extends OncePerRequestFilter {
