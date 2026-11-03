@@ -27,12 +27,33 @@ import { ATTACHMENT_ACCEPT, ATTACHMENT_HELP, attachmentError } from "./attachmen
 type D = Record<string, any>;
 type Place = { place_id: number; lat: string; lon: string; display_name: string };
 const { Title, Text } = Typography;
-const icons = ["▧", "≈", "ϟ", "♻", "≈", "≋", "♧", "♧", "◉", "↔", "⚑", "♙", "⊕", "✓", "⌂", "⌂", "♧", "≈", "▤", "♡", "⚒", "◈", "☷", "…"];
-export default function NewCase({
-  onDone,
-}: {
-  onDone: (id: string) => void;
-}) {
+const icons = [
+  "▧",
+  "≈",
+  "ϟ",
+  "♻",
+  "≈",
+  "≋",
+  "♧",
+  "♧",
+  "◉",
+  "↔",
+  "⚑",
+  "♙",
+  "⊕",
+  "✓",
+  "⌂",
+  "⌂",
+  "♧",
+  "≈",
+  "▤",
+  "♡",
+  "⚒",
+  "◈",
+  "☷",
+  "…",
+];
+export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
   const geo = useGeo();
   const submissionKey = useRef(crypto.randomUUID());
   const [form] = Form.useForm();
@@ -47,7 +68,10 @@ export default function NewCase({
     [nearby, setNearby] = useState<D[]>([]),
     [receipt, setReceipt] = useState<D>(),
     [placeQuery, setPlaceQuery] = useState("");
-  const [locationConfirmation, setLocationConfirmation] = useState<{ address: string; point?: [number, number] }>();
+  const [locationConfirmation, setLocationConfirmation] = useState<{
+    address: string;
+    point?: [number, number];
+  }>();
   const [categoryQuery, setCategoryQuery] = useState("");
   const [categorySearch, setCategorySearch] = useState("");
   const [categoryPage, setCategoryPage] = useState(1);
@@ -68,7 +92,8 @@ export default function NewCase({
   );
   const categoryPageSize = 6;
   const visibleCategories = filteredCategories.slice(
-    (categoryPage - 1) * categoryPageSize, categoryPage * categoryPageSize,
+    (categoryPage - 1) * categoryPageSize,
+    categoryPage * categoryPageSize,
   );
   const fields: D[] = category ? JSON.parse(category.fields) : [];
   useEffect(() => {
@@ -76,7 +101,32 @@ export default function NewCase({
       .then((c) =>
         setCategories(
           [...c.categories].sort((a: D, b: D) => {
-            const order = ["ถนนและทางเท้า", "ท่อระบายน้ำ / น้ำท่วมขัง", "ไฟส่องสว่างสาธารณะ", "ขยะตกค้าง / ลักลอบทิ้งขยะ", "น้ำเสีย / กลิ่นเหม็น", "เสียงดัง / ฝุ่นควัน / เหตุรำคาญ", "ต้นไม้ / กิ่งไม้รบกวนทางสาธารณะ", "ต้นไม้ล้ม / กิ่งไม้เสี่ยงอันตราย", "ประปาเทศบาล / น้ำไม่ไหล / ท่อแตก", "สิ่งกีดขวางทางสาธารณะ", "ป้ายจราจร / สัญญาณไฟในความดูแลเทศบาล", "สัตว์จรจัด / สัตว์ก่อเหตุเดือดร้อน", "ยุงลาย / แหล่งเพาะโรค", "สุขาภิบาลตลาด / อาหาร / สถานประกอบการ", "อาคาร / การก่อสร้างผิดข้อบัญญัติ", "อาคารเสี่ยงอันตราย / ก่อสร้างผิดข้อบัญญัติ", "สวนสาธารณะ / สนามเด็กเล่น / ลานกีฬา", "คลอง / ทางน้ำสาธารณะ", "โรงเรียน / ศูนย์พัฒนาเด็กเล็กของเทศบาล", "สวัสดิการเด็ก / ผู้สูงอายุ / ผู้พิการ", "พื้นที่สาธารณะ / ทรัพย์สินเทศบาลชำรุด", "สุสาน / ฌาปนสถานในความดูแลเทศบาล", "บริการเทศบาล / การปฏิบัติงานเจ้าหน้าที่", "อื่น ๆ (ในอำนาจหน้าที่เทศบาล)"];
+            const order = [
+              "ถนนและทางเท้า",
+              "ท่อระบายน้ำ / น้ำท่วมขัง",
+              "ไฟส่องสว่างสาธารณะ",
+              "ขยะตกค้าง / ลักลอบทิ้งขยะ",
+              "น้ำเสีย / กลิ่นเหม็น",
+              "เสียงดัง / ฝุ่นควัน / เหตุรำคาญ",
+              "ต้นไม้ / กิ่งไม้รบกวนทางสาธารณะ",
+              "ต้นไม้ล้ม / กิ่งไม้เสี่ยงอันตราย",
+              "ประปาเทศบาล / น้ำไม่ไหล / ท่อแตก",
+              "สิ่งกีดขวางทางสาธารณะ",
+              "ป้ายจราจร / สัญญาณไฟในความดูแลเทศบาล",
+              "สัตว์จรจัด / สัตว์ก่อเหตุเดือดร้อน",
+              "ยุงลาย / แหล่งเพาะโรค",
+              "สุขาภิบาลตลาด / อาหาร / สถานประกอบการ",
+              "อาคาร / การก่อสร้างผิดข้อบัญญัติ",
+              "อาคารเสี่ยงอันตราย / ก่อสร้างผิดข้อบัญญัติ",
+              "สวนสาธารณะ / สนามเด็กเล่น / ลานกีฬา",
+              "คลอง / ทางน้ำสาธารณะ",
+              "โรงเรียน / ศูนย์พัฒนาเด็กเล็กของเทศบาล",
+              "สวัสดิการเด็ก / ผู้สูงอายุ / ผู้พิการ",
+              "พื้นที่สาธารณะ / ทรัพย์สินเทศบาลชำรุด",
+              "สุสาน / ฌาปนสถานในความดูแลเทศบาล",
+              "บริการเทศบาล / การปฏิบัติงานเจ้าหน้าที่",
+              "อื่น ๆ (ในอำนาจหน้าที่เทศบาล)",
+            ];
             const rank = (n: string) => {
               const i = order.indexOf(n);
               return i < 0 ? order.length - 1.5 : i;
@@ -99,8 +149,11 @@ export default function NewCase({
         const radians = Math.PI / 180;
         const dLat = (Number(place.lat) - p[0]) * radians;
         const dLon = (Number(place.lon) - p[1]) * radians;
-        const a = Math.sin(dLat / 2) ** 2 + Math.cos(p[0] * radians) *
-          Math.cos(Number(place.lat) * radians) * Math.sin(dLon / 2) ** 2;
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(p[0] * radians) *
+            Math.cos(Number(place.lat) * radians) *
+            Math.sin(dLon / 2) ** 2;
         return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) <= 100;
       });
       form.setFieldValue(
@@ -133,7 +186,9 @@ export default function NewCase({
       } catch (e) {
         // A recent place search may still occupy the provider's rate-limit window.
         if (active && attempts < 3 && (e as Error).message.includes("กรุณารอสักครู่"))
-          retry = setTimeout(() => { if (active) void lookup(); }, 1200);
+          retry = setTimeout(() => {
+            if (active) void lookup();
+          }, 1200);
       }
     }
     const timer = setTimeout(() => void lookup(), 1200);
@@ -165,8 +220,11 @@ export default function NewCase({
     const timer = setTimeout(async () => {
       try {
         const results = await api<D[]>(
-          "/nearby?latitude=" + position[0] + "&longitude=" + position[1] +
-          (category ? "&categoryId=" + category.id : ""),
+          "/nearby?latitude=" +
+            position[0] +
+            "&longitude=" +
+            position[1] +
+            (category ? "&categoryId=" + category.id : ""),
           { signal: controller.signal },
         );
         if (active) setNearby(results);
@@ -259,7 +317,11 @@ export default function NewCase({
       const body = new FormData();
       body.append("complaint", new Blob([JSON.stringify(payload)], { type: "application/json" }));
       for (const file of files) body.append("files", file);
-      const result = await api<{ id: string }>("/complaints", { method: "POST", body, headers: { "Idempotency-Key": key } });
+      const result = await api<{ id: string }>("/complaints", {
+        method: "POST",
+        body,
+        headers: { "Idempotency-Key": key },
+      });
       const id = result.id;
       setReceipt({
         id,
@@ -287,12 +349,7 @@ export default function NewCase({
           <Text strong>{receipt.category}</Text>
           <p>{receipt.address}</p>
         </Card>
-        <Button
-          type="primary"
-          block
-          size="large"
-          onClick={() => onDone(receipt.id)}
-        >
+        <Button type="primary" block size="large" onClick={() => onDone(receipt.id)}>
           ติดตามเรื่องนี้
         </Button>
         <Button
@@ -327,14 +384,7 @@ export default function NewCase({
           </li>
         ))}
       </ol>
-      {error && (
-        <Alert
-          type="error"
-          showIcon
-          message={error}
-          style={{ marginBottom: 16 }}
-        />
-      )}
+      {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
       <Modal
         title="ยืนยันตำแหน่งจุดเกิดเหตุ"
         open={!!locationConfirmation}
@@ -379,14 +429,25 @@ export default function NewCase({
               setSearchNotice("");
               setSelectedPlace(undefined);
             }}
-            onPressEnter={(e) => { e.preventDefault(); searchPlace(); }}
+            onPressEnter={(e) => {
+              e.preventDefault();
+              searchPlace();
+            }}
             maxLength={200}
           />
-          <Button block style={{ margin: "10px 0 18px" }} onClick={searchPlace} loading={searching} disabled={!placeQuery.trim()}>
+          <Button
+            block
+            style={{ margin: "10px 0 18px" }}
+            onClick={searchPlace}
+            loading={searching}
+            disabled={!placeQuery.trim()}
+          >
             ค้นหา
           </Button>
           <div aria-live="polite" aria-busy={searching}>
-            {searchNotice && <Alert type="info" showIcon message={searchNotice} style={{ marginBottom: 16 }} />}
+            {searchNotice && (
+              <Alert type="info" showIcon message={searchNotice} style={{ marginBottom: 16 }} />
+            )}
             {showPlaces && places.length > 0 && (
               <section aria-label="ผลการค้นหาสถานที่" style={{ marginBottom: 18 }}>
                 <Text strong>พบ {places.length} สถานที่ — เลือกจุดเกิดเหตุ</Text>
@@ -400,7 +461,12 @@ export default function NewCase({
                         type={selectedPlace === place.place_id ? "primary" : "default"}
                         aria-pressed={selectedPlace === place.place_id}
                         onClick={() => choosePlace(place)}
-                        style={{ height: "auto", whiteSpace: "normal", textAlign: "left", padding: 12 }}
+                        style={{
+                          height: "auto",
+                          whiteSpace: "normal",
+                          textAlign: "left",
+                          padding: 12,
+                        }}
                         icon={<EnvironmentOutlined />}
                       >
                         {place.display_name}
@@ -428,9 +494,7 @@ export default function NewCase({
           >
             ตำแหน่งของฉัน
           </Button>
-          {geo.error && (
-            <Alert type="info" message={geo.error} style={{ marginTop: 12 }} />
-          )}
+          {geo.error && <Alert type="info" message={geo.error} style={{ marginTop: 12 }} />}
           <Text className="map-help">
             แตะบนแผนที่เพื่อย้ายหมุดให้ตรงจุดเกิดเหตุ หรือกรอกที่อยู่เอง
           </Text>
@@ -439,7 +503,10 @@ export default function NewCase({
               value={position}
               radiusMeters={100}
               points={nearby.map((r) => ({
-                id: r.id, latitude: Number(r.latitude), longitude: Number(r.longitude), status: r.status,
+                id: r.id,
+                latitude: Number(r.latitude),
+                longitude: Number(r.longitude),
+                status: r.status,
               }))}
               onChange={(p) => {
                 manual.current = false;
@@ -490,9 +557,17 @@ export default function NewCase({
           </details>
           <div role="status" aria-live="polite" style={{ marginTop: 16 }}>
             <Text strong>{category ? "เคสประเภทเดียวกัน" : "เคสใกล้เคียง"}ในรัศมี 100 เมตร</Text>
-            <p>{!position ? "เลือกจุดเกิดเหตุเพื่อค้นหาเคสใกล้เคียงอัตโนมัติ" :
-              nearbyBusy ? "กำลังค้นหาเคสใกล้เคียง…" : nearbyError ? nearbyError :
-              nearby.length ? `พบ ${nearby.length} เคสใกล้เคียง` : "ไม่พบเคสใกล้เคียงในรัศมี 100 เมตร"}</p>
+            <p>
+              {!position
+                ? "เลือกจุดเกิดเหตุเพื่อค้นหาเคสใกล้เคียงอัตโนมัติ"
+                : nearbyBusy
+                  ? "กำลังค้นหาเคสใกล้เคียง…"
+                  : nearbyError
+                    ? nearbyError
+                    : nearby.length
+                      ? `พบ ${nearby.length} เคสใกล้เคียง`
+                      : "ไม่พบเคสใกล้เคียงในรัศมี 100 เมตร"}
+            </p>
           </div>
           <List
             dataSource={nearby}
@@ -500,7 +575,19 @@ export default function NewCase({
             renderItem={(r) => (
               <List.Item
                 actions={[
-                  <Button key="vote" onClick={async()=>{try{await post(`/community/complaints/${r.id}/vote`,{});message.success("บันทึกพบเจอปัญหานี้แล้ว");}catch(e){message.error((e as Error).message);}}}>พบเจอ</Button>,
+                  <Button
+                    key="vote"
+                    onClick={async () => {
+                      try {
+                        await post(`/community/complaints/${r.id}/vote`, {});
+                        message.success("บันทึกพบเจอปัญหานี้แล้ว");
+                      } catch (e) {
+                        message.error((e as Error).message);
+                      }
+                    }}
+                  >
+                    พบเจอ
+                  </Button>,
                   <Button
                     key="follow"
                     onClick={async () => {
@@ -520,79 +607,90 @@ export default function NewCase({
                   </Button>,
                 ]}
               >
-                <List.Item.Meta
-                  title={r.category_name}
-                  description={statusNames[r.status]}
-                />
+                <List.Item.Meta title={r.category_name} description={statusNames[r.status]} />
               </List.Item>
             )}
           />
         </div>
         <div hidden={step !== 1}>
           <Title level={2}>รายละเอียดปัญหา</Title>
-        <section aria-label="ประเภทปัญหา">
-          <Title level={2}>พบปัญหาอะไร?</Title>
-          <Text type="secondary">เลือกปัญหาในพื้นที่หรือบริการที่เทศบาลรับผิดชอบ หากไม่ตรงหมวดให้เลือกอื่น ๆ</Text>
-          <label className="control-label" htmlFor="category-query">ค้นหาประเภทปัญหา</label>
-          <Input.Search
-            id="category-query"
-            placeholder="เช่น ขยะ น้ำท่วม ไฟส่องสว่าง หรืออื่น ๆ"
-            enterButton="ค้นหา"
-            allowClear
-            value={categoryQuery}
-            onChange={(e) => {
-              setCategoryQuery(e.target.value);
-              if (!e.target.value) { setCategorySearch(""); setCategoryPage(1); }
-            }}
-            onSearch={(value) => { setCategorySearch(value.trim()); setCategoryPage(1); }}
-            onPressEnter={(e) => e.preventDefault()}
-          />
-          <p aria-live="polite">{categorySearch ? `พบ ${filteredCategories.length} ประเภทปัญหา` : `ทั้งหมด ${categories.length} ประเภทปัญหา`}</p>
-          <div className="report-categories" id="report-category-options">
-            {visibleCategories.map((c) => (
-              <button
-                type="button"
-                key={c.id}
-                aria-pressed={category?.id === c.id}
-                onClick={() => {
-                  const currentTitle = form.getFieldValue("title");
-                  if (!currentTitle?.trim() || currentTitle === category?.name)
-                    form.setFieldValue("title", c.name);
-                  setCategory(c);
-                  setNearby([]);
-                }}
-              >
-                <span>{icons[categories.indexOf(c) % icons.length]}</span>
-                {c.name}
-              </button>
-            ))}
-          </div>
-          {filteredCategories.length === 0 && (
-            <Alert type="info" showIcon message="ไม่พบประเภทปัญหา ลองใช้คำอื่น หรือล้างคำค้นแล้วเลือกหมวดอื่น ๆ" />
-          )}
-          <Pagination
-            current={categoryPage}
-            pageSize={categoryPageSize}
-            total={filteredCategories.length}
-            onChange={setCategoryPage}
-            showSizeChanger={false}
-            hideOnSinglePage
-            responsive
-            locale={{ prev_page: "หน้าก่อนหน้า", next_page: "หน้าถัดไป" }}
-            style={{ marginBottom: 20 }}
-          />
-        </section>
+          <section aria-label="ประเภทปัญหา">
+            <Title level={2}>พบปัญหาอะไร?</Title>
+            <Text type="secondary">
+              เลือกปัญหาในพื้นที่หรือบริการที่เทศบาลรับผิดชอบ หากไม่ตรงหมวดให้เลือกอื่น ๆ
+            </Text>
+            <label className="control-label" htmlFor="category-query">
+              ค้นหาประเภทปัญหา
+            </label>
+            <Input.Search
+              id="category-query"
+              placeholder="เช่น ขยะ น้ำท่วม ไฟส่องสว่าง หรืออื่น ๆ"
+              enterButton="ค้นหา"
+              allowClear
+              value={categoryQuery}
+              onChange={(e) => {
+                setCategoryQuery(e.target.value);
+                if (!e.target.value) {
+                  setCategorySearch("");
+                  setCategoryPage(1);
+                }
+              }}
+              onSearch={(value) => {
+                setCategorySearch(value.trim());
+                setCategoryPage(1);
+              }}
+              onPressEnter={(e) => e.preventDefault()}
+            />
+            <p aria-live="polite">
+              {categorySearch
+                ? `พบ ${filteredCategories.length} ประเภทปัญหา`
+                : `ทั้งหมด ${categories.length} ประเภทปัญหา`}
+            </p>
+            <div className="report-categories" id="report-category-options">
+              {visibleCategories.map((c) => (
+                <button
+                  type="button"
+                  key={c.id}
+                  aria-pressed={category?.id === c.id}
+                  onClick={() => {
+                    const currentTitle = form.getFieldValue("title");
+                    if (!currentTitle?.trim() || currentTitle === category?.name)
+                      form.setFieldValue("title", c.name);
+                    setCategory(c);
+                    setNearby([]);
+                  }}
+                >
+                  <span>{icons[categories.indexOf(c) % icons.length]}</span>
+                  {c.name}
+                </button>
+              ))}
+            </div>
+            {filteredCategories.length === 0 && (
+              <Alert
+                type="info"
+                showIcon
+                message="ไม่พบประเภทปัญหา ลองใช้คำอื่น หรือล้างคำค้นแล้วเลือกหมวดอื่น ๆ"
+              />
+            )}
+            <Pagination
+              current={categoryPage}
+              pageSize={categoryPageSize}
+              total={filteredCategories.length}
+              onChange={setCategoryPage}
+              showSizeChanger={false}
+              hideOnSinglePage
+              responsive
+              locale={{ prev_page: "หน้าก่อนหน้า", next_page: "หน้าถัดไป" }}
+              style={{ marginBottom: 20 }}
+            />
+          </section>
 
           <div className="report-context">
             <strong>{category?.name}</strong>
             <p>{address}</p>
           </div>
           <Title level={5}>ข้อมูลติดต่อผู้แจ้ง</Title>
-          <Form.Item
-            label="ชื่อ–นามสกุล (ไม่บังคับ)"
-            name="contactName"
-            rules={[{ max: 200 }]}
-          >
+          <Form.Item label="ชื่อ–นามสกุล (ไม่บังคับ)" name="contactName" rules={[{ max: 200 }]}>
             <Input placeholder="เช่น สมชาย ใจดี" autoComplete="name" />
           </Form.Item>
           <Form.Item
@@ -601,17 +699,9 @@ export default function NewCase({
             rules={[{ max: 30, pattern: /^[0-9+() -]*$/ }]}
             extra="ใช้สำหรับให้เจ้าหน้าที่ติดต่อกลับ ไม่แสดงต่อประชาชนอื่น"
           >
-            <Input
-              placeholder="เช่น 0812345678"
-              inputMode="tel"
-              autoComplete="tel"
-            />
+            <Input placeholder="เช่น 0812345678" inputMode="tel" autoComplete="tel" />
           </Form.Item>
-          <Form.Item
-            label="หัวข้อปัญหา"
-            name="title"
-            rules={[{ required: step === 1, max: 200 }]}
-          >
+          <Form.Item label="หัวข้อปัญหา" name="title" rules={[{ required: step === 1, max: 200 }]}>
             <Input placeholder="สรุปปัญหาที่พบ" />
           </Form.Item>
           <Form.Item
@@ -619,10 +709,7 @@ export default function NewCase({
             name="description"
             rules={[{ required: step === 1, max: 20000 }]}
           >
-            <Input.TextArea
-              rows={5}
-              placeholder="เช่น น้ำท่วมสูงประมาณ 20 ซม. รถเล็กผ่านลำบาก"
-            />
+            <Input.TextArea rows={5} placeholder="เช่น น้ำท่วมสูงประมาณ 20 ซม. รถเล็กผ่านลำบาก" />
           </Form.Item>
           {fields.map((f) => (
             <Form.Item
@@ -645,7 +732,9 @@ export default function NewCase({
               accept={ATTACHMENT_ACCEPT}
               fileList={files.map((f) => ({
                 uid: (f as File & { uid?: string }).uid || f.name,
-                name: f.name, size: f.size, status: "done" as const,
+                name: f.name,
+                size: f.size,
+                status: "done" as const,
               }))}
               beforeUpload={(file) => {
                 const used = pendingFiles.current.reduce((total, f) => total + f.size, 0);
@@ -671,7 +760,10 @@ export default function NewCase({
               <Button icon={<UploadOutlined />}>แนบภาพ วิดีโอ หรือเอกสาร</Button>
             </Upload>
             <Text type="secondary">ต้องแนบอย่างน้อย 1 ไฟล์ — {ATTACHMENT_HELP}</Text>
-            <p aria-live="polite">ขนาดรวมที่เลือก: {(files.reduce((total, f) => total + f.size, 0) / 1_000_000).toFixed(1)} / 1,000 MB</p>
+            <p aria-live="polite">
+              ขนาดรวมที่เลือก:{" "}
+              {(files.reduce((total, f) => total + f.size, 0) / 1_000_000).toFixed(1)} / 1,000 MB
+            </p>
           </Form.Item>
         </div>
         <div className="wizard-actions">

@@ -38,7 +38,7 @@ export default function Admin() {
     loadRequest.current = request;
     setRefreshing(true);
     try {
-      setData(await api("/admin", {signal:request.signal}));
+      setData(await api("/admin", { signal: request.signal }));
       setError("");
     } catch (e) {
       if (!request.signal.aborted) setError((e as Error).message);
@@ -48,26 +48,34 @@ export default function Admin() {
   }
   useEffect(() => {
     void load();
-    const refresh = () => { if (document.visibilityState === "visible") void load(); };
+    const refresh = () => {
+      if (document.visibilityState === "visible") void load();
+    };
     const timer = window.setInterval(refresh, 10000);
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
-    return () => { window.clearInterval(timer);window.removeEventListener("focus",refresh);document.removeEventListener("visibilitychange",refresh);loadRequest.current?.abort(); };
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+      loadRequest.current?.abort();
+    };
   }, []);
   async function save(v: D) {
     setBusy(true);
     try {
       if (kind === "categories") {
         try {
-          v.fields =
-            typeof v.fields === "string"
-              ? JSON.parse(v.fields || "[]")
-              : v.fields || [];
+          v.fields = typeof v.fields === "string" ? JSON.parse(v.fields || "[]") : v.fields || [];
         } catch {
           throw new Error("รูปแบบ JSON ของช่องข้อมูลไม่ถูกต้อง");
         }
       }
-      if (kind === "roles") await post("/admin/users/" + v.userId + "/role", {role:v.role,departmentId:v.departmentId||null});
+      if (kind === "roles")
+        await post("/admin/users/" + v.userId + "/role", {
+          role: v.role,
+          departmentId: v.departmentId || null,
+        });
       else await post("/admin/" + kind, v);
       message.success("บันทึกแล้ว");
       setKind("");
@@ -84,8 +92,7 @@ export default function Admin() {
     setKind(k);
     if (k === "roles") void load();
   };
-  if (!data)
-    return error ? <Alert type="error" message={error} /> : <Card loading />;
+  if (!data) return error ? <Alert type="error" message={error} /> : <Card loading />;
   const departments = data.departments.map((x: D) => ({
     value: x.id,
     label: x.name,
@@ -122,18 +129,59 @@ export default function Admin() {
               label: "บัญชีผู้ใช้",
               children: (
                 <>
-                  <Text type="secondary">เลือกบัญชีที่สมัครประชาชนไว้แล้ว เพื่อกำหนดบทบาทบุคลากรและหน่วยงาน โดยใช้รหัสผ่านเดิม</Text>
-                  {error&&<Alert type="error" showIcon message={error} style={{marginTop:12}}/>}
-                  <Space wrap style={{width:"100%",justifyContent:"space-between",marginTop:12}}>
-                    <Input.Search aria-label="ค้นหาบัญชีผู้ใช้" placeholder="ค้นหาชื่อผู้ใช้หรือชื่อที่แสดง" allowClear value={userQuery} onChange={e=>setUserQuery(e.target.value)}/>
-                    <Select aria-label="กรองประเภทบัญชี" placeholder="ทุกบทบาท" allowClear style={{minWidth:160}} value={userRoleFilter} onChange={setUserRoleFilter} options={[{value:"CITIZEN",label:"บัญชีประชาชน"},...Object.entries(roleNames).filter(([role])=>role!=="CITIZEN").map(([value,label])=>({value,label}))]}/>
-                    <Button icon={<ReloadOutlined/>} loading={refreshing} onClick={()=>void load()}>โหลดรายชื่อใหม่</Button>
-                    <Button type="primary" onClick={() => create("roles")}>กำหนดบทบาทให้บัญชีที่มีอยู่</Button>
+                  <Text type="secondary">
+                    เลือกบัญชีที่สมัครประชาชนไว้แล้ว เพื่อกำหนดบทบาทบุคลากรและหน่วยงาน
+                    โดยใช้รหัสผ่านเดิม
+                  </Text>
+                  {error && (
+                    <Alert type="error" showIcon message={error} style={{ marginTop: 12 }} />
+                  )}
+                  <Space
+                    wrap
+                    style={{ width: "100%", justifyContent: "space-between", marginTop: 12 }}
+                  >
+                    <Input.Search
+                      aria-label="ค้นหาบัญชีผู้ใช้"
+                      placeholder="ค้นหาชื่อผู้ใช้หรือชื่อที่แสดง"
+                      allowClear
+                      value={userQuery}
+                      onChange={(e) => setUserQuery(e.target.value)}
+                    />
+                    <Select
+                      aria-label="กรองประเภทบัญชี"
+                      placeholder="ทุกบทบาท"
+                      allowClear
+                      style={{ minWidth: 160 }}
+                      value={userRoleFilter}
+                      onChange={setUserRoleFilter}
+                      options={[
+                        { value: "CITIZEN", label: "บัญชีประชาชน" },
+                        ...Object.entries(roleNames)
+                          .filter(([role]) => role !== "CITIZEN")
+                          .map(([value, label]) => ({ value, label })),
+                      ]}
+                    />
+                    <Button
+                      icon={<ReloadOutlined />}
+                      loading={refreshing}
+                      onClick={() => void load()}
+                    >
+                      โหลดรายชื่อใหม่
+                    </Button>
+                    <Button type="primary" onClick={() => create("roles")}>
+                      กำหนดบทบาทให้บัญชีที่มีอยู่
+                    </Button>
                   </Space>
                   <Table<D>
                     style={{ marginTop: 16 }}
                     rowKey="id"
-                    dataSource={data.users.filter((u:D)=>(!userRoleFilter||u.role===userRoleFilter)&&(u.username+" "+u.display_name).toLocaleLowerCase().includes(userQuery.trim().toLocaleLowerCase()))}
+                    dataSource={data.users.filter(
+                      (u: D) =>
+                        (!userRoleFilter || u.role === userRoleFilter) &&
+                        (u.username + " " + u.display_name)
+                          .toLocaleLowerCase()
+                          .includes(userQuery.trim().toLocaleLowerCase()),
+                    )}
                     scroll={{ x: 700 }}
                     columns={[
                       { title: "ชื่อผู้ใช้", dataIndex: "username" },
@@ -143,8 +191,31 @@ export default function Admin() {
                         dataIndex: "role",
                         render: (v) => roleNames[v],
                       },
-                      {title:"หน่วยงาน",dataIndex:"department_id",render:(id:string)=>data.departments.find((d:D)=>d.id===id)?.name||"—"},
-                      {title:"จัดการบทบาท",key:"editRole",render:(_,r)=><Button onClick={()=>{form.resetFields();form.setFieldsValue({userId:r.id,role:r.role,departmentId:r.department_id||undefined});setKind("roles");}}>กำหนดบทบาท</Button>},
+                      {
+                        title: "หน่วยงาน",
+                        dataIndex: "department_id",
+                        render: (id: string) =>
+                          data.departments.find((d: D) => d.id === id)?.name || "—",
+                      },
+                      {
+                        title: "จัดการบทบาท",
+                        key: "editRole",
+                        render: (_, r) => (
+                          <Button
+                            onClick={() => {
+                              form.resetFields();
+                              form.setFieldsValue({
+                                userId: r.id,
+                                role: r.role,
+                                departmentId: r.department_id || undefined,
+                              });
+                              setKind("roles");
+                            }}
+                          >
+                            กำหนดบทบาท
+                          </Button>
+                        ),
+                      },
                       {
                         title: "เปิดใช้งาน",
                         dataIndex: "enabled",
@@ -153,10 +224,7 @@ export default function Admin() {
                             checked={v}
                             onChange={async (enabled) => {
                               try {
-                                await post(
-                                  "/admin/users/" + r.id + "/enabled",
-                                  { enabled },
-                                );
+                                await post("/admin/users/" + r.id + "/enabled", { enabled });
                                 await load();
                               } catch (e) {
                                 message.error((e as Error).message);
@@ -262,7 +330,7 @@ export default function Admin() {
       </Card>
       <Modal
         open={!!kind}
-        title={kind==="roles"?"กำหนดบทบาทให้บัญชีที่มีอยู่":"ตั้งค่าระบบ"}
+        title={kind === "roles" ? "กำหนดบทบาทให้บัญชีที่มีอยู่" : "ตั้งค่าระบบ"}
         onCancel={() => setKind("")}
         footer={null}
         destroyOnHidden
@@ -271,16 +339,80 @@ export default function Admin() {
           <Form.Item name="id" hidden>
             <Input />
           </Form.Item>
-          {kind === "roles" ? <>
-            <Form.Item name="userId" label="ค้นหาบัญชีที่สมัครไว้แล้ว" rules={[{required:true,message:"กรุณาเลือกบัญชีผู้ใช้"}]}>
-              <Select showSearch loading={refreshing} onOpenChange={open=>{if(open)void load();}} optionFilterProp="label" placeholder="พิมพ์ชื่อผู้ใช้หรือชื่อที่แสดงของบัญชีประชาชน" notFoundContent={refreshing?"กำลังโหลดรายชื่อ…":"ไม่พบบัญชีที่สมัครไว้ในเทศบาลนี้"}
-                options={data.users.map((u:D)=>({value:u.id,label:u.username+" — "+u.display_name}))}
-                onChange={id=>{const u=data.users.find((item:D)=>item.id===id);form.setFieldsValue({role:u?.role,departmentId:u?.department_id||undefined});}}/>
-            </Form.Item>
-            {selectedUser&&<Alert style={{marginBottom:16}} type="info" showIcon message={"บทบาทปัจจุบัน: "+roleNames[data.users.find((u:D)=>u.id===selectedUser)?.role]} description="บัญชีและรหัสผ่านเดิมยังใช้ได้ หลังบันทึกให้ผู้ใช้ออกจากระบบแล้วเข้าสู่ระบบใหม่"/>}
-            <Form.Item name="role" label="บทบาทที่ต้องการ" rules={[{required:true,message:"กรุณาเลือกบทบาท"}]}><Select options={Object.entries(roleNames).map(([value,label])=>({value,label}))} onChange={role=>{if(role==="CITIZEN")form.setFieldValue("departmentId",undefined);}}/></Form.Item>
-            <Form.Item name="departmentId" label="หน่วยงาน" rules={[{required:!!selectedRole&&!["ADMIN","CITIZEN"].includes(selectedRole),message:"กรุณาเลือกหน่วยงาน"}]}><Select disabled={selectedRole==="CITIZEN"} allowClear placeholder="เลือกหน่วยงาน" options={departments}/></Form.Item>
-          </> : kind === "users" ? (
+          {kind === "roles" ? (
+            <>
+              <Form.Item
+                name="userId"
+                label="ค้นหาบัญชีที่สมัครไว้แล้ว"
+                rules={[{ required: true, message: "กรุณาเลือกบัญชีผู้ใช้" }]}
+              >
+                <Select
+                  showSearch
+                  loading={refreshing}
+                  onOpenChange={(open) => {
+                    if (open) void load();
+                  }}
+                  optionFilterProp="label"
+                  placeholder="พิมพ์ชื่อผู้ใช้หรือชื่อที่แสดงของบัญชีประชาชน"
+                  notFoundContent={
+                    refreshing ? "กำลังโหลดรายชื่อ…" : "ไม่พบบัญชีที่สมัครไว้ในเทศบาลนี้"
+                  }
+                  options={data.users.map((u: D) => ({
+                    value: u.id,
+                    label: u.username + " — " + u.display_name,
+                  }))}
+                  onChange={(id) => {
+                    const u = data.users.find((item: D) => item.id === id);
+                    form.setFieldsValue({
+                      role: u?.role,
+                      departmentId: u?.department_id || undefined,
+                    });
+                  }}
+                />
+              </Form.Item>
+              {selectedUser && (
+                <Alert
+                  style={{ marginBottom: 16 }}
+                  type="info"
+                  showIcon
+                  message={
+                    "บทบาทปัจจุบัน: " +
+                    roleNames[data.users.find((u: D) => u.id === selectedUser)?.role]
+                  }
+                  description="บัญชีและรหัสผ่านเดิมยังใช้ได้ หลังบันทึกให้ผู้ใช้ออกจากระบบแล้วเข้าสู่ระบบใหม่"
+                />
+              )}
+              <Form.Item
+                name="role"
+                label="บทบาทที่ต้องการ"
+                rules={[{ required: true, message: "กรุณาเลือกบทบาท" }]}
+              >
+                <Select
+                  options={Object.entries(roleNames).map(([value, label]) => ({ value, label }))}
+                  onChange={(role) => {
+                    if (role === "CITIZEN") form.setFieldValue("departmentId", undefined);
+                  }}
+                />
+              </Form.Item>
+              <Form.Item
+                name="departmentId"
+                label="หน่วยงาน"
+                rules={[
+                  {
+                    required: !!selectedRole && !["ADMIN", "CITIZEN"].includes(selectedRole),
+                    message: "กรุณาเลือกหน่วยงาน",
+                  },
+                ]}
+              >
+                <Select
+                  disabled={selectedRole === "CITIZEN"}
+                  allowClear
+                  placeholder="เลือกหน่วยงาน"
+                  options={departments}
+                />
+              </Form.Item>
+            </>
+          ) : kind === "users" ? (
             <>
               <Form.Item
                 name="username"
@@ -311,19 +443,12 @@ export default function Admin() {
                   }))}
                 />
               </Form.Item>
-              <Form.Item
-                name="departmentId"
-                label="หน่วยงาน (จำเป็นสำหรับบุคลากร)"
-              >
+              <Form.Item name="departmentId" label="หน่วยงาน (จำเป็นสำหรับบุคลากร)">
                 <Select allowClear options={departments} />
               </Form.Item>
             </>
           ) : (
-            <Form.Item
-              name="name"
-              label="ชื่อ"
-              rules={[{ required: true, max: 200 }]}
-            >
+            <Form.Item name="name" label="ชื่อ" rules={[{ required: true, max: 200 }]}>
               <Input />
             </Form.Item>
           )}
@@ -338,18 +463,10 @@ export default function Admin() {
           )}
           {kind === "categories" && (
             <>
-              <Form.Item
-                name="departmentId"
-                label="หน่วยงานรับผิดชอบ"
-                rules={[{ required: true }]}
-              >
+              <Form.Item name="departmentId" label="หน่วยงานรับผิดชอบ" rules={[{ required: true }]}>
                 <Select options={departments} />
               </Form.Item>
-              <Form.Item
-                name="workflowId"
-                label="Workflow"
-                rules={[{ required: true }]}
-              >
+              <Form.Item name="workflowId" label="Workflow" rules={[{ required: true }]}>
                 <Select
                   options={data.workflows.map((w: D) => ({
                     value: w.id,
@@ -364,11 +481,7 @@ export default function Admin() {
                   }))}
                 />
               </Form.Item>
-              <Form.Item
-                name="slaHours"
-                label="SLA (ชั่วโมง)"
-                rules={[{ required: true }]}
-              >
+              <Form.Item name="slaHours" label="SLA (ชั่วโมง)" rules={[{ required: true }]}>
                 <InputNumber min={1} max={87600} precision={0} />
               </Form.Item>
               <Typography.Title level={5}>ช่องข้อมูลเพิ่มเติม</Typography.Title>
@@ -376,11 +489,7 @@ export default function Admin() {
                 {(fields, { add, remove }) => (
                   <>
                     {fields.map((field) => (
-                      <Card
-                        key={field.key}
-                        size="small"
-                        style={{ marginBottom: 12 }}
-                      >
+                      <Card key={field.key} size="small" style={{ marginBottom: 12 }}>
                         <Form.Item name={[field.name, "key"]} hidden>
                           <Input />
                         </Form.Item>

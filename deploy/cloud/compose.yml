@@ -18,6 +18,11 @@ services:
     logging: *logging
   frontend:
     image: towntrack-frontend:${RELEASE_SHA:?Set RELEASE_SHA}
+    environment:
+      TRUSTED_PROXY_HOST: gateway
+    depends_on:
+      gateway:
+        condition: service_started
     restart: unless-stopped
     logging: *logging
   backend:

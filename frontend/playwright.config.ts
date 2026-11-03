@@ -4,10 +4,7 @@ export default defineConfig({
   timeout: 45000,
   fullyParallel: false,
   workers: 1,
-  reporter: [
-    ["list"],
-    ["html", { outputFolder: "../work/playwright-report", open: "never" }],
-  ],
+  reporter: [["list"], ["html", { outputFolder: "../work/playwright-report", open: "never" }]],
   use: {
     baseURL: "http://127.0.0.1:5173",
     trace: "retain-on-failure",

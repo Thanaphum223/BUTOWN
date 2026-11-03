@@ -33,22 +33,34 @@ public class AuthController {
   record AdminRole(@NotNull String role, UUID departmentId) {}
 
   @PostMapping("/api/auth/admin-role")
-  public Object adminRole(@Valid @RequestBody AdminRole body, Authentication auth,
+  public Object adminRole(
+      @Valid @RequestBody AdminRole body,
+      Authentication auth,
       jakarta.servlet.http.HttpServletRequest request) {
-    var account = db.one("SELECT id,role,municipality_id FROM app_user WHERE username=? AND enabled=true", auth.getName());
+    var account =
+        db.one(
+            "SELECT id,role,municipality_id FROM app_user WHERE username=? AND enabled=true",
+            auth.getName());
     if (!"ADMIN".equals(account.get("role"))) Access.deny();
-    if (!Set.of("ADMIN","CITIZEN","OFFICER","LEADER","FIELD","APPROVER").contains(body.role()))
+    if (!Set.of("ADMIN", "CITIZEN", "OFFICER", "LEADER", "FIELD", "APPROVER").contains(body.role()))
       throw new IllegalArgumentException("บทบาทไม่ถูกต้อง");
-    if (!Set.of("ADMIN","CITIZEN").contains(body.role()) && body.departmentId()==null)
+    if (!Set.of("ADMIN", "CITIZEN").contains(body.role()) && body.departmentId() == null)
       throw new IllegalArgumentException("กรุณาเลือกหน่วยงาน");
-    if (body.departmentId()!=null) db.one("SELECT id FROM department WHERE id=? AND municipality_id=?", body.departmentId(),account.get("municipality_id"));
-    if(body.departmentId()!=null) db.run("UPDATE app_user SET department_id=? WHERE id=?",body.departmentId(),account.get("id"));
-    var session=request.getSession();
-    session.setAttribute("admin_role",body.role());
-    if(body.departmentId()==null) session.removeAttribute("admin_department");
-    else session.setAttribute("admin_department",body.departmentId());
-    db.run("INSERT INTO audit_event(id,municipality_id,actor_id,action,reason) VALUES(?,?,?,'ADMIN_ROLE_SWITCH',?)",
-      UUID.randomUUID(),account.get("municipality_id"),account.get("id"),"Switch to "+body.role());
+    if (body.departmentId() != null)
+      db.one(
+          "SELECT id FROM department WHERE id=? AND municipality_id=?",
+          body.departmentId(),
+          account.get("municipality_id"));
+    var session = request.getSession();
+    session.setAttribute("admin_role", body.role());
+    if (body.departmentId() == null) session.removeAttribute("admin_department");
+    else session.setAttribute("admin_department", body.departmentId());
+    db.run(
+        "INSERT INTO audit_event(id,municipality_id,actor_id,action,reason) VALUES(?,?,?,'ADMIN_ROLE_SWITCH',?)",
+        UUID.randomUUID(),
+        account.get("municipality_id"),
+        account.get("id"),
+        "Switch to " + body.role());
     return access.user(auth);
   }
 

@@ -14,7 +14,10 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/geocoding")
 public class GeocodingController {
   final String base;
-  @org.springframework.beans.factory.annotation.Autowired(required=false) MapboxGeocoding mapbox;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  MapboxGeocoding mapbox;
+
   final ObjectMapper json;
   final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
   final Map<String, Object> cache = new LinkedHashMap<>();
@@ -56,7 +59,11 @@ public class GeocodingController {
   @GetMapping("/search")
   public Object search(@RequestParam String q) throws Exception {
     if (q.isBlank() || q.length() > 200) throw new IllegalArgumentException();
-    if(mapbox!=null && mapbox.enabled())return mapbox.lookup("forward?q="+URLEncoder.encode(q,java.nio.charset.StandardCharsets.UTF_8)+"&limit=5");
+    if (mapbox != null && mapbox.enabled())
+      return mapbox.lookup(
+          "forward?q="
+              + URLEncoder.encode(q, java.nio.charset.StandardCharsets.UTF_8)
+              + "&limit=5");
     return call(
         "/search?format=jsonv2&limit=5&countrycodes=th&addressdetails=1&q="
             + URLEncoder.encode(q, java.nio.charset.StandardCharsets.UTF_8));
@@ -69,7 +76,10 @@ public class GeocodingController {
         || !Double.isFinite(longitude)
         || Math.abs(latitude) > 90
         || Math.abs(longitude) > 180) throw new IllegalArgumentException();
-    if(mapbox!=null && mapbox.enabled()){var results=mapbox.lookup("reverse?latitude="+latitude+"&longitude="+longitude);return results.isEmpty()?Map.of():results.getFirst();}
+    if (mapbox != null && mapbox.enabled()) {
+      var results = mapbox.lookup("reverse?latitude=" + latitude + "&longitude=" + longitude);
+      return results.isEmpty() ? Map.of() : results.getFirst();
+    }
     return call("/reverse?format=jsonv2&lat=" + latitude + "&lon=" + longitude);
   }
 }

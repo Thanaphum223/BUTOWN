@@ -6,10 +6,7 @@ export async function refreshCsrf() {
   csrf = d.token;
   header = d.headerName;
 }
-export async function api<T = any>(
-  url: string,
-  options: RequestInit = {},
-): Promise<T> {
+export async function api<T = any>(url: string, options: RequestInit = {}): Promise<T> {
   const method = options.method || "GET";
   if (!["GET", "HEAD"].includes(method) && !csrf) await refreshCsrf();
   const headers = new Headers(options.headers);
@@ -31,21 +28,27 @@ export async function api<T = any>(
         ? "กรุณาเข้าสู่ระบบ"
         : r.status === 403
           ? "ไม่มีสิทธิ์ดำเนินการ หรือเซสชันหมดอายุ"
-          : r.status === 429 ? "ทำรายการถี่เกินไป กรุณารอสักครู่แล้วลองอีกครั้ง"
-          : r.status === 413 ? "ไฟล์มีขนาดเกินที่ระบบรองรับ กรุณาตรวจขนาดไฟล์แนบ"
-          : r.status === 503 ? "ระบบยังไม่พร้อมให้บริการชั่วคราว กรุณาลองอีกครั้ง"
-          : "ดำเนินการไม่สำเร็จ";
+          : r.status === 429
+            ? "ทำรายการถี่เกินไป กรุณารอสักครู่แล้วลองอีกครั้ง"
+            : r.status === 413
+              ? "ไฟล์มีขนาดเกินที่ระบบรองรับ กรุณาตรวจขนาดไฟล์แนบ"
+              : r.status === 503
+                ? "ระบบยังไม่พร้อมให้บริการชั่วคราว กรุณาลองอีกครั้ง"
+                : "ดำเนินการไม่สำเร็จ";
     try {
       message = (await r.json()).message || message;
     } catch {}
     throw new Error(message);
   }
-  if (r.status === 204 || r.headers.get("content-length") === "0")
-    return undefined as T;
+  if (r.status === 204 || r.headers.get("content-length") === "0") return undefined as T;
   const text = await r.text();
   return (text ? JSON.parse(text) : undefined) as T;
 }
-export async function uploadFile<T = any>(url: string, body: FormData, progress: (percent: number) => void): Promise<T> {
+export async function uploadFile<T = any>(
+  url: string,
+  body: FormData,
+  progress: (percent: number) => void,
+): Promise<T> {
   if (!csrf) await refreshCsrf();
   return new Promise<T>((resolve, reject) => {
     const request = new XMLHttpRequest();
@@ -53,14 +56,31 @@ export async function uploadFile<T = any>(url: string, body: FormData, progress:
     request.withCredentials = true;
     request.setRequestHeader(header, csrf);
     request.timeout = 20 * 60 * 1000;
-    request.upload.onprogress = event => { if (event.lengthComputable) progress(Math.round(event.loaded / event.total * 100)); };
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) progress(Math.round((event.loaded / event.total) * 100));
+    };
     request.onload = () => {
       let result: any;
-      try { result = JSON.parse(request.responseText); } catch { result = {}; }
+      try {
+        result = JSON.parse(request.responseText);
+      } catch {
+        result = {};
+      }
       if (request.status >= 200 && request.status < 300) resolve(result);
-      else reject(new Error(result.message || (request.status === 429 ? "ทำรายการถี่เกินไป กรุณารอสักครู่แล้วแนบไฟล์อีกครั้ง" : request.status === 413 ? "ไฟล์มีขนาดเกินที่ระบบรองรับ" : "ส่งไฟล์ไม่สำเร็จ กรุณาลองอีกครั้ง")));
+      else
+        reject(
+          new Error(
+            result.message ||
+              (request.status === 429
+                ? "ทำรายการถี่เกินไป กรุณารอสักครู่แล้วแนบไฟล์อีกครั้ง"
+                : request.status === 413
+                  ? "ไฟล์มีขนาดเกินที่ระบบรองรับ"
+                  : "ส่งไฟล์ไม่สำเร็จ กรุณาลองอีกครั้ง"),
+          ),
+        );
     };
-    request.onerror = () => reject(new Error("เชื่อมต่อไม่ได้ กรุณาตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง"));
+    request.onerror = () =>
+      reject(new Error("เชื่อมต่อไม่ได้ กรุณาตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง"));
     request.ontimeout = () => reject(new Error("ส่งไฟล์นานเกินกำหนด กรุณาลองอีกครั้ง"));
     request.onabort = () => reject(new Error("ยกเลิกการส่งไฟล์แล้ว"));
     request.send(body);

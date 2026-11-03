@@ -15,6 +15,9 @@
 - ดูรหัสผ่านเฉพาะในเครื่องด้วย ./scripts/show-local-access.ps1 (ไม่ควรส่งไฟล์รหัสผ่านหรือบันทึกหน้าจอที่มีรหัสผ่านต่อ)
 - บัญชีตัวอย่างเกิดจาก DEMO_PASSWORD เฉพาะการพัฒนา ห้ามกำหนดตัวแปรนี้ใน Production
 
+## ความสะอาดของโค้ดและความปลอดภัย
+ดู docs/CODE_QUALITY_SECURITY.md สำหรับคำสั่งจัดรูปแบบอัตโนมัติ ชุดทดสอบทั้งหมด และขอบเขตความปลอดภัยที่ตรวจแล้ว
+
 ## Build และทดสอบ
 ต้องมี JDK 21, Maven 3.9+, Node 24 และ PostgreSQL/PostGIS
 - Backend: cd backend แล้ว mvn verify (กำหนด DB_URL, DB_USER, DB_PASSWORD, BOOTSTRAP_PASSWORD ก่อน)
@@ -32,8 +35,8 @@
 - docs/OPERATIONS.md: ติดตั้ง สำรอง กู้คืน และเชื่อม LINE
 - docs/STATUS.md: ผลทดสอบและข้อจำกัดที่ยังต้องจัดการ
 
-## เชื่อม GovCenter ภายหลัง
-การเชื่อม GovCenter ใช้ GovCenterPort เป็นขอบเขต Integration และ integration_reference สำหรับจับคู่รหัส รายละเอียดอยู่ใน docs/ARCHITECTURE.md
+## เชื่อม Gov Center SSO
+TownTrack รับข้อมูลผู้ใช้ที่ Backend ตรวจสอบด้วยรหัสใช้ครั้งเดียว แล้วสร้าง Session ของระบบย่อย โดยคงสิทธิ์ที่ผู้ดูแลกำหนดไว้ รายละเอียดการตั้งค่า ข้อจำกัด Session กลาง และรายการที่ต้องยืนยันกับผู้ให้บริการอยู่ใน docs/GOV_SSO.md
 
 ## GPS และฟอร์มแจ้งปัญหา
 ดู docs/GPS_WIZARD.md: ขอสิทธิ์ครั้งแรก แชร์พิกัด Prefill ฟอร์ม 3 ขั้น ใบรับเรื่อง และบริการค้นหาที่อยู่ที่ตั้งค่าได้
