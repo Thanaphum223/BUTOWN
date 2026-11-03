@@ -39,7 +39,7 @@ test('field worker can use mobile menu without horizontal overflow', async ({ pa
 });
 test('citizen privacy notice and report location confirmation work', async ({ page }) => {
   await login(page, 'citizen');
-  await page.getByRole('button', { name: /แจ้งปัญหา/ }).first().click();
+  await page.getByRole('link', { name: 'แจ้งปัญหา', exact: true }).click();
   await page.getByLabel('สถานที่ / จุดสังเกต', { exact: true }).fill('สถานที่ทดสอบ CI');
   await page.getByRole('button', { name: 'ถัดไป', exact: true }).click();
   const confirmation = page.getByRole('dialog', { name: 'ยืนยันตำแหน่งจุดเกิดเหตุ' });

@@ -4,7 +4,7 @@ permissions:
   contents: read
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgis/postgis:17-3.5
@@ -61,3 +61,6 @@ jobs:
           path: |
             backend/target/surefire-reports
             work/playwright-report
+            work/playwright-results
+            work/backend.log
+            work/frontend.log
