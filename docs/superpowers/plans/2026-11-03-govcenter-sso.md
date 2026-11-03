@@ -21,18 +21,18 @@
 - StrictMode/refresh callbacks must not exchange the code twice or strand the screen.
 
 ## Task 1: Backend protocol and identity synchronization
-- [ ] Add integration tests with real DB/local HTTP IAM stand-in covering config/state, HTTP exchange and login/link/role preservation, failures and residence sync; run RED.
-- [ ] Implement CentralGovAuthController, GovCenterSsoClient and GovIdentityService, migration V20, security routes/limit and cookie behavior.
-- [ ] Run focused tests GREEN, full backend suite; fix regressions and commit.
+- [x] Add integration tests with real DB/local HTTP IAM stand-in covering config/state, HTTP exchange and login/link/role preservation, failures and residence sync; run RED.
+- [x] Implement CentralGovAuthController, GovCenterSsoClient and GovIdentityService, migration V20, security routes/limit and cookie behavior.
+- [x] Run focused tests GREEN, full backend suite; fix regressions and commit.
 Interfaces: /api/public/gov-auth; POST /api/auth/gov/start {state,purpose}; POST /api/auth/sso-callback {code,state}; local session and IAM identity tables.
 
 ## Task 2: React SSO and account linking
-- [ ] Add browser boundary tests for login redirect, mandatory state, one callback request and successful session transition; run RED.
-- [ ] Pin gov-sso-login; replace GovLogin, add callback and link component, wire App callback/header.
-- [ ] Build and run browser suite using real UI and mocked external API boundaries; commit.
+- [x] Add browser boundary tests for login redirect, mandatory state, one callback request and successful session transition; run RED.
+- [x] Pin gov-sso-login; replace GovLogin, add callback and link component, wire App callback/header.
+- [x] Build and run browser suite using real UI and mocked external API boundaries; commit.
 Interfaces: task 1 public config/start/callback, API helper CSRF refresh, existing auth/me.
 
 ## Task 3: Config, review and delivery
-- [ ] Update example cloud/local configuration and rollout documentation including account linking and callback registration.
-- [ ] Run full applicable tests, request whole-change review, address material findings, reverify.
+- [x] Update example cloud/local configuration and rollout documentation including account linking and callback registration.
+- [x] Run full applicable tests, request whole-change review, address material findings, reverify.
 - [ ] Integrate/push with existing user authorization and verify CI/deploy; no cloud SSO enforcement without credentials.
