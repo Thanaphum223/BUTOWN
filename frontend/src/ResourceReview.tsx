@@ -13,7 +13,7 @@ export default function ResourceReview({resources=[],files=[]}:{resources?:D[];f
     <div className="resource-review-summary"><Typography.Text strong>งบประมาณ {Number(revision.amount).toLocaleString("th-TH",{minimumFractionDigits:2})} บาท</Typography.Text>
       <Typography.Text>ระยะเวลา {revision.duration_days} วัน</Typography.Text><Typography.Text type="secondary">ส่งเมื่อ {date(revision.created_at)}</Typography.Text></div>
     {Array.isArray(revision.line_items)&&revision.line_items.length>0&&<List size="small" dataSource={revision.line_items}
-      renderItem={(item:D)=><List.Item><span>{item.name}</span><Typography.Text>{Number(item.amount).toLocaleString("th-TH",{minimumFractionDigits:2})} บาท</Typography.Text></List.Item>}/>} 
+      renderItem={(item:D)=><List.Item><span>{item.name}</span><Typography.Text>{Number(item.amount).toLocaleString("th-TH",{minimumFractionDigits:2})} บาท</Typography.Text></List.Item>}/>}
     <Typography.Title level={5}>เอกสารฉบับที่ {revision.revision}</Typography.Title>
     <AttachmentList files={current} emptyText="ไม่พบเอกสารที่ผูกกับฉบับนี้ กรุณาตรวจไฟล์เดิมด้านล่างหรือส่งกลับหัวหน้าให้แนบใหม่"/>
     {legacy.length>0&&<details className="legacy-resource-files" open><summary>ไฟล์คำขอเดิมที่ไม่ระบุฉบับ</summary><AttachmentList files={legacy}/></details>}
