@@ -70,6 +70,21 @@ class GovCenterSsoIntegrationTest {
   @Autowired org.springframework.security.core.session.SessionRegistry sessions;
 
   @Test
+  void acceptsCreatedVerificationResponseAndPersistsVerifiedIdentity() throws Exception {
+    replyStatus.set(201);
+    var session = start("LOGIN", false);
+    callback(session, STATE, "successful-created-code", false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.user.role").value("CITIZEN"));
+    mvc.perform(get("/api/auth/gov-profile").session(session))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.linked").value(true))
+        .andExpect(jsonPath("$.profile.name").value("SSO Citizen"));
+    assertEquals(1, calls.get());
+  }
+
+  @Test
   void authenticatedUserCanReadOnlyOwnLatestIamProfile() throws Exception {
     mvc.perform(get("/api/auth/gov-profile")).andExpect(status().isUnauthorized());
     mvc.perform(get("/api/auth/gov-profile").with(user("sso-local-admin").roles("ADMIN")))

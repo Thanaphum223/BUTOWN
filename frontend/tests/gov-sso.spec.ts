@@ -63,6 +63,9 @@ async function boundary(page: Page, loggedIn = false) {
   await page.route("https://auth.govcenter.co/**", (r) =>
     r.fulfill({ contentType: "text/html", body: "<h1>IAM login test boundary</h1>" }),
   );
+  await page.route("https://access.line.me/**", (r) =>
+    r.fulfill({ contentType: "text/html", body: "<h1>IAM login test boundary</h1>" }),
+  );
   await page.route("https://auth.govcenter.co/auth/session?*", (r) => {
     observed.sessionChecks++;
     return r.fulfill({
@@ -84,26 +87,92 @@ test("SSO button registers matching state before redirect without token entry", 
   await page.getByRole("button", { name: "เข้าสู่ระบบด้วย Gov Center", exact: true }).click();
   await expect(page.getByRole("heading", { name: "IAM login test boundary" })).toBeVisible();
   const url = new URL(page.url());
-  expect(url.searchParams.get("service")).toBe("towntrack-test");
-  expect(url.searchParams.get("callback")).toBe("http://127.0.0.1:5173/auth/callback");
-  const callback = new URL(url.searchParams.get("callback")!);
-  expect(callback.toString()).toBe("http://127.0.0.1:5173/auth/callback");
-  expect(callback.search).toBe("");
+  expect(url.origin + url.pathname).toBe("https://access.line.me/oauth2/v2.1/authorize");
+  expect(url.searchParams.get("client_id")).toBe("2008946775");
+  expect(url.searchParams.get("redirect_uri")).toBe(
+    "https://api-auth.govcenter.co/auth/line/callback",
+  );
+  expect(url.searchParams.get("response_type")).toBe("code");
+  expect(url.searchParams.get("scope")).toBe("profile openid email");
+  const govState = new URLSearchParams(url.searchParams.get("state")!);
+  expect(govState.get("service")).toBe("towntrack-test");
+  const callback = new URL(govState.get("callback")!);
+  expect(callback.origin + callback.pathname).toBe("http://127.0.0.1:5173/auth/callback");
   expect(callback.hash).toBe("");
-  expect(url.searchParams.get("state")).toMatch(/^[a-f0-9]{64}$/);
+  expect(callback.searchParams.get("state")).toMatch(/^[a-f0-9]{64}$/);
   expect(seen.starts).toHaveLength(1);
-  expect(seen.starts[0].state).toBe(url.searchParams.get("state"));
+  expect(seen.starts[0].state).toBe(callback.searchParams.get("state"));
   expect(seen.starts[0].purpose).toBe("LOGIN");
-  // The documented provider contract returns code and echoes the outer state.
-  // The registered callback itself must stay exact; never put a nonce in that URI.
-  callback.searchParams.set("state", url.searchParams.get("state")!);
+  // Gov's LINE callback preserves the transaction query on the configured destination.
   callback.searchParams.set("code", "gov-after-line-code");
   callback.searchParams.set("service", "towntrack-test");
+  callback.searchParams.set("ticket", "unused-one-time-iam-ticket");
   await page.goto(callback.toString());
   await expect(page.getByText("SSO Test User", { exact: true })).toBeVisible();
   expect(seen.callbacks).toEqual([{ code: "gov-after-line-code", state: seen.starts[0].state }]);
   expect(new URL(page.url()).origin).toBe("http://127.0.0.1:5173");
 });
+test("callback removes credentials before config is available and never redeems IAM tickets", async ({
+  page,
+}) => {
+  const seen = await boundary(page);
+  await page.addInitScript((s) => sessionStorage.setItem("gov_sso_state", s), state);
+  let release!: () => void;
+  let configRequested!: () => void;
+  const waiting = new Promise<void>((resolve) => (release = resolve));
+  const requested = new Promise<void>((resolve) => (configRequested = resolve));
+  await page.route("**/api/public/gov-auth", async (r) => {
+    configRequested();
+    await waiting;
+    await r.fulfill({
+      json: {
+        mode: "local",
+        configured: true,
+        iamAuthUrl: "https://auth.govcenter.co",
+        serviceCode: "towntrack-test",
+        callbackUrl: "http://127.0.0.1:5173/auth/callback",
+      },
+    });
+  });
+  const ticketRequests: string[] = [];
+  page.on("request", (r) => {
+    if ((r.postData() || "").includes("unused-one-time-iam-ticket")) ticketRequests.push(r.url());
+  });
+  await page.goto(
+    `/auth/callback?code=sample-code&ticket=unused-one-time-iam-ticket&state=${state}#access_token=ignored`,
+  );
+  await requested;
+  expect(page.url()).toBe("http://127.0.0.1:5173/auth/callback");
+  release();
+  await expect(page.getByText("SSO Test User", { exact: true })).toBeVisible();
+  expect(seen.callbacks).toEqual([{ code: "sample-code", state }]);
+  expect(ticketRequests).toEqual([]);
+  expect(
+    await page.evaluate(() =>
+      Object.values(sessionStorage).some((v) => v.includes("unused-one-time-iam-ticket")),
+    ),
+  ).toBe(false);
+});
+for (const suffix of [
+  "&error=access_denied",
+  "&auth_status=onboarding_required",
+  "&is_new_user=true",
+  "&is_new_user=unexpected",
+  "&service=another-service",
+  "&service=towntrack-test&service=another-service",
+  "&code=duplicate",
+  `&state=${state}`,
+  "&access_token=untrusted-parent-token",
+]) {
+  test(`unsafe provider return is rejected without verification: ${suffix}`, async ({ page }) => {
+    const seen = await boundary(page);
+    await page.addInitScript((s) => sessionStorage.setItem("gov_sso_state", s), state);
+    await page.goto(`/auth/callback?code=sample-code&state=${state}${suffix}`);
+    await expect(page.getByRole("alert")).toBeVisible();
+    expect(seen.callbacks).toHaveLength(0);
+    expect(page.url()).toBe("http://127.0.0.1:5173/auth/callback");
+  });
+}
 test("opening TownTrack never calls undocumented central session endpoint", async ({ page }) => {
   const seen = await boundary(page);
   await page.goto("/");
