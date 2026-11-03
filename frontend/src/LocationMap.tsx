@@ -39,6 +39,8 @@ export function LeafletLocationMap({
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap contributors",
       maxZoom: 19,
+      // OSM requires a Referer; reveal only our origin, never an auth callback URL.
+      referrerPolicy: "origin",
     }).addTo(m);
     m.on("click", (e) => cb.current?.([e.latlng.lat, e.latlng.lng]));
     map.current = m;
@@ -60,9 +62,12 @@ export function LeafletLocationMap({
     };
   }, []);
   useEffect(() => {
-    if (!map.current || !value) return;
+    if (!map.current) return;
     marker.current?.remove();
     radius.current?.remove();
+    marker.current = null;
+    radius.current = null;
+    if (!value) return;
     if (radiusMeters) {
       radius.current = L.circle(value, {
         radius: radiusMeters,

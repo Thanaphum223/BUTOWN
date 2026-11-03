@@ -138,10 +138,16 @@ export default function MapboxLocationMap({
       });
     }
     const selected = props.value;
+    marker.current?.remove();
+    marker.current = undefined;
+    if (!selected && m.getSource("radius"))
+      (m.getSource("radius") as mapboxgl.GeoJSONSource).setData({
+        type: "FeatureCollection",
+        features: [],
+      });
     if (selected) {
       const [lat, lng] = selected,
         r = props.radiusMeters || 0;
-      marker.current?.remove();
       marker.current = new mapboxgl.Marker({ color: "#137455" }).setLngLat([lng, lat]).addTo(m);
       const ring = Array.from({ length: 65 }, (_, i) => {
         const a = (i * 2 * Math.PI) / 64;

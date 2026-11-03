@@ -397,34 +397,48 @@ public class ComplaintController {
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "12") int size,
       @RequestParam(required = false) UUID categoryId,
-      @RequestParam double latitude,
-      @RequestParam double longitude) {
+      @RequestParam(defaultValue = "nearby") String scope,
+      @RequestParam(required = false) Double latitude,
+      @RequestParam(required = false) Double longitude) {
     var u = access.user(a);
     access.role(u, "CITIZEN");
-    if (!Double.isFinite(latitude)
-        || !Double.isFinite(longitude)
-        || Math.abs(latitude) > 90
-        || Math.abs(longitude) > 180
+    boolean nearby = "nearby".equals(scope);
+    if ((!nearby && !"municipality".equals(scope))
+        || (nearby && (latitude == null || longitude == null))
+        || (latitude != null && (!Double.isFinite(latitude) || Math.abs(latitude) > 90))
+        || (longitude != null && (!Double.isFinite(longitude) || Math.abs(longitude) > 180))
         || page < 0
         || page > 1000000
         || size < 1
         || size > 100) throw new IllegalArgumentException();
     String base =
         " FROM complaint c JOIN category k ON k.id=c.category_id"
-            + " WHERE c.municipality_id=? AND (?::uuid IS NULL OR c.category_id=?::uuid)"
-            + " AND ST_DWithin(c.location,ST_SetSRID(ST_MakePoint(?,?),4326)::geography,5000)";
-    Object[] scope = {u.get("municipality_id"), categoryId, categoryId, longitude, latitude};
+            + " WHERE c.municipality_id=? AND (?::uuid IS NULL OR c.category_id=?::uuid)";
+    var parameters =
+        new ArrayList<Object>(Arrays.asList(u.get("municipality_id"), categoryId, categoryId));
+    var municipalityTotal =
+        db.one("SELECT count(*) total" + base, parameters.toArray()).get("total");
+    if (nearby) {
+      base += " AND ST_DWithin(c.location,ST_SetSRID(ST_MakePoint(?,?),4326)::geography,5000)";
+      parameters.add(longitude);
+      parameters.add(latitude);
+    }
     var stats =
         db.one(
             "SELECT COALESCE(sum((SELECT count(*) FROM complaint_vote v WHERE v.complaint_id=c.id)),0) votes,count(*) total,count(*) FILTER(WHERE c.status NOT IN"
                 + " ('CLOSED','REJECTED','TERMINATED')) in_progress,count(*) FILTER(WHERE c.status='CLOSED') closed"
                 + base,
-            scope);
+            parameters.toArray());
     String fields =
         "SELECT (c.external_id LIKE 'mock-community-v1:%') mock,c.id,c.category_id,k.name category_name,c.status,c.created_at,"
             + "(SELECT count(*) FROM complaint_vote v WHERE v.complaint_id=c.id) votes,"
             + "EXISTS(SELECT 1 FROM follower f WHERE f.complaint_id=c.id AND f.user_id=?::uuid) following,"
             + "EXISTS(SELECT 1 FROM complaint_vote v WHERE v.complaint_id=c.id AND v.user_id=?::uuid) voted,";
+    var readerParameters = new ArrayList<Object>(List.of(u.get("id"), u.get("id")));
+    readerParameters.addAll(parameters);
+    var pagedParameters = new ArrayList<Object>(readerParameters);
+    pagedParameters.add(size);
+    pagedParameters.add((long) page * size);
     var items =
         db.list(
             fields
@@ -432,15 +446,7 @@ public class ComplaintController {
                 + "round(ST_X(c.location::geometry)::numeric,3) longitude"
                 + base
                 + " ORDER BY c.created_at DESC,c.id LIMIT ? OFFSET ?",
-            u.get("id"),
-            u.get("id"),
-            u.get("municipality_id"),
-            categoryId,
-            categoryId,
-            longitude,
-            latitude,
-            size,
-            (long) page * size);
+            pagedParameters.toArray());
     var top =
         db.list(
             fields
@@ -449,16 +455,20 @@ public class ComplaintController {
                 + base
                 + " AND EXISTS(SELECT 1 FROM complaint_vote v WHERE v.complaint_id=c.id)"
                 + " ORDER BY votes DESC,c.created_at DESC,c.id LIMIT 5",
-            u.get("id"),
-            u.get("id"),
-            u.get("municipality_id"),
-            categoryId,
-            categoryId,
-            longitude,
-            latitude);
+            readerParameters.toArray());
     media.decorate(items, u);
     media.decorate(top, u);
-    return Map.of("items", items, "top", top, "total", stats.get("total"), "stats", stats);
+    return Map.of(
+        "items",
+        items,
+        "top",
+        top,
+        "total",
+        stats.get("total"),
+        "stats",
+        stats,
+        "municipalityTotal",
+        municipalityTotal);
   }
 
   @GetMapping("/community/complaints/{id}")
