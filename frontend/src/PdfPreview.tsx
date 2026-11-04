@@ -16,7 +16,15 @@ import {
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 GlobalWorkerOptions.workerSrc = workerUrl;
 type FileData = { id: string; original_name: string; size_bytes: number };
-export default function PdfPreview({ file, onClose }: { file: FileData; onClose: () => void }) {
+export default function PdfPreview({
+  file,
+  onClose,
+  endpoint = "files",
+}: {
+  file: FileData;
+  onClose: () => void;
+  endpoint?: "files" | "media";
+}) {
   const [pdf, setPdf] = useState<PDFDocumentProxy>();
   const [page, setPage] = useState(1),
     [zoom, setZoom] = useState(1),
@@ -38,7 +46,7 @@ export default function PdfPreview({ file, onClose }: { file: FileData; onClose:
     setPage(1);
     setZoom(1);
     const loading = getDocument({
-      url: `/api/files/${file.id}`,
+      url: `/api/${endpoint}/${file.id}`,
       withCredentials: true,
       useWasm: false,
       cMapUrl: "/pdfjs/cmaps/",
@@ -66,7 +74,7 @@ export default function PdfPreview({ file, onClose }: { file: FileData; onClose:
       renderTask.current?.cancel();
       void loading.destroy().catch(() => {});
     };
-  }, [file.id, retry]);
+  }, [file.id, endpoint, retry]);
   useEffect(() => {
     if (!container.current) return;
     const observer = new ResizeObserver((entries) =>
@@ -126,7 +134,7 @@ export default function PdfPreview({ file, onClose }: { file: FileData; onClose:
       width={1000}
       className="pdf-preview-modal"
       footer={
-        <Button icon={<DownloadOutlined />} href={`/api/files/${file.id}`}>
+        <Button icon={<DownloadOutlined />} href={`/api/${endpoint}/${file.id}`}>
           ดาวน์โหลดเอกสารต้นฉบับ
         </Button>
       }

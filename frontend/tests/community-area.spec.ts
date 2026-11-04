@@ -24,12 +24,16 @@ test("empty nearby area can explicitly discover existing municipal cases and ret
   );
   await context.setGeolocation({ latitude: 16.5, longitude: 102.5 });
   await page.goto("/");
+  await expect(page.getByRole("radio", { name: "ทั้งเทศบาล", exact: true })).toBeChecked();
+  await page.getByText("ใกล้จุดที่เลือก (5 กม.)", { exact: true }).click();
   const empty = page.getByRole("alert").filter({ hasText: "ไม่พบเรื่องในรัศมี 5 กม." });
   await expect(empty).toBeVisible();
   const ratio = page.locator(".community-metrics > div").filter({ hasText: "สัดส่วนปิดเรื่อง" });
   await expect(ratio.locator("strong")).toHaveText("—");
   await page.getByRole("button", { name: /ดูทั้งเทศบาล/ }).click();
-  await expect(page.getByRole("heading", { name: "ปัญหาทั้งเทศบาล", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "เรื่องแจ้งในเทศบาล", exact: true }),
+  ).toBeVisible();
   const card = page
     .locator(".community-issue")
     .filter({ hasText: "#" + id.slice(0, 8).toUpperCase() });
@@ -119,6 +123,7 @@ test("reselecting identical map coordinates preserves settled community results"
     "Private street",
   );
   await page.goto("/");
+  await page.getByText("ใกล้จุดที่เลือก (5 กม.)", { exact: true }).click();
   const total = page.locator(".community-metrics > div").first().locator("strong");
   await expect(total).toHaveText(/^[1-9]\d*$/);
   const before = await total.innerText();

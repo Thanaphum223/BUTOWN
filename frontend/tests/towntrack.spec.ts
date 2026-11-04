@@ -250,7 +250,7 @@ test("resource refusal by approver terminates a real complaint", async ({ page, 
   });
 });
 
-test("citizen map searches real nearby cases and follows sanitized summary", async ({
+test("citizen municipal map lists real cases and follows sanitized summary", async ({
   page,
   context,
 }) => {

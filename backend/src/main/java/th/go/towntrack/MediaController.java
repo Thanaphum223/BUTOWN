@@ -47,7 +47,7 @@ public class MediaController {
       if (!u.get("id").equals(f.get("uploaded_by")) && !shared) Access.deny();
     } else access.complaint((UUID) f.get("complaint_id"), u, false);
     String type = f.get("content_type").toString();
-    if (!type.startsWith("image/") && !type.startsWith("video/"))
+    if (!type.startsWith("image/") && !type.startsWith("video/") && !type.equals("application/pdf"))
       throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
     String key = f.get("storage_key").toString();
     boolean thumb = thumbnail && f.get("thumbnail_key") != null;
@@ -60,7 +60,12 @@ public class MediaController {
     headers.setCacheControl("private, no-store");
     headers.set("X-Content-Type-Options", "nosniff");
     headers.set("Accept-Ranges", "bytes");
-    headers.setContentDisposition(ContentDisposition.inline().build());
+    headers.setContentDisposition(
+        type.equals("application/pdf")
+            ? ContentDisposition.attachment()
+                .filename((String) f.get("original_name"), java.nio.charset.StandardCharsets.UTF_8)
+                .build()
+            : ContentDisposition.inline().build());
     if ("s3".equals(f.get("storage_provider"))) {
       long size = ((Number) f.get(thumb ? "thumbnail_size" : "size_bytes")).longValue();
       if (range != null) {

@@ -49,7 +49,7 @@ public class EmergencyContactsController {
         || Math.abs(latitude) > 90
         || Math.abs(longitude) > 180
         || !TYPES.containsKey(type)
-        || !List.of(5, 10, 20).contains(radiusKm))
+        || !List.of(5, 10, 20, 50).contains(radiusKm))
       throw new ResponseStatusException(
           HttpStatus.BAD_REQUEST, "จุดค้นหาหรือประเภทสถานที่ไม่ถูกต้อง");
     double lat = Math.round(latitude * 1000) / 1000.0;

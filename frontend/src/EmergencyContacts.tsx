@@ -71,7 +71,7 @@ export default function EmergencyContacts() {
   const geo = useGeo();
   const [point, setPoint] = useState<[number, number] | undefined>(geo.point);
   const [type, setType] = useState("hospital");
-  const radiusKm = 20;
+  const radiusKm = 50;
   const [places, setPlaces] = useState<Place[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -175,7 +175,7 @@ export default function EmergencyContacts() {
         <Title level={3}>
           <EnvironmentOutlined /> สถานที่สำคัญใกล้ฉัน
         </Title>
-        <p>ค้นหาในประเทศไทย ภายในรัศมี 20 กม. เรียงตามระยะห่างเส้นตรงจากจุดที่เลือก</p>
+        <p>ภายใน 50 กม. จากจุดที่เลือก เรียงตามระยะทางเส้นตรงจากใกล้ไปไกล</p>
         {geo.error && (
           <Alert type="info" showIcon message={geo.error} style={{ marginBottom: 12 }} />
         )}

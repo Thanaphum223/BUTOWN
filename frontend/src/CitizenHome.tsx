@@ -14,6 +14,7 @@ import {
 } from "antd";
 import {
   PictureOutlined,
+  FilePdfOutlined,
   PlayCircleOutlined,
   EyeOutlined,
   BellOutlined,
@@ -39,7 +40,7 @@ export default function CitizenHome({
   onFollowing: () => void;
 }) {
   const geo = useGeo();
-  const [area, setArea] = useState<"nearby" | "municipality">("nearby");
+  const [area, setArea] = useState<"nearby" | "municipality">("municipality");
   const municipal = area === "municipality";
   const [point, setPoint] = useState<[number, number] | undefined>(geo.point);
   useEffect(() => {
@@ -185,13 +186,17 @@ export default function CitizenHome({
               <div className="issue-media-placeholder">
                 {item.cover.content_type.startsWith("video/") ? (
                   <PlayCircleOutlined />
+                ) : item.cover.content_type === "application/pdf" ? (
+                  <FilePdfOutlined />
                 ) : (
                   <PictureOutlined />
                 )}
                 <span>
                   {item.cover.content_type.startsWith("video/")
                     ? "เปิดดูวิดีโอหลักฐาน"
-                    : "เปิดดูรูปหลักฐาน"}
+                    : item.cover.content_type === "application/pdf"
+                      ? "เปิดดูเอกสาร PDF"
+                      : "เปิดดูรูปหลักฐาน"}
                 </span>
               </div>
             )}
@@ -223,12 +228,7 @@ export default function CitizenHome({
       <div className="page-heading community-heading">
         <div>
           <Text className="eyebrow">ชุมชน · TOWNTRACK</Text>
-          <Title level={2}>{municipal ? "ปัญหาทั้งเทศบาล" : "ปัญหาในระยะ 5 กม."}</Title>
-          <p className="community-lead">
-            {municipal
-              ? "เรื่องที่ประชาชนแจ้งในเทศบาลที่คุณใช้งาน รวมทุกพื้นที่และทุกสถานะ"
-              : "เรื่องที่ประชาชนแจ้งในเขตเทศบาล ภายในรัศมี 5 กม. จากจุดที่เลือก"}
-          </p>
+          <Title level={2}>{municipal ? "เรื่องแจ้งในเทศบาล" : "เรื่องแจ้งใกล้จุดที่เลือก"}</Title>
         </div>
       </div>
       <div className="community-area-control">
@@ -239,17 +239,16 @@ export default function CitizenHome({
           value={area}
           onChange={(e) => changeArea(e.target.value)}
           options={[
-            { value: "nearby", label: "ใกล้จุดที่เลือก (5 กม.)" },
             { value: "municipality", label: "ทั้งเทศบาล" },
+            { value: "nearby", label: "ใกล้จุดที่เลือก (5 กม.)" },
           ]}
         />
-        <Text type="secondary">เลือกพื้นที่เพื่อดูสถิติ รายการ และโหวตในขอบเขตเดียวกัน</Text>
       </div>
       <div className="community-metrics">
         {[
           [
             FileTextOutlined,
-            municipal ? "ปัญหาทั้งเทศบาล" : "ปัญหาในระยะ 5 กม.",
+            municipal ? "เรื่องทั้งหมด" : "เรื่องใกล้จุดที่เลือก",
             result?.stats?.total ?? "—",
           ],
           [LikeOutlined, "เสียงสนับสนุน", result?.stats?.votes ?? "—"],
@@ -292,7 +291,7 @@ export default function CitizenHome({
           message="ไม่พบเรื่องในรัศมี 5 กม. จากจุดที่เลือก"
           description={
             Number(result.municipalityTotal) > 0
-              ? `ยังมี ${result.municipalityTotal} เรื่องในพื้นที่อื่นของเทศบาล สำหรับประเภทปัญหาที่เลือก`
+              ? `มีอีก ${result.municipalityTotal} เรื่องในเทศบาล`
               : "ลองเปลี่ยนจุดบนแผนที่หรือเลือกประเภทปัญหาอื่น"
           }
           action={
@@ -358,8 +357,7 @@ export default function CitizenHome({
               }))}
           />
           <Text type="secondary">
-            {municipal ? "แสดงตำแหน่งของรายการในหน้านี้ · " : ""}
-            แสดงตำแหน่งโดยประมาณเพื่อรักษาความเป็นส่วนตัวของผู้แจ้ง
+            {municipal ? "ตำแหน่งโดยประมาณของรายการในหน้านี้" : "ตำแหน่งโดยประมาณ"}
           </Text>
         </Card>
         <section className="community-results">
@@ -402,9 +400,7 @@ export default function CitizenHome({
       </div>
       <section className="community-all-results">
         <div className="row-title">
-          <Title level={4}>
-            {municipal ? "รายการปัญหาทั้งเทศบาล" : "ปัญหาทั้งหมดในระยะ 5 กม."}
-          </Title>
+          <Title level={4}>{municipal ? "เรื่องแจ้งทั้งหมด" : "เรื่องแจ้งรอบจุดที่เลือก"}</Title>
           <Tag color="green">{result?.total ?? "—"} เรื่อง</Tag>
         </div>
         <List
