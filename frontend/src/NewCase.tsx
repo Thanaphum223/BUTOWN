@@ -85,6 +85,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
   const [nearbyDetail, setNearbyDetail] = useState<string>();
   const nearbyActionLock = useRef(false);
   const nearbyVersion = useRef(0);
+  const [nearbyRevision, setNearbyRevision] = useState(0);
   const nearbyUrl =
     position && step === 0
       ? `/nearby?latitude=${position[0]}&longitude=${position[1]}${category ? `&categoryId=${category.id}` : ""}`
@@ -160,6 +161,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
   function selectPoint(p: [number, number]) {
     setPosition(p);
     setNearby([]);
+    setNearbyRevision((v) => v + 1);
     setSelectedPlace(undefined);
     setAddressLoading(false);
     setAddressNotice("");
@@ -259,7 +261,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [nearbyUrl]);
+  }, [nearbyUrl, nearbyRevision]);
   async function updateNearby(item: D, type: "vote" | "follow") {
     if (nearbyActionLock.current || nearbyBusy || !nearbyUrl || !position) return;
     nearbyActionLock.current = true;
@@ -291,7 +293,11 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
               ? {
                   ...row,
                   voted: !item.voted,
-                  votes: Math.max(0, Number(row.votes ?? 0) + (item.voted ? -1 : 1)),
+                  votes: Math.max(
+                    0,
+                    Number(row.votes ?? 0) +
+                      (!!row.voted === !item.voted ? 0 : item.voted ? -1 : 1),
+                  ),
                 }
               : { ...row, following: !item.following },
         ),

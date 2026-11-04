@@ -31,8 +31,8 @@
 
 **Interfaces:** `/api/nearby` remains an array with existing fields and adds `votes`, `voted`, `following`, `mock`, `created_at`. Shared `CommunityActions` consumes one item and detail/vote/follow callbacks plus disabled/loading flags. Home retains its existing API mutations and refresh behavior; reporting retains its location/category authorization checks.
 
-- [ ] Add browser regressions for count/toggle/follow/error/rapid-click behavior, category map icons and responsive menu. Run against baseline and observe missing controls/icons.
-- [ ] Add backend integration assertions for initial and changed vote/follow reader state, sanitization and tenant/radius/category constraints.
-- [ ] Implement the minimal shared UI and nearby API projection; keep failed or stale requests from corrupting current results.
-- [ ] Run focused browser regressions, formatting/build/source checks; commit, request one fresh whole-branch review and fix important findings.
+- [x] Add browser regressions for count/toggle/follow/error/rapid-click behavior, category map icons and responsive menu. Run against baseline and observe missing controls/icons.
+- [x] Add backend integration assertions for initial and changed vote/follow reader state, sanitization and tenant/radius/category constraints.
+- [x] Implement the minimal shared UI and nearby API projection; keep failed or stale requests from corrupting current results.
+- [x] Run focused browser regressions, formatting/build/source checks; commit, request one fresh whole-branch review and fix important findings.
 - [ ] Require full main CI before deployment. Verify live counts/icons/preview controls without submitting a vote/follow and preserve preexisting database rows/files.

@@ -9,11 +9,13 @@ const tile = Buffer.from(
   "base64",
 );
 
-async function fixture(page: Page) {
-  let voted = false;
+async function fixture(page: Page, initiallyVoted = false) {
+  let voted = initiallyVoted;
   let following = false;
   let fail = false;
+  let failRead = false;
   let gate: Promise<void> | undefined;
+  let saveBeforeResponse = false;
   const writes: { path: string; method: string; body: unknown }[] = [];
   const item = () => ({
     id,
@@ -39,6 +41,7 @@ async function fixture(page: Page) {
     const path = url.pathname;
     if (["POST", "DELETE"].includes(request.method())) {
       writes.push({ path, method: request.method(), body: request.postDataJSON() });
+      if (saveBeforeResponse && path.endsWith("/vote")) voted = request.method() === "POST";
       if (gate) await gate;
       if (fail)
         return route.fulfill({ status: 503, json: { message: "บันทึกไม่สำเร็จ ลองอีกครั้ง" } });
@@ -46,6 +49,8 @@ async function fixture(page: Page) {
       if (path.endsWith("/follow")) following = request.method() === "POST";
       return route.fulfill({ json: { ok: true } });
     }
+    if (path === "/api/nearby" && failRead)
+      return route.fulfill({ status: 503, json: { message: "Read unavailable" } });
     const payload: Record<string, unknown> = {
       "/api/auth/me": { id: "test-citizen", display_name: "ผู้ทดสอบ", role: "CITIZEN" },
       "/api/auth/csrf": { token: "test", headerName: "X-CSRF-TOKEN" },
@@ -76,7 +81,11 @@ async function fixture(page: Page) {
     fail: (value: boolean) => {
       fail = value;
     },
-    hold: () => {
+    failRead: (value: boolean) => {
+      failRead = value;
+    },
+    hold: (saveFirst = false) => {
+      saveBeforeResponse = saveFirst;
       let release!: () => void;
       gate = new Promise<void>((resolve) => {
         release = resolve;
@@ -183,3 +192,53 @@ test("a vote finishing after point change cannot repopulate the old nearby area"
   await expect(page.getByText("ไม่พบเคสใกล้เคียงในรัศมี 100 เมตร", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /ยกเลิกโหวต/ })).toHaveCount(0);
 });
+
+test("reselecting the same point recovers a saved vote after its refresh fails", async ({
+  page,
+}) => {
+  const state = await fixture(page);
+  state.failRead(true);
+  await page.getByRole("button", { name: `โหวต ${categoryName} #11111111`, exact: true }).click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "บันทึกแล้ว แต่โหลดข้อมูลล่าสุดไม่สำเร็จ" }),
+  ).toBeVisible();
+  state.failRead(false);
+  await page.getByRole("button", { name: "ค้นหา", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: `ยกเลิกโหวต ${categoryName} #11111111`, exact: true }),
+  ).toHaveText("13 โหวต");
+  await expect(page.getByText("พบ 1 เคสใกล้เคียง", { exact: true })).toBeVisible();
+  expect(state.writes).toHaveLength(1);
+});
+
+for (const initiallyVoted of [false, true]) {
+  test(`overlapping-area read cannot count the same ${initiallyVoted ? "cancellation" : "vote"} twice`, async ({
+    page,
+  }) => {
+    const state = await fixture(page, initiallyVoted);
+    const release = state.hold(true);
+    await page
+      .getByRole("button", {
+        name: `${initiallyVoted ? "ยกเลิกโหวต" : "โหวต"} ${categoryName} #11111111`,
+        exact: true,
+      })
+      .click();
+    await expect.poll(() => state.writes.length).toBe(1);
+    await page.getByLabel("ค้นหาชื่อสถานที่ หรือพิกัด", { exact: true }).fill("13.7501, 100.5");
+    await page.getByRole("button", { name: "ค้นหา", exact: true }).click();
+    const saved = page.getByRole("button", {
+      name: `${initiallyVoted ? "โหวต" : "ยกเลิกโหวต"} ${categoryName} #11111111`,
+      exact: true,
+    });
+    await expect(saved).toHaveText(initiallyVoted ? "12 โหวต" : "13 โหวต");
+    state.failRead(true);
+    const response = page.waitForResponse((r) => r.url().endsWith("/vote"));
+    release();
+    await response;
+    await expect(
+      page.getByRole("alert").filter({ hasText: "บันทึกแล้ว แต่โหลดข้อมูลล่าสุดไม่สำเร็จ" }),
+    ).toBeVisible();
+    await expect(saved).toHaveText(initiallyVoted ? "12 โหวต" : "13 โหวต");
+    expect(state.writes).toHaveLength(1);
+  });
+}
