@@ -1,5 +1,6 @@
 import { MenuOutlined } from "@ant-design/icons";
 import GovLogin from "./GovLogin";
+import GovAccountForm, { type GovAccountMode } from "./GovAccountForm";
 import GovProfile from "./GovProfile";
 import GovCallback from "./GovCallback";
 import type { GovCallbackReturn } from "./govCallbackReturn";
@@ -148,6 +149,7 @@ function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () 
   }, [line]);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [govMode, setGovMode] = useState<GovAccountMode>(null);
   async function login(v: RowData) {
     if (busy) return;
     setBusy(true);
@@ -191,30 +193,55 @@ function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () 
         </div>
       </section>
       <Card className="login-card">
-        <Title level={3}>ยินดีต้อนรับ</Title>
-        <Paragraph type="secondary">เข้าสู่ระบบบริการเทศบาล TownTrack</Paragraph>
-        <ErrorBox error={error} />
-        {line?.enabled && (
-          <Button block style={{ marginBottom: 16 }} loading={busy} onClick={lineLogin}>
-            เข้าสู่ระบบด้วย LINE
-          </Button>
+        {govMode ? (
+          <GovAccountForm
+            mode={govMode}
+            onModeChange={setGovMode}
+            disabled={busy}
+            onBusyChange={setBusy}
+            onLogin={onLogin}
+          />
+        ) : (
+          <>
+            <Title level={3}>ยินดีต้อนรับ</Title>
+            <Paragraph type="secondary">เข้าสู่ระบบบริการเทศบาล TownTrack</Paragraph>
+            <ErrorBox error={error} />
+            {line?.enabled && (
+              <Button block style={{ marginBottom: 16 }} loading={busy} onClick={lineLogin}>
+                เข้าสู่ระบบด้วย LINE
+              </Button>
+            )}
+            <GovLogin disabled={busy} onBusyChange={setBusy} />
+            <GovAccountForm
+              mode={null}
+              onModeChange={setGovMode}
+              disabled={busy}
+              onBusyChange={setBusy}
+              onLogin={onLogin}
+            />
+            <Paragraph type="secondary" style={{ marginTop: 24 }}>
+              เข้าสู่ระบบด้วยบัญชี TownTrack
+            </Paragraph>
+            <Form layout="vertical" disabled={busy} onFinish={login}>
+              <Form.Item label="ชื่อผู้ใช้" name="username" rules={[{ required: true }]}>
+                <Input autoComplete="username" size="large" />
+              </Form.Item>
+              <Form.Item label="รหัสผ่าน" name="password" rules={[{ required: true }]}>
+                <Input.Password autoComplete="current-password" size="large" />
+              </Form.Item>
+              <Button type="primary" htmlType="submit" block size="large" loading={busy}>
+                เข้าสู่ระบบ
+              </Button>
+            </Form>
+          </>
         )}
-        <GovLogin disabled={busy} onBusyChange={setBusy} />
-        <Paragraph type="secondary" style={{ marginTop: 24 }}>
-          เข้าสู่ระบบด้วยบัญชี TownTrack
-        </Paragraph>
-        <Form layout="vertical" disabled={busy} onFinish={login}>
-          <Form.Item label="ชื่อผู้ใช้" name="username" rules={[{ required: true }]}>
-            <Input autoComplete="username" size="large" />
-          </Form.Item>
-          <Form.Item label="รหัสผ่าน" name="password" rules={[{ required: true }]}>
-            <Input.Password autoComplete="current-password" size="large" />
-          </Form.Item>
-          <Button type="primary" htmlType="submit" block size="large" loading={busy}>
-            เข้าสู่ระบบ
-          </Button>
-        </Form>
-        <Button block icon={<AlertOutlined />} style={{ marginTop: 16 }} onClick={onEmergency}>
+        <Button
+          block
+          disabled={busy}
+          icon={<AlertOutlined />}
+          style={{ marginTop: 16 }}
+          onClick={onEmergency}
+        >
           เบอร์ฉุกเฉิน
         </Button>
       </Card>

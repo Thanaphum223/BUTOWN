@@ -66,6 +66,8 @@ public class SecurityConfig {
                         "/api/auth/line",
                         "/api/auth/gov",
                         "/api/auth/gov/start",
+                        "/api/auth/gov/register",
+                        "/api/auth/gov/password-login",
                         "/api/auth/sso-callback",
                         "/api/public/gov-auth",
                         "/actuator/health")
@@ -114,21 +116,21 @@ public class SecurityConfig {
                 x.contentSecurityPolicy(
                     c -> c.policyDirectives("default-src 'none'; frame-ancestors 'none'")))
         .addFilterBefore(
-            new SerializedLogout(),
+            new SerializedSessionMutation(),
             org.springframework.security.web.authentication.logout.LogoutFilter.class)
         .addFilterBefore(new LoginLimit(), UsernamePasswordAuthenticationFilter.class);
     return h.build();
   }
 
-  // Logout must not invalidate between an external login's final check and context save.
-  static class SerializedLogout extends OncePerRequestFilter {
+  // Staff login and logout must not mutate sessions during external-login finalization.
+  static class SerializedSessionMutation extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest q, HttpServletResponse s, FilterChain chain)
         throws ServletException, IOException {
       var session = q.getSession(false);
       if (session != null
           && q.getMethod().equals("POST")
-          && q.getRequestURI().equals("/api/auth/logout")) {
+          && List.of("/api/auth/login", "/api/auth/logout").contains(q.getRequestURI())) {
         synchronized (org.springframework.web.util.WebUtils.getSessionMutex(session)) {
           chain.doFilter(q, s);
         }
@@ -148,6 +150,8 @@ public class SecurityConfig {
               || q.getRequestURI().equals("/api/auth/register")
               || q.getRequestURI().equals("/api/auth/line")
               || q.getRequestURI().equals("/api/auth/gov/start")
+              || q.getRequestURI().equals("/api/auth/gov/register")
+              || q.getRequestURI().equals("/api/auth/gov/password-login")
               || q.getRequestURI().equals("/api/auth/sso-callback")
               || q.getRequestURI().equals("/api/auth/gov"))) {
         long now = System.currentTimeMillis();

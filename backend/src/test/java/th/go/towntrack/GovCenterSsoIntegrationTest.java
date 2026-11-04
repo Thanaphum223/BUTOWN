@@ -50,6 +50,22 @@ class GovCenterSsoIntegrationTest {
             e.getResponseBody().write(bytes);
             e.close();
           });
+      iam.createContext(
+          "/auth/register",
+          e -> {
+            e.getRequestBody().readAllBytes();
+            e.sendResponseHeaders(201, -1);
+            e.close();
+          });
+      iam.createContext(
+          "/auth/login",
+          e -> {
+            e.getRequestBody().readAllBytes();
+            byte[] body = "{\"code\":\"account-service-code\"}".getBytes(StandardCharsets.UTF_8);
+            e.sendResponseHeaders(200, body.length);
+            e.getResponseBody().write(body);
+            e.close();
+          });
       iam.start();
     } catch (Exception e) {
       throw new ExceptionInInitializerError(e);
@@ -67,6 +83,7 @@ class GovCenterSsoIntegrationTest {
   @Autowired Db db;
   @Autowired ObjectMapper json;
   @Autowired GovCenterSsoClient provider;
+  @Autowired GovAccountClient accountApi;
   @Autowired org.springframework.security.core.session.SessionRegistry sessions;
 
   @Test
@@ -266,16 +283,18 @@ class GovCenterSsoIntegrationTest {
     var transport = java.net.http.HttpClient.newHttpClient();
     var intercepted = org.mockito.Mockito.mock(java.net.http.HttpClient.class);
     org.mockito.Mockito.when(
-            intercepted.send(
+            intercepted.sendAsync(
                 org.mockito.ArgumentMatchers.any(java.net.http.HttpRequest.class),
-                org.mockito.ArgumentMatchers
-                    .<java.net.http.HttpResponse.BodyHandler<java.io.InputStream>>any()))
+                org.mockito.ArgumentMatchers.<java.net.http.HttpResponse.BodyHandler<byte[]>>any()))
         .thenAnswer(
             invocation -> {
               java.net.http.HttpRequest original = invocation.getArgument(0);
-              assertEquals(
-                  "https://api-auth.govcenter.co/e-services/sso/verify-code",
-                  original.uri().toString());
+              assertTrue(
+                  List.of(
+                          "https://api-auth.govcenter.co/e-services/sso/verify-code",
+                          "https://api-auth.govcenter.co/auth/register",
+                          "https://api-auth.govcenter.co/auth/login?service=towntrack-test")
+                      .contains(original.uri().toString()));
               var redirected =
                   java.net.http.HttpRequest.newBuilder(
                           java.net.URI.create(
@@ -292,12 +311,12 @@ class GovCenterSsoIntegrationTest {
                   .map()
                   .forEach(
                       (name, values) -> values.forEach(value -> redirected.header(name, value)));
-              return transport.send(
+              return transport.sendAsync(
                   redirected.build(),
-                  invocation
-                      .<java.net.http.HttpResponse.BodyHandler<java.io.InputStream>>getArgument(1));
+                  invocation.<java.net.http.HttpResponse.BodyHandler<byte[]>>getArgument(1));
             });
     org.springframework.test.util.ReflectionTestUtils.setField(provider, "http", intercepted);
+    org.springframework.test.util.ReflectionTestUtils.setField(accountApi, "http", intercepted);
     beforeReply.set(() -> {});
     address = "192.0.2." + addresses.incrementAndGet();
     calls.set(0);
@@ -560,7 +579,7 @@ class GovCenterSsoIntegrationTest {
     expired.setAttribute(
         CentralGovAuthController.PENDING,
         new CentralGovAuthController.Pending(
-            STATE, java.time.Instant.now().minusSeconds(1), null, TOWN, false));
+            STATE, java.time.Instant.now().minusSeconds(1), null, TOWN, "LOGIN"));
     callback(expired, STATE, "code", false).andExpect(status().isBadRequest());
     var linking = start("LINK", true);
     linking.removeAttribute("SPRING_SECURITY_CONTEXT");
@@ -597,5 +616,83 @@ class GovCenterSsoIntegrationTest {
         admin,
         db.one("SELECT local_user_id FROM iam_user_profile WHERE municipality_id=?", TOWN)
             .get("local_user_id"));
+  }
+
+  @Test
+  void accountEndpointsRequireCsrfAndEstablishVerifiedCitizenSession() throws Exception {
+    for (String purpose : List.of("REGISTER", "PASSWORD_LOGIN")) {
+      String route =
+          purpose.equals("REGISTER") ? "/api/auth/gov/register" : "/api/auth/gov/password-login";
+      var fields =
+          new HashMap<>(
+              Map.of(
+                  "state",
+                  STATE,
+                  "name",
+                  "Submitted Name",
+                  "email",
+                  "signup@example.test",
+                  "password",
+                  "Fake-test-pass-123"));
+      var session = start(purpose, false);
+      String original = session.getId();
+      mvc.perform(
+              post(route)
+                  .session(session)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(json.writeValueAsString(fields)))
+          .andExpect(status().isForbidden());
+      mvc.perform(
+              post(route)
+                  .session(session)
+                  .with(csrf())
+                  .with(
+                      r -> {
+                        r.setRemoteAddr(address);
+                        return r;
+                      })
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(json.writeValueAsString(fields)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.user.role").value("CITIZEN"));
+      assertNotEquals(original, session.getId());
+      mvc.perform(get("/api/auth/me").session(session))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.display_name").value("SSO Citizen"));
+      assertEquals("{\"code\":\"account-service-code\"}", sentCode.get());
+      assertEquals("isolated-provider-test-key", sentKey.get());
+    }
+    var account =
+        db.one(
+            "SELECT u.password_hash, u.role FROM app_user u JOIN iam_user_profile p ON p.local_user_id=u.id WHERE p.iam_user_id='iam-citizen-1'");
+    assertNotEquals("Fake-test-pass-123", account.get("password_hash"));
+    assertEquals("CITIZEN", account.get("role"));
+  }
+
+  @Test
+  void accountRoutesShareExistingAuthenticationRateLimit() throws Exception {
+    for (int n = 0; n < 20; n++)
+      mvc.perform(
+              post(n % 2 == 0 ? "/api/auth/gov/register" : "/api/auth/gov/password-login")
+                  .with(csrf())
+                  .with(
+                      r -> {
+                        r.setRemoteAddr(address);
+                        return r;
+                      })
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{}"))
+          .andExpect(status().isBadRequest());
+    mvc.perform(
+            post("/api/auth/gov/register")
+                .with(csrf())
+                .with(
+                    r -> {
+                      r.setRemoteAddr(address);
+                      return r;
+                    })
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isTooManyRequests());
   }
 }

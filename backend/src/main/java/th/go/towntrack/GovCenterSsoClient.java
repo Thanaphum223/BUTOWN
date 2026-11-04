@@ -97,42 +97,42 @@ public class GovCenterSsoClient {
                   HttpRequest.BodyPublishers.ofString(
                       json.writeValueAsString(Map.of("code", code.trim()))))
               .build();
-      var response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
-      try (var input = response.body()) {
-        // Gov's live POST returns 201; its published OpenAPI also specifies 200.
-        boolean verifiedStatus = response.statusCode() == 200 || response.statusCode() == 201;
-        if (!verifiedStatus)
-          LOG.warn("Gov SSO verification returned HTTP {}", response.statusCode());
-        if (List.of(400, 401, 403, 409).contains(response.statusCode())) {
-          String error =
-              new String(input.readNBytes(8192), java.nio.charset.StandardCharsets.UTF_8)
-                  .toLowerCase(Locale.ROOT);
-          if (error.contains("invalid sso code")
-              || error.contains("sso code has already been used")
-              || error.contains("sso code has expired"))
-            throw new ResponseStatusException(
-                HttpStatus.UNAUTHORIZED,
-                "รหัส SSO ไม่ถูกต้อง หมดอายุ หรือใช้แล้ว กรุณาเข้าสู่ระบบใหม่");
+      var response = GovHttp.send(http, request, 1048576);
+      // Gov's live POST returns 201; its published OpenAPI also specifies 200.
+      boolean verifiedStatus = response.statusCode() == 200 || response.statusCode() == 201;
+      if (!verifiedStatus) LOG.warn("Gov SSO verification returned HTTP {}", response.statusCode());
+      if (List.of(400, 401, 403, 409).contains(response.statusCode())) {
+        String error =
+            new String(
+                    response.body(),
+                    0,
+                    Math.min(response.body().length, 8192),
+                    java.nio.charset.StandardCharsets.UTF_8)
+                .toLowerCase(Locale.ROOT);
+        if (error.contains("invalid sso code")
+            || error.contains("sso code has already been used")
+            || error.contains("sso code has expired"))
           throw new ResponseStatusException(
-              HttpStatus.SERVICE_UNAVAILABLE,
-              "Gov Center ปฏิเสธการเชื่อมต่อ กรุณาให้ผู้ดูแลตรวจ API Key, Service Code และสิทธิ์บริการ");
-        }
-        if (!verifiedStatus)
-          throw new ResponseStatusException(
-              HttpStatus.SERVICE_UNAVAILABLE,
-              "Gov Center ไม่พร้อมใช้งาน กรุณาเริ่มเข้าสู่ระบบใหม่");
-        byte[] data = input.readNBytes(1048577);
-        if (data.length > 1048576) throw new IllegalArgumentException();
-        JsonNode result = json.readTree(data);
-        if (result == null
-            || !result.isObject()
-            || !result.path("user").isObject()
-            || !result.path("user").path("id").isTextual()
-            || result.path("user").path("id").asText().isBlank()
-            || result.path("user").path("id").asText().length() > 200)
-          throw new IllegalArgumentException();
-        return result;
+              HttpStatus.UNAUTHORIZED,
+              "รหัส SSO ไม่ถูกต้อง หมดอายุ หรือใช้แล้ว กรุณาเข้าสู่ระบบใหม่");
+        throw new ResponseStatusException(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "Gov Center ปฏิเสธการเชื่อมต่อ กรุณาให้ผู้ดูแลตรวจ API Key, Service Code และสิทธิ์บริการ");
       }
+      if (!verifiedStatus)
+        throw new ResponseStatusException(
+            HttpStatus.SERVICE_UNAVAILABLE, "Gov Center ไม่พร้อมใช้งาน กรุณาเริ่มเข้าสู่ระบบใหม่");
+      byte[] data = response.body();
+      if (data.length > 1048576) throw new IllegalArgumentException();
+      JsonNode result = json.readTree(data);
+      if (result == null
+          || !result.isObject()
+          || !result.path("user").isObject()
+          || !result.path("user").path("id").isTextual()
+          || result.path("user").path("id").asText().isBlank()
+          || result.path("user").path("id").asText().length() > 200)
+        throw new IllegalArgumentException();
+      return result;
     } catch (ResponseStatusException e) {
       throw e;
     } catch (InterruptedException e) {

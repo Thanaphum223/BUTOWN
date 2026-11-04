@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Alert, Button, Space } from "antd";
 import { SafetyCertificateOutlined } from "@ant-design/icons";
 import { post } from "./api";
-import { govLineLogin, govRegistration, useGovConfig } from "./govSso";
+import { govLineLogin, useGovConfig } from "./govSso";
 export default function GovLogin({
   link = false,
   disabled = false,
@@ -14,7 +14,7 @@ export default function GovLogin({
 }) {
   const { config, error: loadError } = useGovConfig();
   const [error, setError] = useState(""),
-    [busy, setBusy] = useState<"login" | "register" | null>(null);
+    [busy, setBusy] = useState(false);
   const starting = useRef(false);
   if (!config?.configured)
     return !link && (config || loadError) ? (
@@ -24,21 +24,20 @@ export default function GovLogin({
         message={loadError || "ยังไม่ได้ตั้งค่า Gov Center SSO ครบถ้วน"}
       />
     ) : null;
-  async function start(action: "login" | "register") {
+  async function start() {
     if (disabled || starting.current) return;
     starting.current = true;
-    setBusy(action);
+    setBusy(true);
     onBusyChange?.(true);
     setError("");
     try {
-      const { url, state } =
-        action === "register" ? govRegistration(config!) : govLineLogin(config!);
+      const { url, state } = govLineLogin(config!);
       await post("/auth/gov/start", { state, purpose: link ? "LINK" : "LOGIN" });
       window.location.assign(url);
     } catch (e) {
       setError((e as Error).message);
       starting.current = false;
-      setBusy(null);
+      setBusy(false);
       onBusyChange?.(false);
     }
   }
@@ -47,23 +46,13 @@ export default function GovLogin({
       <Button
         aria-label={link ? "เชื่อมบัญชี Gov Center" : "เข้าสู่ระบบด้วย Gov Center"}
         block={!link}
-        disabled={disabled || busy !== null}
+        disabled={disabled || busy}
         icon={<SafetyCertificateOutlined />}
-        loading={busy === "login"}
-        onClick={() => void start("login")}
+        loading={busy}
+        onClick={() => void start()}
       >
         {link ? "เชื่อมบัญชี Gov Center" : "เข้าสู่ระบบด้วย Gov Center"}
       </Button>
-      {!link && (
-        <Button
-          block
-          disabled={disabled || busy !== null}
-          loading={busy === "register"}
-          onClick={() => void start("register")}
-        >
-          สมัครบัญชีประชาชนผ่าน Gov Center
-        </Button>
-      )}
       {error && <Alert type="error" showIcon message={error} />}
     </Space>
   );

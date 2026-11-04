@@ -173,69 +173,6 @@ for (const suffix of [
     expect(page.url()).toBe("http://127.0.0.1:5173/auth/callback");
   });
 }
-test("citizen signup opens Gov registration with a server-bound return and no local credential form", async ({
-  page,
-}) => {
-  const seen = await boundary(page);
-  const localRegistrations: string[] = [];
-  page.on("request", (r) => {
-    if (r.url().endsWith("/api/auth/register")) localRegistrations.push(r.url());
-  });
-  await page.goto("/");
-  await expect(page.getByRole("tab", { name: "สมัครบัญชีประชาชน" })).toHaveCount(0);
-  await expect(page.getByLabel("ชื่อที่ใช้ติดต่อ", { exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "สมัครบัญชีประชาชนผ่าน Gov Center", exact: true }).click();
-  await expect(page).toHaveURL(/^https:\/\/auth\.govcenter\.co\/auth\/register\?/);
-  const target = new URL(page.url());
-  expect(target.searchParams.get("service")).toBe("towntrack-test");
-  const returned = new URL(target.searchParams.get("callback")!);
-  expect(returned.origin + returned.pathname).toBe("http://127.0.0.1:5173/auth/callback");
-  expect(returned.hash).toBe("");
-  expect(target.searchParams.get("state")).toMatch(/^[a-f0-9]{64}$/);
-  expect(returned.searchParams.get("state")).toBe(target.searchParams.get("state"));
-  expect(seen.starts).toEqual([{ state: target.searchParams.get("state"), purpose: "LOGIN" }]);
-  expect(localRegistrations).toEqual([]);
-  returned.searchParams.set("code", "verified-registration-code");
-  returned.searchParams.set("service", "towntrack-test");
-  returned.searchParams.set("is_new_user", "true");
-  await page.goto(returned.toString());
-  await expect(page.getByText("SSO Test User", { exact: true })).toBeVisible();
-  expect(seen.callbacks).toEqual([
-    { code: "verified-registration-code", state: seen.starts[0].state },
-  ]);
-  expect(page.url()).toBe("http://127.0.0.1:5173/");
-});
-test("signup start failure stays local and restores signup and both login options", async ({
-  page,
-}) => {
-  const seen = await boundary(page);
-  let finish!: () => void;
-  const waiting = new Promise<void>((resolve) => (finish = resolve));
-  await page.route("**/api/auth/gov/start", async (r) => {
-    await waiting;
-    await r.fulfill({ status: 503, json: { message: "Registration start unavailable" } });
-  });
-  await page.goto("/");
-  const signup = page.getByRole("button", {
-    name: "สมัครบัญชีประชาชนผ่าน Gov Center",
-    exact: true,
-  });
-  const govLogin = page.getByRole("button", { name: "เข้าสู่ระบบด้วย Gov Center", exact: true });
-  const localLogin = page.getByRole("button", { name: /เข้าสู่ระบบ$/ });
-  await signup.click();
-  try {
-    await expect(govLogin).toBeDisabled();
-    await expect(localLogin).toBeDisabled();
-  } finally {
-    finish();
-  }
-  await expect(page.getByRole("alert")).toContainText("Registration start unavailable");
-  await expect(signup).toBeEnabled();
-  await expect(govLogin).toBeEnabled();
-  await expect(localLogin).toBeEnabled();
-  expect(page.url()).toBe("http://127.0.0.1:5173/");
-  expect(seen.callbacks).toEqual([]);
-});
 for (const configFailure of ["unconfigured", "unavailable", "wrong-origin"]) {
   test(`signup has no local fallback when configuration is ${configFailure}`, async ({ page }) => {
     const seen = await boundary(page);
