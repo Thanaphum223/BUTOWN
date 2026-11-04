@@ -1,0 +1,9 @@
+# Gov Center registration handoff
+
+TownTrack's citizen signup action must open `https://auth.govcenter.co/auth/register` rather than collect or create local credentials. Keep existing local login and authenticated account linking. A return carrying a valid Gov SSO code and matching browser/server state must exchange the code once, establish the TownTrack session, and load `/`, including a new user marked `is_new_user=true`. Neither that marker nor a browser profile grants identity or permissions. Missing/invalid code, duplicate parameters, onboarding status, provider errors and state failures remain failures.
+
+Use the same three central environment variables and current backend verification API. No new dependencies, central API keys in the browser, role grants, credential forwarding or real account creation during testing. Preserve all live reports, votes, attachments and users.
+
+Provider boundary observed on 2026-11-04: the public RegisterForm sends registration fields to its own server action and on success navigates to a generated Gov login URL. Its URL helper forwards callback/callbackUrl/redirect/service, drops outer state, and currently rejects external hosts outside govcenter.co/gov.co and localhost. Therefore the registered TownTrack sslip.io destination is filtered out. TownTrack can supply its configured return destination and nonce and accept verified returns, but cannot guarantee automatic return from that unmodified provider page. Do not disguise that limitation, alter Gov code, bypass its host checks, or fabricate login. Carry the nonce on the configured return URL as in the working LINE flow, and keep outer state for providers that forward it.
+
+Replace the local signup tab/form with one direct signup button. Explain that signup happens at Gov; avoid claiming that registration is authenticated until the verified callback succeeds. If configuration cannot load or is incomplete, do not offer a local signup fallback.
