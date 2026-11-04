@@ -39,9 +39,9 @@ public class GovAccountClient {
             Map.of("email", email, "password", password),
             null,
             false);
-    if (login.has("code")) return code(login);
+    if (login.hasNonNull("code")) return code(login);
     JsonNode token =
-        login.has("access_token") ? login.path("access_token") : login.path("accessToken");
+        login.hasNonNull("access_token") ? login.path("access_token") : login.path("accessToken");
     if (!token.isTextual()
         || token.asText().isEmpty()
         || token.asText().length() > 16384

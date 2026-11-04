@@ -161,4 +161,26 @@ class GovAccountClientTest {
     assertEquals(401, e.getStatusCode().value());
     assertFalse(e.toString().contains("secret"));
   }
+
+  @Test
+  void nullCodeUsesAccessTokenToGenerateServiceCode() {
+    reply(200, "{\"code\":null,\"access_token\":\"in-memory-token\"}");
+    reply(201, "{\"code\":\"generated-new-account-code\"}");
+    assertEquals(
+        "generated-new-account-code", client.loginCode("citizen@example.test", "password"));
+    assertEquals(2, sent.size());
+    assertEquals(
+        "Bearer in-memory-token", sent.get(1).headers().firstValue("Authorization").orElseThrow());
+  }
+
+  @Test
+  void nullSnakeCaseTokenAllowsPublishedCamelCaseToken() {
+    reply(200, "{\"access_token\":null,\"accessToken\":\"in-memory-token\"}");
+    reply(201, "{\"code\":\"generated-existing-account-code\"}");
+    assertEquals(
+        "generated-existing-account-code", client.loginCode("citizen@example.test", "password"));
+    assertEquals(2, sent.size());
+    assertEquals(
+        "Bearer in-memory-token", sent.get(1).headers().firstValue("Authorization").orElseThrow());
+  }
 }
