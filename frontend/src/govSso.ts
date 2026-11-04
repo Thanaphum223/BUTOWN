@@ -30,16 +30,6 @@ function govTransaction(config: GovConfig) {
   callback.searchParams.set("state", state);
   return { callback, state };
 }
-export function govRegistration(config: GovConfig) {
-  const { callback, state } = govTransaction(config);
-  const url = new URL("/auth/register", config.iamAuthUrl);
-  url.search = new URLSearchParams({
-    service: config.serviceCode,
-    callback: callback.toString(),
-    state,
-  }).toString();
-  return { url: url.toString(), state };
-}
 export function govLineLogin(config: GovConfig) {
   const { callback, state } = govTransaction(config);
   const govState = new URLSearchParams({

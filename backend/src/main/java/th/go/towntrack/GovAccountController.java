@@ -23,7 +23,7 @@ public class GovAccountController {
       @NotNull @Pattern(regexp = "[a-f0-9]{64}") String state,
       @NotBlank @Size(min = 2, max = 200) String name,
       @NotBlank @Email @Size(max = 320) String email,
-      @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) @NotNull @Size(min = 12, max = 72)
+      @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) @NotBlank @Size(min = 12, max = 72)
           String password) {
     Registration {
       name = clean(name);
@@ -39,7 +39,7 @@ public class GovAccountController {
   record PasswordLogin(
       @NotNull @Pattern(regexp = "[a-f0-9]{64}") String state,
       @NotBlank @Email @Size(max = 320) String email,
-      @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) @NotNull @Size(min = 1, max = 72)
+      @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) @NotBlank @Size(min = 1, max = 72)
           String password) {
     PasswordLogin {
       email = cleanEmail(email);
