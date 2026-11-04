@@ -42,7 +42,6 @@ import {
   Steps,
   Table,
   Tag,
-  Tabs,
   Timeline,
   Typography,
   Upload,
@@ -149,8 +148,6 @@ function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () 
   }, [line]);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const { data: towns } = useData<RowData[]>("/public/municipalities");
-  const { message } = AntApp.useApp();
   async function login(v: RowData) {
     if (busy) return;
     setBusy(true);
@@ -163,19 +160,6 @@ function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () 
       });
       await refreshCsrf();
       onLogin();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function register(v: RowData) {
-    if (busy) return;
-    setBusy(true);
-    setError("");
-    try {
-      await post("/auth/register", v);
-      message.success("สร้างบัญชีแล้ว กรุณาเข้าสู่ระบบ");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -216,67 +200,20 @@ function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () 
           </Button>
         )}
         <GovLogin disabled={busy} onBusyChange={setBusy} />
-        <Tabs
-          items={[
-            {
-              key: "login",
-              label: "เข้าสู่ระบบ",
-              children: (
-                <Form layout="vertical" disabled={busy} onFinish={login}>
-                  <Form.Item label="ชื่อผู้ใช้" name="username" rules={[{ required: true }]}>
-                    <Input autoComplete="username" size="large" />
-                  </Form.Item>
-                  <Form.Item label="รหัสผ่าน" name="password" rules={[{ required: true }]}>
-                    <Input.Password autoComplete="current-password" size="large" />
-                  </Form.Item>
-                  <Button type="primary" htmlType="submit" block size="large" loading={busy}>
-                    เข้าสู่ระบบ
-                  </Button>
-                </Form>
-              ),
-            },
-            {
-              key: "register",
-              label: "สมัครบัญชีประชาชน",
-              children: (
-                <Form layout="vertical" disabled={busy} onFinish={register}>
-                  <Form.Item label="เทศบาล" name="municipalityId" rules={[{ required: true }]}>
-                    <Select
-                      options={towns?.map((t) => ({
-                        value: t.id,
-                        label: t.name,
-                      }))}
-                    />
-                  </Form.Item>
-                  <Form.Item
-                    label="ชื่อที่ใช้ติดต่อ"
-                    name="displayName"
-                    rules={[{ required: true, max: 200 }]}
-                  >
-                    <Input />
-                  </Form.Item>
-                  <Form.Item
-                    label="ชื่อผู้ใช้ (อังกฤษ/ตัวเลข อย่างน้อย 4 ตัว)"
-                    name="username"
-                    rules={[{ required: true, pattern: /^[a-zA-Z0-9._-]{4,60}$/ }]}
-                  >
-                    <Input autoComplete="username" />
-                  </Form.Item>
-                  <Form.Item
-                    label="รหัสผ่าน อย่างน้อย 12 ตัวอักษร"
-                    name="password"
-                    rules={[{ required: true, min: 12, max: 72 }]}
-                  >
-                    <Input.Password autoComplete="new-password" />
-                  </Form.Item>
-                  <Button type="primary" htmlType="submit" block loading={busy}>
-                    สมัครบัญชีประชาชน
-                  </Button>
-                </Form>
-              ),
-            },
-          ]}
-        />
+        <Paragraph type="secondary" style={{ marginTop: 24 }}>
+          เข้าสู่ระบบด้วยบัญชี TownTrack
+        </Paragraph>
+        <Form layout="vertical" disabled={busy} onFinish={login}>
+          <Form.Item label="ชื่อผู้ใช้" name="username" rules={[{ required: true }]}>
+            <Input autoComplete="username" size="large" />
+          </Form.Item>
+          <Form.Item label="รหัสผ่าน" name="password" rules={[{ required: true }]}>
+            <Input.Password autoComplete="current-password" size="large" />
+          </Form.Item>
+          <Button type="primary" htmlType="submit" block size="large" loading={busy}>
+            เข้าสู่ระบบ
+          </Button>
+        </Form>
         <Button block icon={<AlertOutlined />} style={{ marginTop: 16 }} onClick={onEmergency}>
           เบอร์ฉุกเฉิน
         </Button>

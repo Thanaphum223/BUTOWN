@@ -16,6 +16,14 @@ TownTrack first checks its own `/api/auth/me` session. If absent, it shows the s
 
 The guide documents the one-time-code redirect/verify flow, not a browser `/auth/session` endpoint. TownTrack therefore does not call that endpoint, use an opaque session token, or inspect another origin's cookies. Gov Center controls reuse of its existing login when this documented authorization flow starts. A provider session should return an E-Service code to `/auth/callback`; landing on Gov's own dashboard without a callback is not a successful TownTrack login.
 
+## Citizen registration
+
+The login screen's citizen signup button records the same CSRF-protected pending LOGIN, then opens `https://auth.govcenter.co/auth/register` with the configured service and callback destination carrying the transaction nonce (plus outer state). TownTrack no longer collects local signup credentials on this screen. Existing local login and the legacy local registration API remain compatible; this change replaces the public signup UI, not existing account data or API clients.
+
+Gov's published RegisterForm currently returns to its own Login page after success. Its auth-flow URL helper drops outer state and filters out the current sslip.io callback host. A signed-in Gov session also redirects the register page to Gov's dashboard. Consequently this handoff does not establish automatic return after registration. Gov must preserve the registered destination/nonce and issue a scoped code for that end-to-end result; TownTrack never infers authentication from visiting or leaving signup.
+
+A completed, verified Gov code may carry `is_new_user=true` or `false`. The marker is ignored for identity/permissions and does not block an otherwise valid exchange. Explicit onboarding status, invalid markers, missing/mismatched state and rejected codes remain failures. The existing backend creates a new IAM-linked account as CITIZEN only from the verified response, rotates the session and returns TownTrack `/` without requiring a second local login. No real Gov account was created to test registration.
+
 After a verified callback, TownTrack creates its own HttpOnly session, refreshes CSRF and reloads its own `/` (whose default view is the dashboard). It never explicitly navigates to `auth.govcenter.co/dashboard`. Logout remains on TownTrack until the user initiates sign-in again. One-use exchanges are never automatically retried.
 
 The reference screenshots illustrate the authorization concept. They do not replace Gov Center's documented API with `/connect/authorize`, `/connect/token` or `/connect/userinfo`. The service API key stays on the backend; the verified `user` and `residences` arrive together from `verify-code`.

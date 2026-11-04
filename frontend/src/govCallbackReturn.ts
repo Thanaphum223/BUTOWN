@@ -31,7 +31,7 @@ export function captureGovReturn(): GovCallbackReturn | null {
     error = "Gov Center ไม่ได้อนุมัติการเข้าสู่ระบบ กรุณาเริ่มเข้าสู่ระบบใหม่";
   else if (
     query.has("auth_status") ||
-    (query.has("is_new_user") && query.get("is_new_user") !== "false")
+    (query.has("is_new_user") && !["true", "false"].includes(query.get("is_new_user")!))
   )
     error = "กรุณาลงทะเบียนข้อมูลบัญชี Gov Center ให้ครบ แล้วเริ่มเข้าสู่ระบบใหม่";
   return {

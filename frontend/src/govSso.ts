@@ -17,7 +17,7 @@ export function govClient(config: GovConfig) {
     ssoCallbackPath: "/auth/sso-callback",
   });
 }
-export function govLineLogin(config: GovConfig) {
+function govTransaction(config: GovConfig) {
   const callback = new URL(config.callbackUrl);
   if (callback.origin !== window.location.origin || callback.search || callback.hash)
     throw new Error("กรุณาเข้า TownTrack ด้วยโดเมนที่ลงทะเบียน SSO ไว้");
@@ -25,9 +25,23 @@ export function govLineLogin(config: GovConfig) {
   const state = sdkUrl.searchParams.get("state");
   if (!state || !/^[a-f0-9]{64}$/.test(state))
     throw new Error("สร้างคำขอเข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่");
-  // Gov's published LINE helper accepts callback/service inside LINE state.
-  // Put our transaction nonce on the return URL so Gov preserves it unchanged.
+  // Gov's auth helpers do not consistently forward an outer state parameter.
+  // Preserve the browser/server nonce on our configured return destination too.
   callback.searchParams.set("state", state);
+  return { callback, state };
+}
+export function govRegistration(config: GovConfig) {
+  const { callback, state } = govTransaction(config);
+  const url = new URL("/auth/register", config.iamAuthUrl);
+  url.search = new URLSearchParams({
+    service: config.serviceCode,
+    callback: callback.toString(),
+    state,
+  }).toString();
+  return { url: url.toString(), state };
+}
+export function govLineLogin(config: GovConfig) {
+  const { callback, state } = govTransaction(config);
   const govState = new URLSearchParams({
     callback: callback.toString(),
     service: config.serviceCode,
