@@ -22,7 +22,9 @@ test("first visit asks GPS once and prefills wizard, preserves manual address, s
   await signIn(page);
   await expect.poll(() => page.evaluate(() => (window as any).gpsCalls)).toBe(1);
   await openReport(page);
-  await expect(page.getByLabel("สถานที่ / จุดสังเกต", { exact: true })).not.toBeEmpty();
+  await expect(page.getByLabel("สถานที่ / จุดสังเกต", { exact: true })).toHaveValue(
+    "ตำแหน่ง GPS ทดสอบ",
+  );
   await page.getByText("ดูหรือแก้ไขพิกัด GPS", { exact: true }).click();
   await expect(page.getByRole("spinbutton", { name: "ละติจูด", exact: true })).toHaveValue(
     "13.751234",
