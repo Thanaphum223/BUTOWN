@@ -409,3 +409,59 @@ test("signed-in user can inspect synchronized Gov Center profile and residence s
     animations: "disabled",
   });
 });
+
+test("LINE sign-in after logout refreshes the session token without a page reload", async ({
+  page,
+}) => {
+  const seen = await boundary(page, true);
+  let generation = 0;
+  const starts: number[] = [];
+  let rejectedStarts = 0;
+  await page.route("**/api/auth/csrf", (route) =>
+    route.fulfill({
+      json: { token: `session-csrf-${generation}`, headerName: "X-CSRF-TOKEN" },
+    }),
+  );
+  await page.route("**/api/auth/logout", (route) => {
+    expect(route.request().headers()["x-csrf-token"]).toBe(`session-csrf-${generation}`);
+    seen.signedIn = false;
+    generation++;
+    return route.fulfill({ status: 204 });
+  });
+  await page.route("**/api/auth/gov/start", (route) => {
+    if (route.request().headers()["x-csrf-token"] !== `session-csrf-${generation}`) {
+      rejectedStarts++;
+      return route.fulfill({ status: 401, json: { message: "กรุณาเข้าสู่ระบบ" } });
+    }
+    starts.push(generation);
+    seen.starts.push(route.request().postDataJSON());
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.route("**/api/auth/sso-callback", (route) => {
+    expect(route.request().headers()["x-csrf-token"]).toBe(`session-csrf-${generation}`);
+    seen.callbacks.push(route.request().postDataJSON());
+    seen.signedIn = true;
+    generation++;
+    return route.fulfill({ json: { success: true } });
+  });
+  await page.goto("/");
+  for (let cycle = 0; cycle < 2; cycle++) {
+    await expect(page.getByText("SSO Test User", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "ออกจากระบบ", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "เข้าสู่ระบบ", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "เข้าสู่ระบบด้วย LINE", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "IAM login test boundary" })).toBeVisible();
+    const provider = new URL(page.url());
+    const callback = new URL(
+      new URLSearchParams(provider.searchParams.get("state")!).get("callback")!,
+    );
+    callback.searchParams.set("code", `one-use-cycle-${cycle}`);
+    await page.goto(callback.toString());
+  }
+  await expect(page.getByText("SSO Test User", { exact: true })).toBeVisible();
+  expect(rejectedStarts).toBe(0);
+  expect(starts).toEqual([1, 3]);
+  expect(seen.starts.map((s) => s.purpose)).toEqual(["LOGIN", "LOGIN"]);
+  expect(seen.starts[0].state).not.toBe(seen.starts[1].state);
+  expect(seen.callbacks).toHaveLength(2);
+});

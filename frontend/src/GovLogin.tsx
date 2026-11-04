@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Alert, Button, Space } from "antd";
 import { SafetyCertificateOutlined } from "@ant-design/icons";
-import { post } from "./api";
+import { post, refreshCsrf } from "./api";
 import { govLineLogin, useGovConfig } from "./govSso";
 export default function GovLogin({
   link = false,
@@ -33,6 +33,7 @@ export default function GovLogin({
     onBusyChange?.(true);
     setError("");
     try {
+      await refreshCsrf();
       const { url, state } = govLineLogin(config!);
       await post("/auth/gov/start", { state, purpose: link ? "LINK" : "LOGIN" });
       window.location.assign(url);
