@@ -1747,13 +1747,13 @@ h3,
   grid-column: 1 / -1;
   margin-top: 0;
 }
-.community-home .community-issue-actions {
+:is(.community-home, .nearby-issues) .community-issue-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-top: 14px;
 }
-.community-home .community-issue-actions > .ant-btn {
+:is(.community-home, .nearby-issues) .community-issue-actions > .ant-btn {
   width: 100%;
   min-width: 0;
   height: 44px;
@@ -1764,10 +1764,10 @@ h3,
   gap: 5px;
   box-shadow: none;
 }
-.community-home .community-issue-actions > .ant-btn > span:not(.anticon) {
+:is(.community-home, .nearby-issues) .community-issue-actions > .ant-btn > span:not(.anticon) {
   white-space: nowrap;
 }
-.community-home .community-issue-actions > .ant-btn:focus-visible {
+:is(.community-home, .nearby-issues) .community-issue-actions > .ant-btn:focus-visible {
   outline: 2px solid var(--gov-brand-primary);
   outline-offset: 2px;
 }
@@ -1779,10 +1779,10 @@ h3,
     grid-template-columns: 24px minmax(0, 1fr);
     column-gap: 8px;
   }
-  .community-home .community-issue-actions {
+  :is(.community-home, .nearby-issues) .community-issue-actions {
     gap: 6px;
   }
-  .community-home .community-issue-actions > .ant-btn {
+  :is(.community-home, .nearby-issues) .community-issue-actions > .ant-btn {
     padding: 0 5px;
     font-size: 11px;
     gap: 4px;
@@ -3113,4 +3113,26 @@ button.queue-item .queue-item-top .ant-tag {
   .staff-shell .split-workspace.viewing-work .workspace-detail > .page-heading {
     position: relative;
   }
+}
+
+.nearby-issues .ant-list-item {
+  display: block;
+  padding: 8px 0;
+  border-bottom: 0;
+}
+.nearby-issue {
+  width: 100%;
+}
+.nearby-issue-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.nearby-issue-heading > strong {
+  overflow-wrap: anywhere;
+}
+.nearby-issue > .ant-card-body > .ant-tag {
+  margin-left: 8px;
 }

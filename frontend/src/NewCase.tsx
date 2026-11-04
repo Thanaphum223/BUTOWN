@@ -11,6 +11,7 @@ import {
   Modal,
   Pagination,
   Space,
+  Tag,
   Typography,
   Upload,
 } from "antd";
@@ -23,6 +24,8 @@ import {
 import { api, post, statusNames } from "./api";
 import { useGeo } from "./GeoContext";
 import LocationMap from "./LocationMap";
+import CommunityActions from "./CommunityActions";
+import CommunityDetail from "./CommunityDetail";
 import { ATTACHMENT_ACCEPT, ATTACHMENT_HELP, attachmentError } from "./attachments";
 type D = Record<string, any>;
 type Place = { place_id: number; lat: string; lon: string; display_name: string };
@@ -77,6 +80,17 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
   const [categoryPage, setCategoryPage] = useState(1);
   const [nearbyBusy, setNearbyBusy] = useState(false);
   const [nearbyError, setNearbyError] = useState("");
+  const [nearbyActionError, setNearbyActionError] = useState("");
+  const [nearbyAction, setNearbyAction] = useState<{ id: string; type: "vote" | "follow" }>();
+  const [nearbyDetail, setNearbyDetail] = useState<string>();
+  const nearbyActionLock = useRef(false);
+  const nearbyVersion = useRef(0);
+  const nearbyUrl =
+    position && step === 0
+      ? `/nearby?latitude=${position[0]}&longitude=${position[1]}${category ? `&categoryId=${category.id}` : ""}`
+      : undefined;
+  const nearbyContext = useRef(nearbyUrl);
+  nearbyContext.current = nearbyUrl;
   const [places, setPlaces] = useState<Place[]>([]);
   const [showPlaces, setShowPlaces] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -219,9 +233,11 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
     } catch {}
   }
   useEffect(() => {
+    const version = ++nearbyVersion.current;
     setNearby([]);
     setNearbyError("");
-    if (!position || step !== 0) {
+    setNearbyActionError("");
+    if (!nearbyUrl) {
       setNearbyBusy(false);
       return;
     }
@@ -230,19 +246,12 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
     setNearbyBusy(true);
     const timer = setTimeout(async () => {
       try {
-        const results = await api<D[]>(
-          "/nearby?latitude=" +
-            position[0] +
-            "&longitude=" +
-            position[1] +
-            (category ? "&categoryId=" + category.id : ""),
-          { signal: controller.signal },
-        );
-        if (active) setNearby(results);
+        const results = await api<D[]>(nearbyUrl, { signal: controller.signal });
+        if (active && version === nearbyVersion.current) setNearby(results);
       } catch (e) {
-        if (active) setNearbyError((e as Error).message);
+        if (active && version === nearbyVersion.current) setNearbyError((e as Error).message);
       } finally {
-        if (active) setNearbyBusy(false);
+        if (active && version === nearbyVersion.current) setNearbyBusy(false);
       }
     }, 400);
     return () => {
@@ -250,7 +259,63 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [category?.id, position?.[0], position?.[1], step]);
+  }, [nearbyUrl]);
+  async function updateNearby(item: D, type: "vote" | "follow") {
+    if (nearbyActionLock.current || nearbyBusy || !nearbyUrl || !position) return;
+    nearbyActionLock.current = true;
+    setNearbyAction({ id: item.id, type });
+    setNearbyActionError("");
+    const context = nearbyUrl;
+    try {
+      if (type === "vote") {
+        await api(`/community/complaints/${item.id}/vote`, {
+          method: item.voted ? "DELETE" : "POST",
+        });
+      } else if (item.following) {
+        await api(`/complaints/${item.id}/follow`, { method: "DELETE" });
+      } else {
+        await post(`/complaints/${item.id}/follow`, {
+          categoryId: item.category_id,
+          latitude: position[0],
+          longitude: position[1],
+        });
+      }
+      const refreshedContext = nearbyContext.current;
+      if (!refreshedContext) return;
+      // Keep the saved action visible even if the subsequent read fails.
+      setNearby((rows) =>
+        rows.map((row) =>
+          row.id !== item.id
+            ? row
+            : type === "vote"
+              ? {
+                  ...row,
+                  voted: !item.voted,
+                  votes: Math.max(0, Number(row.votes ?? 0) + (item.voted ? -1 : 1)),
+                }
+              : { ...row, following: !item.following },
+        ),
+      );
+      const version = ++nearbyVersion.current;
+      setNearbyBusy(true);
+      try {
+        const rows = await api<D[]>(refreshedContext);
+        if (nearbyContext.current === refreshedContext && nearbyVersion.current === version)
+          setNearby(rows);
+      } catch {
+        if (nearbyContext.current === refreshedContext && nearbyVersion.current === version)
+          setNearbyActionError("บันทึกแล้ว แต่โหลดข้อมูลล่าสุดไม่สำเร็จ กรุณาเลือกจุดเดิมอีกครั้ง");
+      } finally {
+        if (nearbyContext.current === refreshedContext && nearbyVersion.current === version)
+          setNearbyBusy(false);
+      }
+    } catch (e) {
+      if (nearbyContext.current === context) setNearbyActionError((e as Error).message);
+    } finally {
+      nearbyActionLock.current = false;
+      setNearbyAction(undefined);
+    }
+  }
   function choosePlace(place: Place) {
     manual.current = true;
     selectPoint([Number(place.lat), Number(place.lon)]);
@@ -518,6 +583,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
                 latitude: Number(r.latitude),
                 longitude: Number(r.longitude),
                 status: r.status,
+                categoryName: r.category_name,
               }))}
               onChange={(p) => {
                 manual.current = false;
@@ -604,48 +670,36 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
                       : "ไม่พบเคสใกล้เคียงในรัศมี 100 เมตร"}
             </p>
           </div>
+          {nearbyActionError && <Alert type="error" showIcon message={nearbyActionError} />}
           <List
+            className="nearby-issues"
             dataSource={nearby}
             locale={{ emptyText: <span /> }}
             renderItem={(r) => (
-              <List.Item
-                actions={[
-                  <Button
-                    key="vote"
-                    onClick={async () => {
-                      try {
-                        await post(`/community/complaints/${r.id}/vote`, {});
-                        message.success("บันทึกพบเจอปัญหานี้แล้ว");
-                      } catch (e) {
-                        message.error((e as Error).message);
-                      }
-                    }}
-                  >
-                    พบเจอ
-                  </Button>,
-                  <Button
-                    key="follow"
-                    onClick={async () => {
-                      try {
-                        await post("/complaints/" + r.id + "/follow", {
-                          categoryId: r.category_id,
-                          latitude: position![0],
-                          longitude: position![1],
-                        });
-                        message.success("ติดตามเรื่องแล้ว");
-                      } catch (e) {
-                        message.error((e as Error).message);
-                      }
-                    }}
-                  >
-                    ติดตาม
-                  </Button>,
-                ]}
-              >
-                <List.Item.Meta title={r.category_name} description={statusNames[r.status]} />
+              <List.Item key={r.id}>
+                <Card className="nearby-issue" size="small">
+                  <div className="nearby-issue-heading">
+                    <Text strong>{r.category_name}</Text>
+                    <Tag color={r.status === "NEW" ? "orange" : "blue"}>
+                      {statusNames[r.status]}
+                    </Tag>
+                  </div>
+                  <Text type="secondary">#{r.id.slice(0, 8).toUpperCase()}</Text>
+                  {r.mock && <Tag>MOCK · ข้อมูลจำลอง</Tag>}
+                  <CommunityActions
+                    item={r as any}
+                    disabled={nearbyBusy || !!nearbyAction}
+                    voting={nearbyAction?.id === r.id && nearbyAction?.type === "vote"}
+                    following={nearbyAction?.id === r.id && nearbyAction?.type === "follow"}
+                    onDetails={() => setNearbyDetail(r.id)}
+                    onVote={() => void updateNearby(r, "vote")}
+                    onFollow={() => void updateNearby(r, "follow")}
+                  />
+                </Card>
               </List.Item>
             )}
           />
+          <CommunityDetail id={nearbyDetail} onClose={() => setNearbyDetail(undefined)} />
         </div>
         <div hidden={step !== 1}>
           <Title level={2}>รายละเอียดปัญหา</Title>

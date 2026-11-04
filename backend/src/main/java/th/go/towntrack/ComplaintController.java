@@ -541,12 +541,21 @@ public class ComplaintController {
         || Math.abs(latitude) > 90
         || Math.abs(longitude) > 180) throw new IllegalArgumentException();
     return db.list(
-        "SELECT c.id,c.category_id,k.name category_name,c.status,round(ST_Y(c.location::geometry)::numeric,3)"
+        "SELECT c.id,c.category_id,k.name"
+            + " category_name,c.status,c.created_at,COALESCE(c.external_id LIKE"
+            + " 'mock-community-v1:%',false) mock,(SELECT count(*) FROM complaint_vote v WHERE"
+            + " v.complaint_id=c.id) votes,EXISTS(SELECT 1 FROM complaint_vote v WHERE"
+            + " v.complaint_id=c.id AND v.user_id=?::uuid) voted,EXISTS(SELECT 1 FROM follower f"
+            + " WHERE f.complaint_id=c.id AND f.user_id=?::uuid) following,"
+            + "round(ST_Y(c.location::geometry)::numeric,3)"
             + " latitude,round(ST_X(c.location::geometry)::numeric,3) longitude FROM complaint c"
-            + " JOIN category k ON k.id=c.category_id WHERE c.municipality_id=? AND (?::uuid IS NULL OR c.category_id=?::uuid)"
-            + " AND c.status NOT IN ('REJECTED','TERMINATED','CLOSED') AND"
+            + " JOIN category k ON k.id=c.category_id WHERE c.municipality_id=? AND (?::uuid IS"
+            + " NULL OR c.category_id=?::uuid) AND c.status NOT IN"
+            + " ('REJECTED','TERMINATED','CLOSED') AND"
             + " ST_DWithin(c.location,ST_SetSRID(ST_MakePoint(?,?),4326)::geography,100) ORDER BY"
             + " c.created_at DESC LIMIT 20",
+        u.get("id"),
+        u.get("id"),
         u.get("municipality_id"),
         categoryId,
         categoryId,

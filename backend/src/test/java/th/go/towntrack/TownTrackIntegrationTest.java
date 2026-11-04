@@ -1271,6 +1271,68 @@ class TownTrackIntegrationTest {
   }
 
   @Test
+  void nearbySharesCommunityVoteAndFollowStateWithoutPrivateFields() throws Exception {
+    UUID id = create();
+    String endpoint = "/api/nearby?latitude=13.75&longitude=100.5";
+    mvc.perform(as(get(endpoint), "CITIZEN"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].votes").value(0))
+        .andExpect(jsonPath("$[0].voted").value(false))
+        .andExpect(jsonPath("$[0].following").value(false));
+    mvc.perform(as(post("/api/community/complaints/" + id + "/vote").with(csrf()), "CITIZEN"))
+        .andExpect(status().isOk());
+    mvc.perform(
+            as(
+                post("/api/complaints/" + id + "/follow")
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        json.writeValueAsString(
+                            Map.of("categoryId", cat, "latitude", 13.75, "longitude", 100.5))),
+                "CITIZEN"))
+        .andExpect(status().isOk());
+    mvc.perform(as(get(endpoint), "CITIZEN"))
+        .andExpect(jsonPath("$[0].votes").value(1))
+        .andExpect(jsonPath("$[0].voted").value(true))
+        .andExpect(jsonPath("$[0].following").value(true))
+        .andExpect(jsonPath("$[0].created_at").exists())
+        .andExpect(jsonPath("$[0].description").doesNotExist())
+        .andExpect(jsonPath("$[0].address").doesNotExist())
+        .andExpect(jsonPath("$[0].reporter_id").doesNotExist())
+        .andExpect(jsonPath("$[0].contact_phone").doesNotExist())
+        .andExpect(jsonPath("$[0].media").doesNotExist());
+    UUID other = UUID.randomUUID();
+    db.run(
+        "INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role)"
+            + " VALUES(?,?,'nearbyReader','x','Other','CITIZEN')",
+        other,
+        town);
+    mvc.perform(get(endpoint).with(user("nearbyReader")))
+        .andExpect(jsonPath("$[0].votes").value(1))
+        .andExpect(jsonPath("$[0].voted").value(false))
+        .andExpect(jsonPath("$[0].following").value(false));
+    mvc.perform(as(delete("/api/community/complaints/" + id + "/vote").with(csrf()), "CITIZEN"))
+        .andExpect(status().isOk());
+    mvc.perform(as(delete("/api/complaints/" + id + "/follow").with(csrf()), "CITIZEN"))
+        .andExpect(status().isOk());
+    mvc.perform(as(get(endpoint), "CITIZEN"))
+        .andExpect(jsonPath("$[0].votes").value(0))
+        .andExpect(jsonPath("$[0].voted").value(false))
+        .andExpect(jsonPath("$[0].following").value(false));
+    mvc.perform(as(get(endpoint).param("categoryId", UUID.randomUUID().toString()), "CITIZEN"))
+        .andExpect(jsonPath("$.length()").value(0));
+    UUID foreign = UUID.randomUUID();
+    db.run("INSERT INTO municipality(id,name) VALUES(?,'Nearby other town')", foreign);
+    db.run(
+        "INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role)"
+            + " VALUES(?,?,'nearbyOutsider','x','Other','CITIZEN')",
+        UUID.randomUUID(),
+        foreign);
+    mvc.perform(get(endpoint).with(user("nearbyOutsider")))
+        .andExpect(jsonPath("$.length()").value(0));
+  }
+
+  @Test
   void nearbyOnly100MetersAndSanitized() throws Exception {
     UUID id = create();
     mvc.perform(
