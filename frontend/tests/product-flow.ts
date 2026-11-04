@@ -19,7 +19,7 @@ export async function signIn(page: Page, role = "citizen", password = accountPas
       exact: true,
     });
     const home = page.getByRole("heading", {
-      name: "ปัญหาในระยะ 5 กม.",
+      name: "เรื่องแจ้งในเทศบาล",
       exact: true,
     });
     await expect(consent.or(home)).toBeVisible();
@@ -55,11 +55,31 @@ export const photo = (name: string) => ({
     "base64",
   ),
 });
-export const pdfEvidence = (name: string) => ({
-  name,
-  mimeType: "application/pdf",
-  buffer: Buffer.from("%PDF-1.4 test evidence"),
-});
+export function pdfEvidence(name: string) {
+  // One real PDF page with an xref table, so previews exercise PDF.js rendering.
+  const stream = "BT /F1 18 Tf 36 100 Td (TownTrack evidence) Tj ET\n";
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+    `<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}endstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  let source = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((body, index) => {
+    offsets.push(Buffer.byteLength(source));
+    source += `${index + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const start = Buffer.byteLength(source);
+  source += `xref\n0 6\n0000000000 65535 f \n`;
+  source += offsets
+    .slice(1)
+    .map((n) => `${String(n).padStart(10, "0")} 00000 n \n`)
+    .join("");
+  source += `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${start}\n%%EOF\n`;
+  return { name, mimeType: "application/pdf", buffer: Buffer.from(source) };
+}
 export async function fillReport(page: Page, title: string, description: string) {
   await page.getByRole("button", { name: /ถนนและทางเท้า/ }).click();
   await page.getByLabel("หัวข้อปัญหา", { exact: true }).fill(title);

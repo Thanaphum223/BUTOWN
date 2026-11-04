@@ -1,43 +1,50 @@
 import { Image, Typography, Tag } from "antd";
+import AttachmentList from "./AttachmentList";
 type Media = {
   id: string;
   original_name: string;
   content_type: string;
+  size_bytes?: number;
   evidence_stage?: string;
   has_thumbnail?: boolean;
 };
 export default function EvidenceGallery({ media = [] }: { media: Media[] }) {
   if (!media.length)
-    return (
-      <Typography.Paragraph type="secondary">ยังไม่มีหลักฐานที่อนุญาตให้แสดง</Typography.Paragraph>
-    );
+    return <Typography.Paragraph type="secondary">ยังไม่มีไฟล์ให้แสดง</Typography.Paragraph>;
+  const documents = media.filter((file) => file.content_type === "application/pdf");
+  const visual = media.filter(
+    (file) => file.content_type.startsWith("image/") || file.content_type.startsWith("video/"),
+  );
   return (
-    <div className="evidence-gallery">
-      <Image.PreviewGroup>
-        {media.map((file) => (
-          <figure key={file.id}>
-            {file.content_type.startsWith("image/") ? (
-              <Image
-                loading="lazy"
-                src={`/api/media/${file.id}${file.has_thumbnail ? "?thumbnail=true" : ""}`}
-                alt={file.original_name}
-                preview={{ src: `/api/media/${file.id}` }}
-              />
-            ) : (
-              <video controls playsInline preload="none" aria-label={file.original_name}>
-                <source src={`/api/media/${file.id}`} type={file.content_type} />
-                เบราว์เซอร์นี้ไม่รองรับวิดีโอชนิดนี้
-              </video>
-            )}
-            <figcaption>
-              {file.evidence_stage && file.evidence_stage !== "GENERAL" && (
-                <Tag>{file.evidence_stage === "BEFORE" ? "ก่อนแก้ไข" : "หลังแก้ไข"}</Tag>
+    <>
+      <div className="evidence-gallery">
+        <Image.PreviewGroup>
+          {visual.map((file) => (
+            <figure key={file.id}>
+              {file.content_type.startsWith("image/") ? (
+                <Image
+                  loading="lazy"
+                  src={`/api/media/${file.id}${file.has_thumbnail ? "?thumbnail=true" : ""}`}
+                  alt={file.original_name}
+                  preview={{ src: `/api/media/${file.id}` }}
+                />
+              ) : (
+                <video controls playsInline preload="none" aria-label={file.original_name}>
+                  <source src={`/api/media/${file.id}`} type={file.content_type} />
+                  เบราว์เซอร์นี้ไม่รองรับวิดีโอชนิดนี้
+                </video>
               )}
-              <span>{file.original_name}</span>
-            </figcaption>
-          </figure>
-        ))}
-      </Image.PreviewGroup>
-    </div>
+              <figcaption>
+                {file.evidence_stage && file.evidence_stage !== "GENERAL" && (
+                  <Tag>{file.evidence_stage === "BEFORE" ? "ก่อนแก้ไข" : "หลังแก้ไข"}</Tag>
+                )}
+                <span>{file.original_name}</span>
+              </figcaption>
+            </figure>
+          ))}
+        </Image.PreviewGroup>
+      </div>
+      {documents.length > 0 && <AttachmentList files={documents} endpoint="media" />}
+    </>
   );
 }

@@ -142,6 +142,26 @@ class EmergencyContactsTest {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
+  void fiftyKilometresIsAcceptedAndResultsRemainBoundedAndNearestFirst() throws Exception {
+    var provider = mock(GeocodingController.class);
+    when(provider.call(anyString()))
+        .thenReturn(
+            List.of(
+                place("Far inside", 16.40, 100.0, "th", Map.of()),
+                place("Near", 16.01, 100.0, "th", Map.of()),
+                place("Outside fifty", 16.50, 100.0, "th", Map.of())));
+    var result = (Map<String, Object>) service(provider).nearby(16.0, 100.0, "clinic", 50);
+    var places = (List<Map<String, Object>>) result.get("places");
+    assertEquals(50, result.get("radiusKm"));
+    assertEquals(List.of("Near", "Far inside"), places.stream().map(p -> p.get("name")).toList());
+    assertTrue(
+        places.stream().allMatch(p -> ((Number) p.get("distanceMeters")).doubleValue() <= 50_000));
+    assertThrows(
+        ResponseStatusException.class, () -> service(provider).nearby(16, 100, "clinic", 51));
+  }
+
+  @Test
   void onlySafePhoneLinksAndWebsitesAreExposed() {
     assertEquals(
         List.of("025971131", "+6625971132"),

@@ -444,6 +444,76 @@ class TownTrackIntegrationTest {
   }
 
   @Test
+  void pdfCommunityPreviewKeepsOwnershipApprovalAndTenantBoundaries() throws Exception {
+    UUID complaint = create();
+    UUID pdf = (UUID) db.one("SELECT id FROM attachment WHERE complaint_id=?", complaint).get("id");
+    mvc.perform(as(get("/api/community/complaints?scope=municipality"), "CITIZEN"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].media_count").value(1))
+        .andExpect(jsonPath("$.items[0].cover.content_type").value("application/pdf"));
+    mvc.perform(as(get("/api/community/complaints/" + complaint), "CITIZEN"))
+        .andExpect(jsonPath("$.media[0].id").value(pdf.toString()));
+    mvc.perform(as(get("/api/media/" + pdf), "CITIZEN"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Content-Type", "application/pdf"))
+        .andExpect(header().string("Cache-Control", "private, no-store"))
+        .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+        .andExpect(
+            header().string("Content-Disposition", org.hamcrest.Matchers.startsWith("attachment")));
+    db.run(
+        "INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role) VALUES(?,?,?,'unused','Peer','CITIZEN')",
+        UUID.randomUUID(),
+        town,
+        "pdfPeer");
+    mvc.perform(get("/api/media/" + pdf).with(user("pdfPeer"))).andExpect(status().isForbidden());
+    mvc.perform(get("/api/community/complaints/" + complaint).with(user("pdfPeer")))
+        .andExpect(jsonPath("$.media.length()").value(0));
+    mvc.perform(get("/api/community/complaints?scope=municipality").with(user("pdfPeer")))
+        .andExpect(jsonPath("$.items[0].media_count").value(0))
+        .andExpect(jsonPath("$.items[0].cover").isEmpty());
+    UUID otherTown = UUID.randomUUID();
+    db.run("INSERT INTO municipality(id,name) VALUES(?,'Other PDF town')", otherTown);
+    db.run(
+        "INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role) VALUES(?,?,?,'unused','Other','CITIZEN')",
+        UUID.randomUUID(),
+        otherTown,
+        "pdfOtherTown");
+    mvc.perform(get("/api/media/" + pdf).with(user("pdfOtherTown")))
+        .andExpect(status().isNotFound());
+    var upload =
+        mvc.perform(
+                as(
+                    multipart("/api/complaints/" + complaint + "/files")
+                        .file(
+                            new MockMultipartFile(
+                                "file",
+                                "approved.pdf",
+                                "application/pdf",
+                                "%PDF-1.4 approved copy".getBytes()))
+                        .with(csrf()),
+                    "OFFICER"))
+            .andExpect(status().isOk())
+            .andReturn();
+    UUID copy =
+        UUID.fromString(
+            json.readTree(upload.getResponse().getContentAsString()).get("id").asText());
+    db.run("UPDATE attachment SET public_approved=true,public_copy_of=? WHERE id=?", pdf, copy);
+    mvc.perform(get("/api/community/complaints/" + complaint).with(user("pdfPeer")))
+        .andExpect(jsonPath("$.media.length()").value(1))
+        .andExpect(jsonPath("$.media[0].id").value(copy.toString()));
+    mvc.perform(get("/api/media/" + copy).with(user("pdfPeer"))).andExpect(status().isOk());
+    mvc.perform(get("/api/files/" + copy).with(user("pdfPeer"))).andExpect(status().isForbidden());
+    mvc.perform(get("/api/media/" + copy).with(user("pdfOtherTown")))
+        .andExpect(status().isNotFound());
+    mvc.perform(
+            as(
+                delete("/api/complaints/" + complaint + "/shared-media/" + copy).with(csrf()),
+                "OFFICER"))
+        .andExpect(status().isOk());
+    mvc.perform(get("/api/media/" + copy).with(user("pdfPeer"))).andExpect(status().isForbidden());
+  }
+
+  @Test
   void citizensCannotPublishOtherEvidence() throws Exception {
     UUID complaint = create();
     UUID source =

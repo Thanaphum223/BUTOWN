@@ -8,8 +8,9 @@ import {
 } from "@ant-design/icons";
 const PdfPreview = lazy(() => import("./PdfPreview"));
 type D = Record<string, any>;
+type FileEndpoint = "files" | "media";
 class PdfLoadBoundary extends Component<
-  { file: D; onClose: () => void; children: ReactNode },
+  { file: D; endpoint: FileEndpoint; onClose: () => void; children: ReactNode },
   { failed: boolean }
 > {
   state = { failed: false };
@@ -23,7 +24,10 @@ class PdfLoadBoundary extends Component<
         title="เปิดเอกสาร"
         onCancel={this.props.onClose}
         footer={
-          <Button href={`/api/files/${this.props.file.id}`} icon={<DownloadOutlined />}>
+          <Button
+            href={`/api/${this.props.endpoint}/${this.props.file.id}`}
+            icon={<DownloadOutlined />}
+          >
             ดาวน์โหลดเอกสารต้นฉบับ
           </Button>
         }
@@ -42,8 +46,10 @@ export default function AttachmentList({
   files = [],
   emptyText = "ยังไม่มีเอกสารแนบ",
   extraActions,
+  endpoint = "files",
 }: {
   files?: D[];
+  endpoint?: FileEndpoint;
   emptyText?: string;
   extraActions?: (file: D) => ReactNode;
 }) {
@@ -79,7 +85,7 @@ export default function AttachmentList({
                       ดูเอกสาร
                     </Button>
                   )}
-                  <Button icon={<DownloadOutlined />} href={`/api/files/${file.id}`}>
+                  <Button icon={<DownloadOutlined />} href={`/api/${endpoint}/${file.id}`}>
                     ดาวน์โหลด
                   </Button>
                   {extraActions?.(file)}
@@ -90,7 +96,12 @@ export default function AttachmentList({
         </div>
       )}
       {preview && (
-        <PdfLoadBoundary key={preview.id} file={preview} onClose={() => setPreview(undefined)}>
+        <PdfLoadBoundary
+          key={`${endpoint}:${preview.id}`}
+          file={preview}
+          endpoint={endpoint}
+          onClose={() => setPreview(undefined)}
+        >
           <Suspense
             fallback={
               <Modal
@@ -104,7 +115,8 @@ export default function AttachmentList({
             }
           >
             <PdfPreview
-              key={preview.id}
+              key={`${endpoint}:${preview.id}`}
+              endpoint={endpoint}
               file={preview as { id: string; original_name: string; size_bytes: number }}
               onClose={() => setPreview(undefined)}
             />

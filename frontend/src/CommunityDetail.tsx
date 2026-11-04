@@ -40,7 +40,7 @@ export default function CommunityDetail({ id, onClose }: { id?: string; onClose:
               { key: "updated", label: "อัปเดตล่าสุด", children: date(c.updated_at) },
             ]}
           />
-          <Typography.Title level={5}>รูปภาพและวิดีโอหลักฐาน</Typography.Title>
+          <Typography.Title level={5}>หลักฐานประกอบ</Typography.Title>
           <EvidenceGallery media={data?.media || []} />
           {c.latitude != null && c.longitude != null && (
             <LocationMap
