@@ -146,11 +146,11 @@ body {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  background: var(--gov-page-surface);
+  background: var(--gov-surface-soft);
 }
 .login-story {
   padding: 60px 10%;
-  background: #0c4a45;
+  background: color-mix(in srgb, var(--gov-brand-primary) 70%, #000);
   color: #fff;
   display: flex;
   flex-direction: column;
@@ -175,6 +175,9 @@ body {
   padding: 0;
   margin-bottom: 60px;
 }
+.login-story .municipal-mark {
+  background: var(--gov-brand-primary);
+}
 .login-story h1 {
   font-size: clamp(32px, 3.5vw, 54px);
   line-height: 1.5;
@@ -194,6 +197,9 @@ body {
   margin: auto;
   border: 1px solid var(--gov-border-neutral);
   box-shadow: 0 15px 50px #173d2910;
+}
+.login-card h3 {
+  color: var(--gov-brand-primary);
 }
 .loading {
   display: grid;
@@ -1045,9 +1051,6 @@ h3,
 .font-large .ant-select-selection-item,
 .font-large .ant-btn {
   font-size: 18px;
-}
-.login-story {
-  background: var(--gov-text-primary);
 }
 .login-story .brand {
   letter-spacing: 0;
