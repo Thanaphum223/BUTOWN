@@ -43,7 +43,8 @@ export function installGovTokens() {
 export const govTheme: ThemeConfig = {
   token: {
     colorPrimary: govTokens["brand-primary"],
-    colorPrimaryHover: govTokens["brand-secondary"],
+    // Shared hover affects outlined text and radio labels as well as fills.
+    colorPrimaryHover: govTokens["brand-primary"],
     colorSuccess: govTokens["semantic-success"],
     colorWarning: govTokens["semantic-warning"],
     colorError: govTokens["semantic-critical"],

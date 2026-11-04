@@ -302,8 +302,10 @@ a:focus-visible {
 .ant-btn-primary {
   font-weight: 600;
 }
-.ant-btn-primary:not(:disabled):not(.ant-btn-dangerous):hover {
+.ant-btn-color-primary.ant-btn-variant-solid:not(:disabled):not(.ant-btn-dangerous):hover {
   color: var(--gov-text-primary);
+  background: var(--gov-brand-secondary);
+  border-color: var(--gov-brand-secondary);
 }
 h1,
 h2,
