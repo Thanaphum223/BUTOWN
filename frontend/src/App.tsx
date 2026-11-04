@@ -1,6 +1,5 @@
 import { MenuOutlined } from "@ant-design/icons";
-import GovLogin from "./GovLogin";
-import GovAccountForm, { type GovAccountMode } from "./GovAccountForm";
+import GovAuthPage from "./GovAuthPage";
 import GovProfile from "./GovProfile";
 import GovCallback from "./GovCallback";
 import type { GovCallbackReturn } from "./govCallbackReturn";
@@ -15,7 +14,7 @@ const Admin = lazy(() => import("./Admin"));
 const Detail = lazy(() => import("./Detail"));
 const CitizenHome = lazy(() => import("./CitizenHome"));
 const StaffWorkspace = lazy(() => import("./StaffWorkspace"));
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import {
   App as AntApp,
   Alert,
@@ -110,144 +109,6 @@ function ErrorBox({ error }: { error: string }) {
     <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />
   ) : null;
 }
-function Login({ onLogin, onEmergency }: { onLogin: () => void; onEmergency: () => void }) {
-  const { data: line } = useData<RowData>("/public/line");
-  const lineStarted = useRef(false);
-  async function lineLogin() {
-    setBusy(true);
-    setError("");
-    try {
-      const { default: liff } = await import("@line/liff");
-      await liff.init({ liffId: line!.liffId });
-      if (!liff.isLoggedIn()) {
-        liff.login({
-          redirectUri: window.location.origin + window.location.pathname + "?lineLogin=1",
-        });
-        return;
-      }
-      const idToken = liff.getIDToken();
-      if (!idToken) throw new Error("กรุณาเปิดสิทธิ์ openid ของ LIFF");
-      await post("/auth/line", { idToken });
-      await refreshCsrf();
-      window.history.replaceState({}, "", window.location.pathname);
-      onLogin();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  useEffect(() => {
-    if (
-      line?.enabled &&
-      new URLSearchParams(window.location.search).get("lineLogin") === "1" &&
-      !lineStarted.current
-    ) {
-      lineStarted.current = true;
-      void lineLogin();
-    }
-  }, [line]);
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  const [govMode, setGovMode] = useState<GovAccountMode>(null);
-  async function login(v: RowData) {
-    if (busy) return;
-    setBusy(true);
-    setError("");
-    try {
-      await refreshCsrf();
-      await api("/auth/login", {
-        method: "POST",
-        body: new URLSearchParams(v),
-      });
-      await refreshCsrf();
-      onLogin();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <div className="login">
-      <section className="login-story">
-        <div className="brand">
-          <span className="municipal-mark">ท</span>
-          <span>
-            TownTrack<small>พื้นที่ทำงานเทศบาล</small>
-          </span>
-        </div>
-        <Tag color="gold">MUNICIPAL SERVICE PLATFORM</Tag>
-        <h1>
-          ทุกปัญหาในเมือง
-          <br />
-          ติดตามได้จนแก้ไข
-        </h1>
-        <p>
-          รับเรื่อง • จัดทีม • ลงพื้นที่ • ตรวจสอบผล
-          <br />
-          เชื่อมการทำงานของเทศบาลไว้ในที่เดียว
-        </p>
-        <div className="login-feature">
-          <TeamOutlined /> ทำงานร่วมกัน พร้อมประวัติทุกขั้นตอน
-        </div>
-      </section>
-      <Card className="login-card">
-        {govMode ? (
-          <GovAccountForm
-            mode={govMode}
-            onModeChange={setGovMode}
-            disabled={busy}
-            onBusyChange={setBusy}
-            onLogin={onLogin}
-          />
-        ) : (
-          <>
-            <Title level={3}>ยินดีต้อนรับ</Title>
-            <Paragraph type="secondary">เข้าสู่ระบบบริการเทศบาล TownTrack</Paragraph>
-            <ErrorBox error={error} />
-            {line?.enabled && (
-              <Button block style={{ marginBottom: 16 }} loading={busy} onClick={lineLogin}>
-                เข้าสู่ระบบด้วย LINE
-              </Button>
-            )}
-            <GovLogin disabled={busy} onBusyChange={setBusy} />
-            <GovAccountForm
-              mode={null}
-              onModeChange={setGovMode}
-              disabled={busy}
-              onBusyChange={setBusy}
-              onLogin={onLogin}
-            />
-            <Paragraph type="secondary" style={{ marginTop: 24 }}>
-              เข้าสู่ระบบด้วยบัญชี TownTrack
-            </Paragraph>
-            <Form layout="vertical" disabled={busy} onFinish={login}>
-              <Form.Item label="ชื่อผู้ใช้" name="username" rules={[{ required: true }]}>
-                <Input autoComplete="username" size="large" />
-              </Form.Item>
-              <Form.Item label="รหัสผ่าน" name="password" rules={[{ required: true }]}>
-                <Input.Password autoComplete="current-password" size="large" />
-              </Form.Item>
-              <Button type="primary" htmlType="submit" block size="large" loading={busy}>
-                เข้าสู่ระบบ
-              </Button>
-            </Form>
-          </>
-        )}
-        <Button
-          block
-          disabled={busy}
-          icon={<AlertOutlined />}
-          style={{ marginTop: 16 }}
-          onClick={onEmergency}
-        >
-          เบอร์ฉุกเฉิน
-        </Button>
-      </Card>
-    </div>
-  );
-}
 export default function App({ govReturn }: { govReturn: GovCallbackReturn | null }) {
   return govReturn ? <GovCallback returned={govReturn} /> : <TownTrackApp />;
 }
@@ -328,7 +189,7 @@ function TownTrackApp() {
     );
   if (!user)
     return (
-      <Login
+      <GovAuthPage
         onEmergency={() => {
           setView("emergency");
           window.scrollTo({ top: 0 });
