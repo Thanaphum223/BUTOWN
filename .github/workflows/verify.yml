@@ -48,10 +48,17 @@ jobs:
         run: |
           docker build -f deploy/Dockerfile.frontend -t towntrack-proxy-check .
           python3 scripts/test-proxy-security.py --image towntrack-proxy-check
+      - name: Keep browser fixtures out of the production artifact
+        run: |
+          if jar tf backend/target/towntrack-0.1.0.jar | grep -q BrowserTestServer; then
+            echo "Test fixtures must not ship in the application jar"
+            exit 1
+          fi
+          mvn -B -f backend/pom.xml dependency:build-classpath -Dmdep.outputFile=target/browser-classpath.txt -Dmdep.includeScope=test
       - name: Start test services
         run: |
           mkdir -p work
-          java -jar backend/target/towntrack-0.1.0.jar >work/backend.log 2>&1 &
+          java -cp "backend/target/test-classes:backend/target/classes:$(cat backend/target/browser-classpath.txt)" th.go.towntrack.BrowserTestServer >work/backend.log 2>&1 &
           (cd frontend && npm run dev >../work/frontend.log 2>&1) &
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:8080/actuator/health && curl -fsS http://127.0.0.1:5173/; then break; fi

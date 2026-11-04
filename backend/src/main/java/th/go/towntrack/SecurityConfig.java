@@ -55,15 +55,14 @@ public class SecurityConfig {
       throws Exception {
     h.authorizeHttpRequests(
             a ->
-                a.requestMatchers(
+                a.requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/line")
+                    .denyAll()
+                    .requestMatchers(
                         "/api/auth/csrf",
-                        "/api/auth/login",
-                        "/api/auth/register",
                         "/api/public/municipalities",
                         "/api/public/line",
                         "/api/public/map-config",
                         "/api/emergency/nearby",
-                        "/api/auth/line",
                         "/api/auth/gov",
                         "/api/auth/gov/start",
                         "/api/auth/gov/register",
@@ -74,30 +73,6 @@ public class SecurityConfig {
                     .permitAll()
                     .anyRequest()
                     .authenticated())
-        .formLogin(
-            f ->
-                f.loginProcessingUrl("/api/auth/login")
-                    .successHandler(
-                        (q, s, a) -> {
-                          var session = q.getSession(false);
-                          if (session != null) {
-                            session.removeAttribute("gov_verified_until");
-                            session.removeAttribute("gov_verified_username");
-                            session.removeAttribute(CentralGovAuthController.PENDING);
-                            session.removeAttribute(CentralGovAuthController.EXCHANGING);
-                            session.removeAttribute("admin_role");
-                            session.removeAttribute("admin_department");
-                          }
-                          s.setCharacterEncoding("UTF-8");
-                          s.setContentType("application/json");
-                          s.getWriter().write("{\"ok\":true}");
-                        })
-                    .failureHandler(
-                        (q, s, e) -> {
-                          s.setStatus(401);
-                          s.setContentType("application/json");
-                          s.getWriter().write("{\"message\":\"ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง\"}");
-                        }))
         .logout(
             l ->
                 l.logoutUrl("/api/auth/logout").logoutSuccessHandler((q, s, a) -> s.setStatus(204)))

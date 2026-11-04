@@ -38,11 +38,15 @@ for (const denied of [false, true]) {
       });
       await waitForLoginSlot();
       await page.goto("/");
-      await expect(page.getByLabel("ชื่อผู้ใช้", { exact: true })).toBeVisible();
+      await expect(page.getByLabel("อีเมล", { exact: true })).toBeVisible();
       expect(await page.evaluate(() => (window as any).gpsCalls)).toBe(0);
-      await page.getByLabel("ชื่อผู้ใช้", { exact: true }).fill("citizen");
-      await page.getByLabel("รหัสผ่าน", { exact: true }).fill(accountPassword("citizen"));
-      await page.getByRole("button", { name: "เข้าสู่ระบบ", exact: true }).click();
+      const csrf = await (await page.request.get("/api/auth/csrf")).json();
+      const response = await page.request.post("/api/test/session", {
+        headers: { [csrf.headerName]: csrf.token },
+        form: { username: "citizen", password: accountPassword("citizen") },
+      });
+      expect(response.ok()).toBeTruthy();
+      await page.reload();
       const notice = page.getByRole("dialog", {
         name: "ประกาศคุ้มครองข้อมูลส่วนบุคคล",
       });

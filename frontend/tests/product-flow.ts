@@ -9,10 +9,13 @@ export function accountPassword(role: string) {
 }
 export async function signIn(page: Page, role = "citizen", password = accountPassword(role)) {
   await waitForLoginSlot();
+  const csrf = await (await page.request.get("/api/auth/csrf")).json();
+  const response = await page.request.post("/api/test/session", {
+    headers: { [csrf.headerName]: csrf.token },
+    form: { username: role, password },
+  });
+  expect(response.ok()).toBeTruthy();
   await page.goto("/");
-  await page.getByLabel("ชื่อผู้ใช้", { exact: true }).fill(role);
-  await page.getByLabel("รหัสผ่าน", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "เข้าสู่ระบบ", exact: true }).click();
   if (role === "citizen") {
     const consent = page.getByRole("button", {
       name: "รับทราบประกาศ",
