@@ -83,12 +83,22 @@ test("changing the point discards an older address response", async ({ page }) =
   const firstRequested = new Promise<void>((resolve) => {
     arrived = resolve;
   });
+  let settled!: () => void;
+  const oldResponseSettled = new Promise<void>((resolve) => {
+    settled = resolve;
+  });
   await page.route("**/api/geocoding/reverse?**", async (route) => {
     const latitude = new URL(route.request().url()).searchParams.get("latitude");
     if (latitude === "13.751234") {
       arrived();
       await gate;
-      await route.fulfill({ json: { display_name: "ที่อยู่ของจุดเก่า" } }).catch(() => {});
+      try {
+        await route.fulfill({ json: { display_name: "ที่อยู่ของจุดเก่า" } });
+      } catch {
+        // Changing the point cancels the obsolete request.
+      } finally {
+        settled();
+      }
     } else {
       await route.fulfill({ json: { display_name: "ที่อยู่ของจุดใหม่" } });
     }
@@ -102,6 +112,10 @@ test("changing the point discards an older address response", async ({ page }) =
   await expect(address).toBeEmpty();
   await expect(address).toHaveValue("ที่อยู่ของจุดใหม่");
   release();
+  await oldResponseSettled;
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
   await expect(address).toHaveValue("ที่อยู่ของจุดใหม่");
 });
 
@@ -113,6 +127,13 @@ test("refreshing the same GPS point keeps a readable location", async ({ page })
   await openReport(page);
   const address = page.getByLabel("สถานที่ / จุดสังเกต", { exact: true });
   await expect(address).toHaveValue("ถนนทดสอบจาก GPS");
+  const refreshed = page.waitForResponse((r) => r.url().includes("/api/geocoding/reverse?"), {
+    timeout: 5000,
+  });
   await page.getByRole("button", { name: /ตำแหน่งของฉัน$/ }).click();
+  await (await refreshed).finished();
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
   await expect(address).toHaveValue("ถนนทดสอบจาก GPS");
 });
