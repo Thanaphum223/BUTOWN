@@ -283,10 +283,9 @@ class GovCenterSsoIntegrationTest {
     var transport = java.net.http.HttpClient.newHttpClient();
     var intercepted = org.mockito.Mockito.mock(java.net.http.HttpClient.class);
     org.mockito.Mockito.when(
-            intercepted.send(
+            intercepted.sendAsync(
                 org.mockito.ArgumentMatchers.any(java.net.http.HttpRequest.class),
-                org.mockito.ArgumentMatchers
-                    .<java.net.http.HttpResponse.BodyHandler<java.io.InputStream>>any()))
+                org.mockito.ArgumentMatchers.<java.net.http.HttpResponse.BodyHandler<byte[]>>any()))
         .thenAnswer(
             invocation -> {
               java.net.http.HttpRequest original = invocation.getArgument(0);
@@ -312,10 +311,9 @@ class GovCenterSsoIntegrationTest {
                   .map()
                   .forEach(
                       (name, values) -> values.forEach(value -> redirected.header(name, value)));
-              return transport.send(
+              return transport.sendAsync(
                   redirected.build(),
-                  invocation
-                      .<java.net.http.HttpResponse.BodyHandler<java.io.InputStream>>getArgument(1));
+                  invocation.<java.net.http.HttpResponse.BodyHandler<byte[]>>getArgument(1));
             });
     org.springframework.test.util.ReflectionTestUtils.setField(provider, "http", intercepted);
     org.springframework.test.util.ReflectionTestUtils.setField(accountApi, "http", intercepted);

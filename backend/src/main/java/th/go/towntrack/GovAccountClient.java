@@ -73,31 +73,29 @@ public class GovAccountClient {
               .header("Accept", "application/json")
               .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));
       if (token != null) builder.header("Authorization", "Bearer " + token);
-      var response = http.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
-      try (var input = response.body()) {
-        int status = response.statusCode();
-        if (registration && status == 409)
-          throw new ResponseStatusException(
-              HttpStatus.CONFLICT,
-              "อีเมลนี้มีบัญชี Gov Center แล้ว กรุณาเข้าสู่ระบบด้วยอีเมล Gov Center");
-        if (!registration && path.startsWith("/auth/login") && status == 401)
-          throw new ResponseStatusException(
-              HttpStatus.UNAUTHORIZED, "อีเมลหรือรหัสผ่าน Gov Center ไม่ถูกต้อง");
-        if (registration && status != 201
-            || !registration && status != (path.startsWith("/auth/login") ? 200 : 201))
-          throw new ResponseStatusException(
-              HttpStatus.SERVICE_UNAVAILABLE,
-              registration
-                  ? "Gov Center ไม่รับคำขอสมัคร กรุณาลองเข้าสู่ระบบด้วยอีเมลก่อนสมัครใหม่"
-                  : "Gov Center ไม่พร้อมเข้าสู่ระบบ กรุณาลองใหม่ภายหลัง");
-        // Registration's response is not an identity source, and can have no JSON body.
-        if (registration) return json.createObjectNode();
-        byte[] bytes = input.readNBytes(65537);
-        if (bytes.length > 65536) throw malformed();
-        var result = json.readTree(bytes);
-        if (result == null || !result.isObject()) throw malformed();
-        return result;
-      }
+      var response = GovHttp.send(http, builder.build(), 65536);
+      int status = response.statusCode();
+      if (registration && status == 409)
+        throw new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "อีเมลนี้มีบัญชี Gov Center แล้ว กรุณาเข้าสู่ระบบด้วยอีเมล Gov Center");
+      if (!registration && path.startsWith("/auth/login") && status == 401)
+        throw new ResponseStatusException(
+            HttpStatus.UNAUTHORIZED, "อีเมลหรือรหัสผ่าน Gov Center ไม่ถูกต้อง");
+      if (registration && status != 201
+          || !registration && status != (path.startsWith("/auth/login") ? 200 : 201))
+        throw new ResponseStatusException(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            registration
+                ? "Gov Center ไม่รับคำขอสมัคร กรุณาลองเข้าสู่ระบบด้วยอีเมลก่อนสมัครใหม่"
+                : "Gov Center ไม่พร้อมเข้าสู่ระบบ กรุณาลองใหม่ภายหลัง");
+      // Registration's response is not an identity source, and can have no JSON body.
+      if (registration) return json.createObjectNode();
+      byte[] bytes = response.body();
+      if (bytes.length > 65536) throw malformed();
+      var result = json.readTree(bytes);
+      if (result == null || !result.isObject()) throw malformed();
+      return result;
     } catch (ResponseStatusException e) {
       throw e;
     } catch (InterruptedException e) {

@@ -217,4 +217,88 @@ class GovAccountControllerTest {
         .andExpect(status().isConflict());
     verifyNoInteractions(api);
   }
+
+  @Test
+  void persistenceFailureAfterSignupHasSanitizedEmailRecoveryAndNoSession() throws Exception {
+    start("REGISTER");
+    when(identities.sync(any(), any(), isNull()))
+        .thenThrow(
+            new org.springframework.dao.DataAccessResourceFailureException(
+                "secret database details"));
+    submit(true)
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(
+            jsonPath("$.message")
+                .value(org.hamcrest.Matchers.containsString("สมัครบัญชี Gov Center สำเร็จแล้ว")))
+        .andExpect(
+            jsonPath("$.message").value(org.hamcrest.Matchers.containsString("อีเมล Gov Center")))
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("secret database"))));
+    assertNull(session.getAttribute("SPRING_SECURITY_CONTEXT"));
+    assertNull(SecurityContextHolder.getContext().getAuthentication());
+    verify(api, times(1)).register(anyString(), anyString(), anyString());
+  }
+
+  @Test
+  void newerStaffLoginWaitsForGovFinalizationAndWins() throws Exception {
+    start("PASSWORD_LOGIN");
+    var syncing = new java.util.concurrent.CountDownLatch(1);
+    var release = new java.util.concurrent.CountDownLatch(1);
+    when(identities.sync(any(), any(), isNull()))
+        .thenAnswer(
+            call -> {
+              syncing.countDown();
+              assertTrue(release.await(3, java.util.concurrent.TimeUnit.SECONDS));
+              return Map.of("username", "iam-citizen", "role", "CITIZEN");
+            });
+    var gov =
+        java.util.concurrent.CompletableFuture.supplyAsync(
+            () -> {
+              try {
+                return submit(false).andReturn().getResponse().getStatus();
+              } catch (Exception e) {
+                throw new RuntimeException(e);
+              }
+            });
+    assertTrue(syncing.await(2, java.util.concurrent.TimeUnit.SECONDS));
+    var staff =
+        java.util.concurrent.CompletableFuture.runAsync(
+            () -> {
+              var q = new MockHttpServletRequest("POST", "/api/auth/login");
+              q.setSession(session);
+              try {
+                new SecurityConfig.SerializedSessionMutation()
+                    .doFilter(
+                        q,
+                        new MockHttpServletResponse(),
+                        (req, res) -> {
+                          session.changeSessionId();
+                          var context = SecurityContextHolder.createEmptyContext();
+                          context.setAuthentication(
+                              org.springframework.security.authentication
+                                  .UsernamePasswordAuthenticationToken.authenticated(
+                                  "staff", null, List.of()));
+                          session.setAttribute("SPRING_SECURITY_CONTEXT", context);
+                        });
+              } catch (Exception e) {
+                throw new RuntimeException(e);
+              }
+            });
+    try {
+      assertThrows(
+          java.util.concurrent.TimeoutException.class,
+          () -> staff.get(150, java.util.concurrent.TimeUnit.MILLISECONDS));
+    } finally {
+      release.countDown();
+    }
+    assertEquals(200, gov.get(3, java.util.concurrent.TimeUnit.SECONDS));
+    staff.get(3, java.util.concurrent.TimeUnit.SECONDS);
+    var saved =
+        (org.springframework.security.core.context.SecurityContext)
+            session.getAttribute("SPRING_SECURITY_CONTEXT");
+    assertEquals("staff", saved.getAuthentication().getName());
+  }
 }

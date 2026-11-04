@@ -37,19 +37,20 @@ class GovAccountClientTest {
                   req.uri().getScheme() + "://" + req.uri().getHost());
               sent.add(req);
               Object next = replies.removeFirst();
-              if (next instanceof IOException e) throw e;
-              return next;
+              if (next instanceof IOException e)
+                return java.util.concurrent.CompletableFuture.failedFuture(e);
+              return java.util.concurrent.CompletableFuture.completedFuture(next);
             })
         .when(http)
-        .send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        .sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     ReflectionTestUtils.setField(client, "http", http);
   }
 
   @SuppressWarnings("unchecked")
   void reply(int status, String body) {
-    HttpResponse<InputStream> r = mock(HttpResponse.class);
+    HttpResponse<byte[]> r = mock(HttpResponse.class);
     when(r.statusCode()).thenReturn(status);
-    when(r.body()).thenReturn(new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)));
+    when(r.body()).thenReturn(body.getBytes(StandardCharsets.UTF_8));
     replies.add(r);
   }
 

@@ -74,6 +74,10 @@ public class GovAccountController {
       throw new ResponseStatusException(
           e.getStatusCode(),
           "สมัครบัญชี Gov Center สำเร็จแล้ว แต่ยังเข้า TownTrack ไม่สำเร็จ — " + e.getReason());
+    } catch (RuntimeException e) {
+      throw new ResponseStatusException(
+          org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
+          "สมัครบัญชี Gov Center สำเร็จแล้ว แต่ยังเข้า TownTrack ไม่สำเร็จ กรุณาเข้าสู่ระบบด้วยอีเมล Gov Center อีกครั้ง");
     }
   }
 
