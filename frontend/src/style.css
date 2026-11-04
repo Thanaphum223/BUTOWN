@@ -142,64 +142,104 @@ body {
   padding: 12px 0;
   border-bottom: 1px solid #eee;
 }
-.login {
+.auth-page {
   min-height: 100vh;
+  min-height: 100svh;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  background: var(--gov-surface-soft);
+  place-items: center;
+  padding: 32px 16px;
+  background: #f7f9fa;
 }
-.login-story {
-  padding: 60px 10%;
-  background: color-mix(in srgb, var(--gov-brand-primary) 70%, #000);
-  color: #fff;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
+.auth-card.ant-card {
+  width: min(400px, 100%);
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  box-shadow:
+    0 8px 16px #10182812,
+    0 2px 4px #10182808;
 }
-.login-story:after {
-  content: "";
-  width: 420px;
-  height: 420px;
-  border: 70px solid #ffffff06;
-  border-radius: 50%;
-  position: absolute;
-  bottom: -180px;
-  right: -150px;
-  pointer-events: none;
+.auth-card > .ant-card-body {
+  padding: 24px !important;
 }
-.login-story .brand {
-  color: white;
-  padding: 0;
-  margin-bottom: 60px;
+.auth-heading {
+  text-align: center;
+  margin-bottom: 24px;
 }
-.login-story .municipal-mark {
-  background: var(--gov-brand-primary);
-}
-.login-story h1 {
-  font-size: clamp(32px, 3.5vw, 54px);
-  line-height: 1.5;
-  margin: 24px 0;
-}
-.login-story p {
-  color: #c3d9d0;
-  line-height: 2;
-}
-.login-feature {
-  margin-top: 36px;
-  color: #dae8d9;
-  font-size: 13px;
-}
-.login-card {
-  width: min(440px, 90%);
-  margin: auto;
-  border: 1px solid var(--gov-border-neutral);
-  box-shadow: 0 15px 50px #173d2910;
-}
-.login-card h3 {
+.auth-heading h1.ant-typography {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 700;
   color: var(--gov-brand-primary);
+}
+.auth-heading .ant-typography:last-child {
+  margin: 0;
+  color: #757575;
+  font-size: 14px;
+}
+.auth-card .ant-form-item {
+  margin-bottom: 20px;
+}
+.auth-card .ant-form-item-label > label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #202020;
+}
+.auth-card .ant-input,
+.auth-card .ant-input-affix-wrapper,
+.auth-card .ant-btn {
+  font-size: 14px;
+}
+.auth-card .ant-input,
+.auth-card .ant-input-affix-wrapper {
+  background: #fff !important;
+  min-height: 36px;
+  border-radius: 8px;
+}
+.auth-card .ant-input-affix-wrapper .ant-input {
+  min-height: 0;
+}
+.auth-card .ant-btn {
+  height: 36px;
+  min-height: 36px;
+  border-radius: 8px;
+}
+.auth-card .ant-form-item-extra {
+  font-size: 12px;
+}
+.auth-card .gov-line-login {
+  background: #06c755;
+  border-color: #06c755;
+  color: white;
+  font-weight: 600;
+}
+.auth-card .gov-line-login:not(:disabled):hover {
+  background: #05b34c;
+  border-color: #05b34c;
+  color: white;
+}
+.auth-card .auth-divider {
+  margin: 24px 0;
+  color: #888;
+  font-size: 12px;
+}
+.auth-switch {
+  margin: 20px 0 8px;
+  text-align: center;
+  font-size: 13px;
+  color: #757575;
+}
+.auth-switch .ant-btn {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  font-size: inherit;
+  font-weight: 600;
+}
+.auth-emergency.ant-btn {
+  display: flex;
+  margin: 0 auto;
+  color: #757575;
+  font-size: 12px;
 }
 .loading {
   display: grid;
@@ -234,27 +274,6 @@ body {
   }
   .page-heading h2 {
     font-size: 23px;
-  }
-  .login {
-    display: flex;
-    flex-direction: column;
-  }
-  .login-story {
-    padding: 28px 24px;
-  }
-  .login-story .brand {
-    margin-bottom: 18px;
-  }
-  .login-story h1 {
-    font-size: 27px;
-    margin: 12px 0;
-  }
-  .login-story p,
-  .login-feature {
-    display: none;
-  }
-  .login-card {
-    margin: 24px auto;
   }
   .submit-bar {
     align-items: stretch;
@@ -1051,12 +1070,6 @@ h3,
 .font-large .ant-select-selection-item,
 .font-large .ant-btn {
   font-size: 18px;
-}
-.login-story .brand {
-  letter-spacing: 0;
-}
-.login-card {
-  border-radius: var(--gov-radius-card);
 }
 @media (min-width: 1500px) {
   .work-grid {

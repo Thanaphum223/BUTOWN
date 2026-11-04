@@ -1402,7 +1402,7 @@ class TownTrackIntegrationTest {
   }
 
   @Test
-  void publicRegistrationCannotAssignRole() throws Exception {
+  void legacyRegistrationCannotCreateAnAccount() throws Exception {
     mvc.perform(
             post("/api/auth/register")
                 .with(csrf())
@@ -1420,9 +1420,8 @@ class TownTrackIntegrationTest {
                             "Citizen",
                             "role",
                             "ADMIN"))))
-        .andExpect(status().isOk());
-    assertEquals(
-        "CITIZEN", db.one("SELECT role FROM app_user WHERE username='registered'").get("role"));
+        .andExpect(status().isUnauthorized());
+    assertTrue(db.list("SELECT id FROM app_user WHERE username='registered'").isEmpty());
   }
 
   @Test
@@ -1569,14 +1568,36 @@ class TownTrackIntegrationTest {
   }
 
   @Test
-  void lineIsDisabledWithoutConfiguration() throws Exception {
+  void directLegacyLineEntryIsDisabled() throws Exception {
     mvc.perform(
             post("/api/auth/line")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"idToken\":\"invalid\"}"))
-        .andExpect(status().isServiceUnavailable());
+        .andExpect(status().isUnauthorized());
   }
+
+  org.springframework.mock.web.MockHttpSession registeredSession(String username) {
+    var principal =
+        org.springframework.security.core.userdetails.User.withUsername(username)
+            .password("unused-test-password")
+            .roles("CITIZEN")
+            .build();
+    var authentication =
+        org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+            .authenticated(principal, null, principal.getAuthorities());
+    var request = new org.springframework.mock.web.MockHttpServletRequest();
+    new ExternalLoginSessions(sessionRegistry)
+        .authenticate(
+            authentication, request, new org.springframework.mock.web.MockHttpServletResponse());
+    var context =
+        org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
+    context.setAuthentication(authentication);
+    request.getSession().setAttribute("SPRING_SECURITY_CONTEXT", context);
+    return (org.springframework.mock.web.MockHttpSession) request.getSession();
+  }
+
+  @Autowired org.springframework.security.core.session.SessionRegistry sessionRegistry;
 
   @Test
   void passwordChangeExpiresOtherSessions() throws Exception {
@@ -1585,24 +1606,8 @@ class TownTrackIntegrationTest {
         "UPDATE app_user SET password_hash=? WHERE id=?",
         encoder.encode("current-password-123"),
         users.get("CITIZEN"));
-    var first =
-        mvc.perform(
-                post("/api/auth/login")
-                    .with(csrf())
-                    .param("username", "testCITIZEN")
-                    .param("password", "current-password-123"))
-            .andExpect(status().isOk())
-            .andReturn();
-    var second =
-        mvc.perform(
-                post("/api/auth/login")
-                    .with(csrf())
-                    .param("username", "testCITIZEN")
-                    .param("password", "current-password-123"))
-            .andExpect(status().isOk())
-            .andReturn();
-    var one = (org.springframework.mock.web.MockHttpSession) first.getRequest().getSession(false);
-    var two = (org.springframework.mock.web.MockHttpSession) second.getRequest().getSession(false);
+    var one = registeredSession("testCITIZEN");
+    var two = registeredSession("testCITIZEN");
     mvc.perform(
             post("/api/auth/password")
                 .session(one)

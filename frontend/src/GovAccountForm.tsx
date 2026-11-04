@@ -1,9 +1,8 @@
 import { useRef, useState } from "react";
-import { Alert, Button, Form, Input, Space, Typography } from "antd";
-import { ArrowLeftOutlined, MailOutlined, UserAddOutlined } from "@ant-design/icons";
+import { Alert, Button, Form, Input } from "antd";
 import { post, refreshCsrf } from "./api";
 import { useGovConfig } from "./govSso";
-export type GovAccountMode = "register" | "login" | null;
+export type GovAccountMode = "register" | "login";
 type Fields = { name?: string; email: string; password: string; confirmation?: string };
 export default function GovAccountForm({
   mode,
@@ -32,14 +31,6 @@ export default function GovAccountForm({
     if (!config?.configured) throw new Error("ยังไม่ได้ตั้งค่า Gov Center SSO ครบถ้วน");
     if (new URL(config.callbackUrl).origin !== window.location.origin)
       throw new Error("กรุณาเข้า TownTrack ด้วยโดเมนที่ลงทะเบียน SSO ไว้");
-  }
-  function open(next: GovAccountMode) {
-    try {
-      sameOrigin();
-      change(next);
-    } catch (e) {
-      setError((e as Error).message);
-    }
   }
   async function submit(values: Fields) {
     if (disabled || submitting.current || !mode) return;
@@ -83,76 +74,35 @@ export default function GovAccountForm({
     }
   }
   if (!config?.configured)
-    return mode ? (
-      <>
-        <Button
-          type="text"
-          aria-label="กลับไปหน้าเข้าสู่ระบบ"
-          icon={<ArrowLeftOutlined />}
-          onClick={() => change(null)}
-        >
-          กลับไปหน้าเข้าสู่ระบบ
-        </Button>
-        <Alert
-          type="warning"
-          showIcon
-          message={
-            loadError ||
-            (config ? "ยังไม่ได้ตั้งค่า Gov Center SSO ครบถ้วน" : "กำลังโหลดข้อมูล Gov Center")
-          }
-        />
-      </>
-    ) : null;
-  if (!mode)
     return (
-      <Space direction="vertical" style={{ width: "100%", marginTop: 8 }}>
-        <Button
-          block
-          aria-label="สมัครบัญชีประชาชนผ่าน Gov Center"
-          icon={<UserAddOutlined />}
-          disabled={disabled}
-          onClick={() => open("register")}
-        >
-          สมัครบัญชีประชาชนผ่าน Gov Center
-        </Button>
-        <Button
-          block
-          aria-label="เข้าสู่ระบบด้วยอีเมล Gov Center"
-          icon={<MailOutlined />}
-          disabled={disabled}
-          onClick={() => open("login")}
-        >
-          เข้าสู่ระบบด้วยอีเมล Gov Center
-        </Button>
-        {error && <Alert type="error" showIcon message={error} />}
-      </Space>
+      <Alert
+        type="warning"
+        showIcon
+        message={
+          loadError ||
+          (config ? "ยังไม่ได้ตั้งค่า Gov Center SSO ครบถ้วน" : "กำลังโหลดข้อมูล Gov Center")
+        }
+      />
+    );
+  if (new URL(config.callbackUrl).origin !== window.location.origin)
+    return (
+      <Alert type="warning" showIcon message="กรุณาเข้า TownTrack ด้วยโดเมนที่ลงทะเบียน SSO ไว้" />
     );
   const register = mode === "register";
   return (
     <>
-      <Button
-        type="text"
-        aria-label="กลับไปหน้าเข้าสู่ระบบ"
-        icon={<ArrowLeftOutlined />}
-        disabled={disabled}
-        onClick={() => change(null)}
-        style={{ marginBottom: 16 }}
-      >
-        กลับไปหน้าเข้าสู่ระบบ
-      </Button>
-      <Typography.Title level={3}>
-        {register ? "สมัครบัญชี Gov Center" : "เข้าสู่ระบบด้วยอีเมล Gov Center"}
-      </Typography.Title>
-      <Typography.Paragraph type="secondary">
-        {register
-          ? "ใช้บัญชีนี้เข้า TownTrack และบริการที่เชื่อมกับ Gov Center"
-          : "ใช้บัญชีอีเมลที่สมัครกับ Gov Center"}
-      </Typography.Paragraph>
       {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
-      <Form form={form} name="gov-account" layout="vertical" disabled={disabled} onFinish={submit}>
+      <Form
+        form={form}
+        name="gov-account"
+        layout="vertical"
+        requiredMark={false}
+        disabled={disabled}
+        onFinish={submit}
+      >
         {register && (
           <Form.Item
-            label="ชื่อที่ใช้ติดต่อ"
+            label="ชื่อ-นามสกุล"
             name="name"
             rules={[
               {
@@ -164,7 +114,7 @@ export default function GovAccountForm({
               },
             ]}
           >
-            <Input autoComplete="name" maxLength={200} size="large" />
+            <Input autoComplete="name" maxLength={200} placeholder="ชื่อและนามสกุล" />
           </Form.Item>
         )}
         <Form.Item
@@ -172,7 +122,7 @@ export default function GovAccountForm({
           name="email"
           rules={[{ required: true, type: "email", max: 320, message: "กรุณากรอกอีเมลให้ถูกต้อง" }]}
         >
-          <Input autoComplete="email" type="email" maxLength={320} size="large" />
+          <Input autoComplete="email" type="email" maxLength={320} placeholder="name@example.com" />
         </Form.Item>
         <Form.Item
           label="รหัสผ่าน"
@@ -191,7 +141,7 @@ export default function GovAccountForm({
           <Input.Password
             autoComplete={register ? "new-password" : "current-password"}
             maxLength={72}
-            size="large"
+            placeholder="รหัสผ่าน"
           />
         </Form.Item>
         {register && (
@@ -210,7 +160,11 @@ export default function GovAccountForm({
               }),
             ]}
           >
-            <Input.Password autoComplete="new-password" maxLength={72} size="large" />
+            <Input.Password
+              autoComplete="new-password"
+              maxLength={72}
+              placeholder="กรอกรหัสผ่านอีกครั้ง"
+            />
           </Form.Item>
         )}
         <Button
@@ -225,15 +179,17 @@ export default function GovAccountForm({
           {register ? "สมัครและเข้าสู่ระบบ" : "เข้าสู่ระบบ"}
         </Button>
       </Form>
-      <Button
-        type="link"
-        block
-        disabled={disabled}
-        onClick={() => change(register ? "login" : "register")}
-        style={{ marginTop: 16 }}
-      >
-        {register ? "มีบัญชีแล้ว เข้าสู่ระบบด้วยอีเมล Gov" : "ยังไม่มีบัญชี สมัครบัญชี Gov Center"}
-      </Button>
+      <p className="auth-switch">
+        {register ? "มีบัญชีอยู่แล้ว?" : "ยังไม่มีบัญชี?"}{" "}
+        <Button
+          type="link"
+          aria-label={register ? "กลับไปหน้าเข้าสู่ระบบ" : "สมัครสมาชิก"}
+          disabled={disabled}
+          onClick={() => change(register ? "login" : "register")}
+        >
+          {register ? "เข้าสู่ระบบ" : "สมัครสมาชิก"}
+        </Button>
+      </p>
     </>
   );
 }

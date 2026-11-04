@@ -84,7 +84,7 @@ test("SSO button registers matching state before redirect without token entry", 
 }) => {
   const seen = await boundary(page);
   await page.goto("/");
-  await page.getByRole("button", { name: "เข้าสู่ระบบด้วย Gov Center", exact: true }).click();
+  await page.getByRole("button", { name: "เข้าสู่ระบบด้วย LINE", exact: true }).click();
   await expect(page.getByRole("heading", { name: "IAM login test boundary" })).toBeVisible();
   const url = new URL(page.url());
   expect(url.origin + url.pathname).toBe("https://access.line.me/oauth2/v2.1/authorize");
@@ -193,9 +193,6 @@ for (const configFailure of ["unconfigured", "unavailable", "wrong-origin"]) {
     );
     await page.goto("/");
     if (configFailure === "wrong-origin") {
-      await page
-        .getByRole("button", { name: "สมัครบัญชีประชาชนผ่าน Gov Center", exact: true })
-        .click();
       await expect(page.getByRole("alert")).toContainText("โดเมนที่ลงทะเบียน");
     } else {
       await expect(
@@ -205,12 +202,10 @@ for (const configFailure of ["unconfigured", "unavailable", "wrong-origin"]) {
             : "ยังไม่ได้ตั้งค่า Gov Center SSO ครบถ้วน",
         ),
       ).toBeVisible();
-      await expect(
-        page.getByRole("button", { name: "สมัครบัญชีประชาชนผ่าน Gov Center", exact: true }),
-      ).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "สมัครสมาชิก", exact: true })).toHaveCount(0);
     }
     await expect(page.getByRole("tab", { name: "สมัครบัญชีประชาชน" })).toHaveCount(0);
-    await expect(page.getByLabel("ชื่อที่ใช้ติดต่อ", { exact: true })).toHaveCount(0);
+    await expect(page.getByLabel("ชื่อ-นามสกุล", { exact: true })).toHaveCount(0);
     expect(seen.starts).toEqual([]);
     expect(page.url()).toBe("http://127.0.0.1:5173/");
   });
@@ -234,7 +229,7 @@ test("opening TownTrack never calls undocumented central session endpoint", asyn
   const seen = await boundary(page);
   await page.goto("/");
   await expect(
-    page.getByRole("button", { name: "เข้าสู่ระบบด้วย Gov Center", exact: true }),
+    page.getByRole("button", { name: "เข้าสู่ระบบด้วย LINE", exact: true }),
   ).toBeVisible();
   expect(seen.sessionChecks).toBe(0);
   expect(seen.starts).toHaveLength(0);
@@ -260,7 +255,7 @@ test("central profile or opaque token cannot authenticate and unavailable sessio
   );
   await page.goto("/");
   await expect(
-    page.getByRole("button", { name: "เข้าสู่ระบบด้วย Gov Center", exact: true }),
+    page.getByRole("button", { name: "เข้าสู่ระบบด้วย LINE", exact: true }),
   ).toBeVisible();
   expect(seen.callbacks).toHaveLength(0);
   expect(seen.starts).toHaveLength(0);
@@ -281,22 +276,22 @@ test("logout stays local without silently signing in again", async ({ page }) =>
   await page.goto("/");
   await page.getByRole("button", { name: "ออกจากระบบ", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "เข้าสู่ระบบด้วย Gov Center", exact: true }),
+    page.getByRole("button", { name: "เข้าสู่ระบบด้วย LINE", exact: true }),
   ).toBeVisible();
   await page.reload();
   await expect(
-    page.getByRole("button", { name: "เข้าสู่ระบบด้วย Gov Center", exact: true }),
+    page.getByRole("button", { name: "เข้าสู่ระบบด้วย LINE", exact: true }),
   ).toBeVisible();
   expect(seen.sessionChecks).toBe(0);
   expect(seen.callbacks).toHaveLength(0);
 });
-test("SSO start prevents concurrent local login and recovers on start failure", async ({
+test("SSO start prevents concurrent Gov email login and recovers on start failure", async ({
   page,
 }) => {
   await boundary(page);
   await page.goto("/");
   await expect(
-    page.getByRole("button", { name: "เข้าสู่ระบบด้วย Gov Center", exact: true }),
+    page.getByRole("button", { name: "เข้าสู่ระบบด้วย LINE", exact: true }),
   ).toBeVisible();
   let finish!: () => void;
   const waiting = new Promise<void>((resolve) => (finish = resolve));
@@ -304,7 +299,7 @@ test("SSO start prevents concurrent local login and recovers on start failure", 
     await waiting;
     await r.fulfill({ status: 503, json: { message: "SSO start unavailable" } });
   });
-  await page.getByRole("button", { name: "เข้าสู่ระบบด้วย Gov Center", exact: true }).click();
+  await page.getByRole("button", { name: "เข้าสู่ระบบด้วย LINE", exact: true }).click();
   await expect(page.getByRole("button", { name: /เข้าสู่ระบบ$/ })).toBeDisabled();
   finish();
   await expect(page.getByRole("button", { name: /เข้าสู่ระบบ$/ })).toBeEnabled();
@@ -349,7 +344,7 @@ test("direct LINE return is not mistaken for a Gov callback", async ({ page }) =
   await page.addInitScript((s) => sessionStorage.setItem("gov_sso_state", s), state);
   await page.goto(`/?lineLogin=1&code=line-code&state=${state}`);
   await expect(
-    page.getByRole("button", { name: "เข้าสู่ระบบด้วย Gov Center", exact: true }),
+    page.getByRole("button", { name: "เข้าสู่ระบบด้วย LINE", exact: true }),
   ).toBeVisible();
   expect(seen.callbacks).toHaveLength(0);
 });

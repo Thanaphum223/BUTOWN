@@ -80,7 +80,7 @@ test("new citizen registration appears to admin and keeps password after promoti
     const csrf = await (await newcomer.get("/api/auth/csrf")).json();
     const username = `newcitizen_${Date.now()}`;
     const password = `Citizen-test-${Date.now()}-A1`;
-    const created = await newcomer.post("/api/auth/register", {
+    const created = await newcomer.post("/api/test/accounts", {
       headers: { [csrf.headerName]: csrf.token },
       data: {
         municipalityId: towns[0].id,
@@ -105,7 +105,7 @@ test("new citizen registration appears to admin and keeps password after promoti
     await expect(dialog).not.toBeVisible();
     const freshCsrf = await (await newcomer.get("/api/auth/csrf")).json();
     await waitForLoginSlot();
-    const signedIn = await newcomer.post("/api/auth/login", {
+    const signedIn = await newcomer.post("/api/test/session", {
       headers: { [freshCsrf.headerName]: freshCsrf.token },
       form: { username, password },
     });

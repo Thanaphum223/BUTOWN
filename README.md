@@ -11,8 +11,8 @@
 - ฐานทดสอบแยก: 127.0.0.1:55432 / towntrack (ไม่ใช้ฐานเดิมของเครื่องที่พอร์ต 5432)
 - รัน PowerShell: ./scripts/start-dev.ps1
 - หยุด: ./scripts/stop-dev.ps1
-- บัญชีทดสอบ: citizen, officer, leader, field, approver; ผู้ดูแล: admin
-- ดูรหัสผ่านเฉพาะในเครื่องด้วย ./scripts/show-local-access.ps1 (ไม่ควรส่งไฟล์รหัสผ่านหรือบันทึกหน้าจอที่มีรหัสผ่านต่อ)
+- เข้าสู่ระบบด้วยอีเมล Gov Center หรือ LINE ผ่าน Gov Center เท่านั้น บัญชีและรหัสผ่าน TownTrack เดิมใช้ล็อกอินใหม่ไม่ได้
+- บัญชีทดสอบ citizen, officer, leader, field, approver และ admin ใช้เฉพาะ fixture ของชุดทดสอบ ไม่ใช่ช่องทางล็อกอินของแอปจริง
 - บัญชีตัวอย่างเกิดจาก DEMO_PASSWORD เฉพาะการพัฒนา ห้ามกำหนดตัวแปรนี้ใน Production
 
 ## ความสะอาดของโค้ดและความปลอดภัย
@@ -23,7 +23,7 @@
 - Backend: cd backend แล้ว mvn verify (กำหนด DB_URL, DB_USER, DB_PASSWORD, BOOTSTRAP_PASSWORD ก่อน)
 - Frontend: cd frontend แล้ว npm ci และ npm run build
 - Integration test บนเครื่องนี้: ./scripts/test-backend.ps1
-- Browser test: เปิด Backend และ Vite แล้ว cd frontend; npx playwright test
+- Browser test: ใช้ฐานข้อมูลทดสอบแยก เปิด Vite และรัน backend ด้วย `BrowserTestServer` จาก test classpath ตาม `.github/workflows/verify.yml` แล้ว `cd frontend` และ `npx playwright test` ตัว launcher และ `/api/test/*` อยู่ใน test sources เท่านั้นและไม่รวมใน JAR ที่ deploy
 - DEV_UNSCANNED_FILES=true ใช้ได้เฉพาะทดสอบภายในเครื่อง การใช้งานจริงต้องกำหนด CLAMAV_HOST และไม่เปิดตัวแปรนี้
 
 ## เอกสาร
@@ -36,6 +36,10 @@
 - docs/STATUS.md: ผลทดสอบและข้อจำกัดที่ยังต้องจัดการ
 
 ## เชื่อม Gov Center SSO
+หน้าเข้าสู่ระบบเป็นฟอร์มอีเมล Gov พร้อมปุ่ม LINE ส่วนหน้าสมัครรับชื่อ-นามสกุล อีเมล รหัสผ่าน และการยืนยันรหัสผ่าน โดยส่งสมัครผ่าน backend ไปยัง Gov API และตรวจรหัสใช้ครั้งเดียวก่อนเปิด session ของ TownTrack ไม่มีการเก็บรหัสผ่าน Gov
+
+ปิด API เดิม `/api/auth/login`, `/api/auth/register` และ `/api/auth/line` ทั้งผู้ใช้ที่ยังไม่เข้าสู่ระบบและผู้ใช้ที่มี session แล้ว ข้อมูลบัญชีเดิม สิทธิ์ และรายการต่าง ๆ ยังคงอยู่ บัญชีบุคลากรเดิมต้องมีการเชื่อม Gov ไว้จึงจะเข้าสู่ระบบด้วยบัญชี Gov และคงบทบาทเดิมได้ ระบบไม่จับคู่หรือยกระดับสิทธิ์จากอีเมลโดยอัตโนมัติ
+
 TownTrack รับข้อมูลผู้ใช้ที่ Backend ตรวจสอบด้วยรหัสใช้ครั้งเดียว แล้วสร้าง Session ของระบบย่อย โดยคงสิทธิ์ที่ผู้ดูแลกำหนดไว้ รายละเอียดการตั้งค่า ข้อจำกัด Session กลาง และรายการที่ต้องยืนยันกับผู้ให้บริการอยู่ใน docs/GOV_SSO.md
 
 ปุ่ม Gov Center เริ่ม LINE Login ด้วยช่องทางของ Gov แล้วรับผลผ่าน Gov API กลับมายัง `GOV_CALLBACK_URL` ของ TownTrack โดยตรง ใช้ `E_SERVICE_CODE`, `E_SERVICE_API_KEY`, `GOV_CALLBACK_URL` เหมือนเดิม เพิ่ม nonce ของแต่ละคำขอใน query ของ callback และตรวจทั้ง browser/server ก่อนยืนยัน code ฝั่ง server จึงไม่ต้องแวะหน้า dashboard ของ Gov และไม่ใช้ ticket หรือ token ของ Session กลาง บัญชีที่ Gov ระบุว่าต้องลงทะเบียนข้อมูลเพิ่มเติมจะยังเข้า TownTrack ไม่ได้จนกว่าจะดำเนินการเสร็จ

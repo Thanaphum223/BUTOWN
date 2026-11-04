@@ -4,7 +4,9 @@
 
 ## Session และ CSRF
 1. GET /api/auth/csrf รับ token และ headerName พร้อม Cookie เซสชัน
-2. POST /api/auth/login ส่ง application/x-www-form-urlencoded: username,password พร้อม CSRF header และ Cookie เดิม
+2. เริ่มคำขอด้วย POST /api/auth/gov/start พร้อม state และ purpose=PASSWORD_LOGIN (หรือ REGISTER สำหรับสมัคร)
+3. POST /api/auth/gov/password-login ส่ง JSON state,email,password พร้อม CSRF header และ Cookie เดิม สำหรับสมัครใช้ /api/auth/gov/register และเพิ่ม name หลัง Gov ยืนยันตัวตนสำเร็จจึงเปิด session ของ TownTrack
+4. ช่องทางเดิม /api/auth/login, /api/auth/register และ /api/auth/line ถูกปิด ไม่รองรับบัญชีและรหัสผ่าน TownTrack โดยตรง
 3. หลัง Login เรียก csrf ใหม่ เพราะ Token หมุนเวียน
 4. คำขอ POST/DELETE ทุกครั้งต้องแนบ CSRF header และ Cookie ใช้ same-origin ไม่มี Token ใน localStorage
 5. POST /api/auth/logout ออกจากระบบ; POST /api/auth/password ส่ง currentPassword,newPassword และทำให้ Session ทั้งบัญชีหมดอายุ
