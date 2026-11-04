@@ -188,6 +188,7 @@ test("unconfigured Gov has no local account fallback", async ({ page }) => {
     route.fulfill({ json: { configured: false } }),
   );
   await page.goto("/");
+  await expect(page.getByRole("heading", { name: "เข้าสู่ระบบ", exact: true })).toBeVisible();
   await expect(page.getByRole("alert").first()).toContainText("ยังไม่ได้ตั้งค่า Gov Center");
   await expect(page.locator("input")).toHaveCount(0);
 });

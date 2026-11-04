@@ -38,7 +38,7 @@ for (const denied of [false, true]) {
       });
       await waitForLoginSlot();
       await page.goto("/");
-      await expect(page.getByLabel("อีเมล", { exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "เข้าสู่ระบบ", exact: true })).toBeVisible();
       expect(await page.evaluate(() => (window as any).gpsCalls)).toBe(0);
       const csrf = await (await page.request.get("/api/auth/csrf")).json();
       const response = await page.request.post("/api/test/session", {
