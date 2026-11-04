@@ -1,0 +1,9 @@
+# Gov account registration and email sign-in
+
+User approved TownTrack forms connected to official Gov APIs, superseding external Gov registration navigation. Never create a production account during testing. Maintain the green theme and existing TownTrack/LINE login.
+
+Flow: CSRF-protected TownTrack form → session-bound single-use REGISTER or PASSWORD_LOGIN transaction → official Gov register (registration only) → Gov login with service query → direct service code or generate-code with in-memory bearer → existing verify-code API → existing stable IAM identity sync and local session rotation → home. Trust identity only from verify-code; never auto-link by email or elevate roles.
+
+Use only existing E_SERVICE_API_KEY, E_SERVICE_CODE, GOV_CALLBACK_URL. Fixed HTTPS official API origin; redirects disabled; short timeout, bounded responses, no retries. Never store/log/return passwords or central tokens. Request DTO string representations and JSON serialization redact credentials. Registration fields name 2..200, email <=320, password 12..72; email login accepts 1..72 for existing provider accounts. Preserve passwords exactly; trim names/email. Password confirmation is local validation. Registration conflict offers Gov email login; unknown network outcome advises login first; post-registration failure explicitly says account was created and offers login. Login and registration submissions cannot replace a signed-in session, survive logout/session rotation, or reuse a different purpose/state.
+
+Sources: https://library.govcenter.co/sso and public https://api-auth.govcenter.co/api-json (POST /auth/register, /auth/login?service=..., /e-services/sso/generate-code, /e-services/sso/verify-code). No OIDC endpoint guesses. All account creation tests use mock Gov HTTP. Deployment smoke checks may open and validate fields only, never submit credentials to production.
