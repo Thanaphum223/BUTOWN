@@ -505,10 +505,16 @@ function TownTrackApp() {
               />
             )}
             <div className="header-identity">
-              <span className="municipal-mark">ท</span>
+              {user.role === "CITIZEN" ? (
+                <Avatar className="citizen-profile-avatar">{user.display_name?.[0]}</Avatar>
+              ) : (
+                <span className="municipal-mark">ท</span>
+              )}
               <div>
-                <strong>
-                  {user.role === "CITIZEN" ? "เทศบาลใกล้คุณ" : "ศูนย์รับเรื่องเทศบาล"}
+                <strong title={user.role === "CITIZEN" ? user.display_name : undefined}>
+                  {user.role === "CITIZEN"
+                    ? `สวัสดี, ${user.display_name}`
+                    : "ศูนย์รับเรื่องเทศบาล"}
                 </strong>
                 <small>
                   {user.role === "CITIZEN"
@@ -565,8 +571,14 @@ function TownTrackApp() {
                 </>
               )}
               {user.role === "CITIZEN" && (
-                <Button aria-pressed={fontLarge} onClick={() => setFontLarge((v) => !v)}>
-                  {fontLarge ? "ก− ย่อ" : "ก+ ขยาย"}
+                <Button
+                  className="font-size-toggle"
+                  aria-label={fontLarge ? "ย่อขนาดตัวอักษร" : "ขยายขนาดตัวอักษร"}
+                  aria-pressed={fontLarge}
+                  onClick={() => setFontLarge((v) => !v)}
+                >
+                  <span aria-hidden="true">{fontLarge ? "ก−" : "ก+"}</span>
+                  <span className="font-toggle-label">{fontLarge ? "ย่อ" : "ขยาย"}</span>
                 </Button>
               )}
               <GovProfile />
