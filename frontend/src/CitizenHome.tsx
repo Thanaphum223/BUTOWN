@@ -16,9 +16,6 @@ import {
   PictureOutlined,
   FilePdfOutlined,
   PlayCircleOutlined,
-  EyeOutlined,
-  BellOutlined,
-  CheckOutlined,
   LikeOutlined,
   TrophyOutlined,
   EnvironmentOutlined,
@@ -29,6 +26,7 @@ import {
 import { api, statusNames } from "./api";
 import { useGeo } from "./GeoContext";
 import CommunityDetail from "./CommunityDetail";
+import CommunityActions from "./CommunityActions";
 import LocationMap from "./LocationMap";
 type D = Record<string, any>;
 const { Title, Text } = Typography;
@@ -114,51 +112,33 @@ export default function CitizenHome({
       setVoting(undefined);
     }
   }
-  const voteButton = (item: D) => (
-    <Button
-      disabled={busy || !!voting || !!followingId}
-      icon={<LikeOutlined />}
-      loading={voting === item.id}
-      type={item.voted ? "primary" : "default"}
-      aria-pressed={!!item.voted}
-      aria-label={`${item.voted ? "ยกเลิกโหวต" : "โหวต"} ${item.category_name} #${item.id.slice(0, 8)}`}
-      onClick={() => void vote(item)}
-    >
-      {item.votes} โหวต
-    </Button>
-  );
   const issueActions = (item: D) => (
-    <div className="community-issue-actions">
-      <Button icon={<EyeOutlined />} onClick={() => setDetailId(item.id)}>
-        ดูรายละเอียด
-      </Button>
-      <Button
-        disabled={busy || !!voting || !!followingId}
-        icon={item.following ? <CheckOutlined /> : <BellOutlined />}
-        type={item.following ? "primary" : "default"}
-        loading={followingId === item.id}
-        aria-pressed={!!item.following}
-        onClick={async () => {
-          setFollowingId(item.id);
-          try {
-            await api(
-              item.following
-                ? `/complaints/${item.id}/follow`
-                : `/community/complaints/${item.id}/follow`,
-              { method: item.following ? "DELETE" : "POST" },
-            );
-            setRevision((v) => v + 1);
-          } catch (e) {
-            setError((e as Error).message);
-          } finally {
-            setFollowingId(undefined);
-          }
-        }}
-      >
-        {item.following ? "ติดตามแล้ว" : "ติดตาม"}
-      </Button>
-      {voteButton(item)}
-    </div>
+    <CommunityActions
+      item={item as any}
+      disabled={busy || !!voting || !!followingId}
+      voting={voting === item.id}
+      following={followingId === item.id}
+      onDetails={() => setDetailId(item.id)}
+      onVote={() => void vote(item)}
+      onFollow={async () => {
+        setFollowingId(item.id);
+        try {
+          await api(
+            item.following
+              ? `/complaints/${item.id}/follow`
+              : `/community/complaints/${item.id}/follow`,
+            {
+              method: item.following ? "DELETE" : "POST",
+            },
+          );
+          setRevision((v) => v + 1);
+        } catch (e) {
+          setError((e as Error).message);
+        } finally {
+          setFollowingId(undefined);
+        }
+      }}
+    />
   );
   const statusTag = (item: D) => (
     <Tag color={item.status === "CLOSED" ? "green" : item.status === "NEW" ? "orange" : "blue"}>
