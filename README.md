@@ -41,4 +41,4 @@ TownTrack รับข้อมูลผู้ใช้ที่ Backend ตร�
 ปุ่ม Gov Center เริ่ม LINE Login ด้วยช่องทางของ Gov แล้วรับผลผ่าน Gov API กลับมายัง `GOV_CALLBACK_URL` ของ TownTrack โดยตรง ใช้ `E_SERVICE_CODE`, `E_SERVICE_API_KEY`, `GOV_CALLBACK_URL` เหมือนเดิม เพิ่ม nonce ของแต่ละคำขอใน query ของ callback และตรวจทั้ง browser/server ก่อนยืนยัน code ฝั่ง server จึงไม่ต้องแวะหน้า dashboard ของ Gov และไม่ใช้ ticket หรือ token ของ Session กลาง บัญชีที่ Gov ระบุว่าต้องลงทะเบียนข้อมูลเพิ่มเติมจะยังเข้า TownTrack ไม่ได้จนกว่าจะดำเนินการเสร็จ
 
 ## GPS และฟอร์มแจ้งปัญหา
-ดู docs/GPS_WIZARD.md: ขอสิทธิ์ครั้งแรก แชร์พิกัด Prefill ฟอร์ม 3 ขั้น ใบรับเรื่อง และบริการค้นหาที่อยู่ที่ตั้งค่าได้
+ดู docs/GPS_WIZARD.md: ขอสิทธิ์ครั้งแรก แชร์พิกัด Prefill ฟอร์ม 2 ขั้น ใบรับเรื่อง และบริการค้นหาที่อยู่ที่ตั้งค่าได้

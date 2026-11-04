@@ -82,6 +82,9 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
   const [searching, setSearching] = useState(false);
   const [searchNotice, setSearchNotice] = useState("");
   const [selectedPlace, setSelectedPlace] = useState<number>();
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [addressNotice, setAddressNotice] = useState("");
+  const [addressRevision, setAddressRevision] = useState(0);
   const searchVersion = useRef(0);
   const pendingFiles = useRef<File[]>([]);
   const [attachmentMissing, setAttachmentMissing] = useState(false);
@@ -144,6 +147,9 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
     setPosition(p);
     setNearby([]);
     setSelectedPlace(undefined);
+    setAddressLoading(false);
+    setAddressNotice("");
+    setAddressRevision((v) => v + 1);
     if (!manual.current) {
       const known = places.find((place) => {
         const radians = Math.PI / 180;
@@ -156,39 +162,43 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
             Math.sin(dLon / 2) ** 2;
         return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) <= 100;
       });
-      form.setFieldValue(
-        "address",
-        known?.display_name || "พิกัด " + p[0].toFixed(6) + ", " + p[1].toFixed(6),
-      );
+      form.setFieldValue("address", known?.display_name || "");
     }
   }
   useEffect(() => {
-    if (position && !form.getFieldValue("address"))
-      form.setFieldValue(
-        "address",
-        "พิกัด " + position[0].toFixed(6) + ", " + position[1].toFixed(6),
-      );
-  }, []);
-  useEffect(() => {
     if (!position || manual.current || step !== 0) return;
     const point = position;
+    const controller = new AbortController();
     let attempts = 0;
     let active = true;
     let retry: ReturnType<typeof setTimeout> | undefined;
+    setAddressLoading(true);
+    setAddressNotice("");
     async function lookup() {
       attempts++;
+      let retrying = false;
       try {
         const r = await api<D>(
           "/geocoding/reverse?latitude=" + point[0] + "&longitude=" + point[1],
+          { signal: controller.signal },
         );
-        if (active && !manual.current && r.display_name)
-          form.setFieldValue("address", r.display_name);
+        if (active && !manual.current) {
+          const name = typeof r?.display_name === "string" ? r.display_name.trim() : "";
+          if (name) form.setFieldValue("address", name);
+          else setAddressNotice("ไม่พบชื่อสถานที่ตรงจุดนี้ กรุณากรอกสถานที่หรือจุดสังเกตเอง");
+        }
       } catch (e) {
-        // A recent place search may still occupy the provider's rate-limit window.
-        if (active && attempts < 3 && (e as Error).message.includes("กรุณารอสักครู่"))
-          retry = setTimeout(() => {
-            if (active) void lookup();
-          }, 1200);
+        if (active && !manual.current) {
+          // A recent place search may still occupy the provider's rate-limit window.
+          if (attempts < 3 && (e as Error).message.includes("กรุณารอสักครู่")) {
+            retrying = true;
+            retry = setTimeout(() => {
+              if (active) void lookup();
+            }, 1200);
+          } else setAddressNotice("ค้นหาที่อยู่ไม่สำเร็จ กรุณาระบุสถานที่หรือจุดสังเกตเอง");
+        }
+      } finally {
+        if (active && !retrying) setAddressLoading(false);
       }
     }
     const timer = setTimeout(() => void lookup(), 1200);
@@ -196,8 +206,9 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
       active = false;
       clearTimeout(timer);
       clearTimeout(retry);
+      controller.abort();
     };
-  }, [position?.[0], position?.[1], step]);
+  }, [position?.[0], position?.[1], step, addressRevision]);
   async function next() {
     try {
       const values = await form.validateFields(["address"]);
@@ -517,12 +528,36 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
           <Form.Item
             label="สถานที่ / จุดสังเกต"
             name="address"
-            rules={[{ required: true, max: 1000 }]}
+            rules={[
+              { required: true, whitespace: true, message: "กรุณาระบุสถานที่หรือจุดสังเกต" },
+              { max: 1000 },
+            ]}
+            extra={
+              addressLoading ? (
+                <span role="status">กำลังค้นหาที่อยู่…</span>
+              ) : addressNotice ? (
+                <Space wrap>
+                  <span role="status">{addressNotice}</span>
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      manual.current = false;
+                      setAddressRevision((v) => v + 1);
+                    }}
+                  >
+                    ค้นหาที่อยู่อีกครั้ง
+                  </Button>
+                </Space>
+              ) : undefined
+            }
           >
             <Input.TextArea
               rows={3}
+              placeholder="ชื่อสถานที่ ถนน ซอย หรือจุดสังเกต"
               onChange={() => {
                 manual.current = true;
+                setAddressLoading(false);
+                setAddressNotice("");
               }}
             />
           </Form.Item>
