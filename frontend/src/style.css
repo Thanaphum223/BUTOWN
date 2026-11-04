@@ -1347,10 +1347,6 @@ a:focus-visible {
   }
 }
 
-.citizen-shell:has(.report-wizard) .footer {
-  padding-bottom: 24px;
-}
-
 .emergency-page {
   max-width: 1040px;
   margin: 0 auto;
@@ -1423,11 +1419,6 @@ a:focus-visible {
   }
 }
 
-@media (max-width: 1023px) {
-  .citizen-bottom-nav.is-reporting {
-    display: none;
-  }
-}
 @media (min-width: 1024px) {
   .citizen-shell {
     padding-left: 232px;

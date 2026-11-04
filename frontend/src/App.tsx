@@ -589,18 +589,6 @@ function TownTrackApp() {
             </Space>
           </Layout.Header>
           <Layout.Content className="content">
-            {user.role === "CITIZEN" && view !== "dashboard" && view !== "emergency" && (
-              <Button
-                icon={<HomeOutlined />}
-                onClick={() => {
-                  setView("dashboard");
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                style={{ marginBottom: 16 }}
-              >
-                กลับหน้าหลัก
-              </Button>
-            )}
             {view === "dashboard" && user.role === "CITIZEN" ? (
               <CitizenHome
                 onTrack={() => setView("cases")}
@@ -653,10 +641,7 @@ function TownTrackApp() {
           </Layout.Footer>
         </Layout>
         {user.role === "CITIZEN" && (
-          <nav
-            className={"citizen-bottom-nav" + (view === "new" ? " is-reporting" : "")}
-            aria-label="เมนูประชาชน"
-          >
+          <nav className="citizen-bottom-nav" aria-label="เมนูประชาชน">
             {[
               { key: "dashboard", icon: <HomeOutlined />, label: "หน้าหลัก" },
               { key: "new", icon: <PlusOutlined />, label: "แจ้งปัญหา" },
