@@ -24,7 +24,13 @@ public class CentralGovAuthController {
   final Clock clock;
   static final String PENDING = "gov_sso_pending", EXCHANGING = "gov_sso_exchanging";
 
-  record Pending(String state, Instant expires, UUID linkUser, UUID municipality, boolean reuse) {}
+  record Pending(String state, Instant expires, UUID linkUser, UUID municipality, String purpose) {
+    boolean reuse() {
+      return purpose.equals("REUSE");
+    }
+  }
+
+  record Exchange(Pending pending, HttpSession session, String sessionId, Object mutex) {}
 
   public CentralGovAuthController(
       GovCenterSsoClient client,
@@ -55,9 +61,10 @@ public class CentralGovAuthController {
     if (state == null
         || purpose == null
         || !state.matches("[a-f0-9]{64}")
-        || !List.of("LOGIN", "LINK", "REUSE").contains(purpose))
+        || !List.of("LOGIN", "LINK", "REUSE", "REGISTER", "PASSWORD_LOGIN").contains(purpose))
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ข้อมูลเริ่มต้น SSO ไม่ถูกต้อง");
-    if (purpose.equals("REUSE") && signedIn(auth)) throw changedSession();
+    if (List.of("REUSE", "REGISTER", "PASSWORD_LOGIN").contains(purpose) && signedIn(auth))
+      throw changedSession();
     UUID link = null;
     UUID municipality;
     if (purpose.equals("LINK")) {
@@ -76,12 +83,7 @@ public class CentralGovAuthController {
       session.removeAttribute(EXCHANGING);
       session.setAttribute(
           PENDING,
-          new Pending(
-              state,
-              clock.instant().plusSeconds(600),
-              link,
-              municipality,
-              purpose.equals("REUSE")));
+          new Pending(state, clock.instant().plusSeconds(600), link, municipality, purpose));
     }
     return Map.of("ok", true);
   }
@@ -92,29 +94,8 @@ public class CentralGovAuthController {
       HttpServletRequest request,
       HttpServletResponse response,
       Authentication auth) {
-    client.requireConfigured();
-    var session = request.getSession(false);
-    Object mutex =
-        session == null
-            ? new Object()
-            : org.springframework.web.util.WebUtils.getSessionMutex(session);
-    Pending pending = null;
-    String initialSessionId = session == null ? null : session.getId();
-    if (session != null)
-      synchronized (mutex) {
-        if (session.getAttribute(PENDING) instanceof Pending value) pending = value;
-        session.removeAttribute(PENDING);
-        if (pending != null) session.setAttribute(EXCHANGING, pending.state());
-      }
-    String state = body.get("state");
-    if (pending == null
-        || !pending.expires().isAfter(clock.instant())
-        || state == null
-        || !MessageDigest.isEqual(
-            pending.state().getBytes(StandardCharsets.UTF_8),
-            state.getBytes(StandardCharsets.UTF_8)))
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, "การตรวจสอบ SSO ไม่สำเร็จ กรุณาเริ่มเข้าสู่ระบบใหม่");
+    var exchange = consume(request, body.get("state"), List.of("LOGIN", "LINK", "REUSE"));
+    var pending = exchange.pending();
     if (pending.reuse() && signedIn(auth)) throw changedSession();
     if (pending.linkUser() != null) {
       if (auth == null
@@ -129,11 +110,48 @@ public class CentralGovAuthController {
             HttpStatus.UNAUTHORIZED, "บัญชีที่กำลังเชื่อมเปลี่ยนไป กรุณาเริ่มใหม่");
     }
     var verified = client.verify(body.get("code"));
-    // Network verification must not resurrect logout or overwrite a newer login/start.
-    synchronized (mutex) {
+    return complete(exchange, verified, request, response);
+  }
+
+  Exchange consume(HttpServletRequest request, String state, List<String> purposes) {
+    client.requireConfigured();
+    var session = request.getSession(false);
+    Pending pending = null;
+    String sessionId = session == null ? null : session.getId();
+    Object mutex =
+        session == null
+            ? new Object()
+            : org.springframework.web.util.WebUtils.getSessionMutex(session);
+    if (session != null)
+      synchronized (mutex) {
+        if (session.getAttribute(PENDING) instanceof Pending value) pending = value;
+        session.removeAttribute(PENDING);
+        if (pending != null) session.setAttribute(EXCHANGING, pending);
+      }
+    if (pending == null
+        || !purposes.contains(pending.purpose())
+        || !pending.expires().isAfter(clock.instant())
+        || state == null
+        || !MessageDigest.isEqual(
+            pending.state().getBytes(StandardCharsets.UTF_8),
+            state.getBytes(StandardCharsets.UTF_8)))
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "การตรวจสอบ SSO ไม่สำเร็จ กรุณาเริ่มเข้าสู่ระบบใหม่");
+    return new Exchange(pending, session, sessionId, mutex);
+  }
+
+  Object complete(
+      Exchange exchange,
+      com.fasterxml.jackson.databind.JsonNode verified,
+      HttpServletRequest request,
+      HttpServletResponse response) {
+    var session = exchange.session();
+    var pending = exchange.pending();
+    // Identity comparison also rejects a newer transaction that reused the same state.
+    synchronized (exchange.mutex()) {
       try {
-        if (!Objects.equals(initialSessionId, session.getId())
-            || !pending.state().equals(session.getAttribute(EXCHANGING))) throw changedSession();
+        if (!Objects.equals(exchange.sessionId(), session.getId())
+            || pending != session.getAttribute(EXCHANGING)) throw changedSession();
         session.removeAttribute(EXCHANGING);
       } catch (IllegalStateException expired) {
         throw changedSession();

@@ -66,6 +66,8 @@ public class SecurityConfig {
                         "/api/auth/line",
                         "/api/auth/gov",
                         "/api/auth/gov/start",
+                        "/api/auth/gov/register",
+                        "/api/auth/gov/password-login",
                         "/api/auth/sso-callback",
                         "/api/public/gov-auth",
                         "/actuator/health")
@@ -148,6 +150,8 @@ public class SecurityConfig {
               || q.getRequestURI().equals("/api/auth/register")
               || q.getRequestURI().equals("/api/auth/line")
               || q.getRequestURI().equals("/api/auth/gov/start")
+              || q.getRequestURI().equals("/api/auth/gov/register")
+              || q.getRequestURI().equals("/api/auth/gov/password-login")
               || q.getRequestURI().equals("/api/auth/sso-callback")
               || q.getRequestURI().equals("/api/auth/gov"))) {
         long now = System.currentTimeMillis();
