@@ -17,6 +17,7 @@ import {
 } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import { api, post, roleNames } from "./api";
+import DepartmentPeople from "./DepartmentPeople";
 type D = Record<string, any>;
 const { Title, Text } = Typography;
 export default function Admin() {
@@ -122,6 +123,7 @@ export default function Admin() {
         message="Workflow ที่เผยแพร่แล้วจะไม่ถูกแก้ทับ เปลี่ยนค่าโดยสร้างเวอร์ชันใหม่ แล้วเลือกใช้ในประเภทปัญหา คำร้องเดิมยังใช้เวอร์ชันเดิม"
       />
       <Card>
+        {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 12 }} />}
         <Tabs
           items={[
             {
@@ -133,9 +135,6 @@ export default function Admin() {
                     เลือกบัญชีที่สมัครประชาชนไว้แล้ว เพื่อกำหนดบทบาทบุคลากรและหน่วยงาน
                     โดยใช้รหัสผ่านเดิม
                   </Text>
-                  {error && (
-                    <Alert type="error" showIcon message={error} style={{ marginTop: 12 }} />
-                  )}
                   <Space
                     wrap
                     style={{ width: "100%", justifyContent: "space-between", marginTop: 12 }}
@@ -246,10 +245,11 @@ export default function Admin() {
                   <Button type="primary" onClick={() => create("departments")}>
                     เพิ่มหน่วยงาน
                   </Button>
-                  <Table<D>
-                    rowKey="id"
-                    dataSource={data.departments}
-                    columns={[{ title: "ชื่อหน่วยงาน", dataIndex: "name" }]}
+                  <DepartmentPeople
+                    departments={data.departments}
+                    users={data.users}
+                    refreshing={refreshing}
+                    onRefresh={load}
                   />
                 </>
               ),
