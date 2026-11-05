@@ -98,6 +98,114 @@ class TownTrackIntegrationTest {
   }
 
   @Test
+  void approvalQueueKeepsRecipientIdentityWhenAdministratorsSwitchRoles() throws Exception {
+    UUID recipient = UUID.randomUUID();
+    db.run(
+        "INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role) VALUES(?,?,'approvalRecipient','x','Assigned administrator','ADMIN')",
+        recipient,
+        town);
+    UUID id = create();
+    action(id, "OFFICER", "TRIAGE", Map.of("leaderId", users.get("LEADER")))
+        .andExpect(status().isOk());
+    action(id, "LEADER", "REQUEST_RESOURCE", Map.of()).andExpect(status().isOk());
+    evidence(id, "LEADER");
+    action(
+            id,
+            "LEADER",
+            "PROPOSE",
+            Map.of("proposal", "Equipment", "amount", 100, "durationDays", 1))
+        .andExpect(status().isOk());
+    action(id, "OFFICER", "SEND_APPROVAL", Map.of("approverIds", List.of(recipient)))
+        .andExpect(status().isOk());
+    mvc.perform(as(get("/api/complaints/" + id), "OFFICER"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.resources[0].approver_id").value(recipient.toString()))
+        .andExpect(jsonPath("$.resources[0].approver_name").value("Assigned administrator"));
+    var otherSession = new org.springframework.mock.web.MockHttpSession();
+    otherSession.setAttribute("admin_role", "APPROVER");
+    mvc.perform(as(get("/api/complaints?activeOnly=true").session(otherSession), "ADMIN"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].id").value(id.toString()));
+    mvc.perform(as(get("/api/complaints/" + id).session(otherSession), "ADMIN"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.actions").isEmpty());
+    mvc.perform(
+            as(
+                post("/api/complaints/" + id + "/actions")
+                    .session(otherSession)
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        json.writeValueAsString(
+                            Map.of(
+                                "action",
+                                "APPROVE",
+                                "reason",
+                                "Not assigned",
+                                "version",
+                                version(id)))),
+                "ADMIN"))
+        .andExpect(status().isForbidden());
+    mvc.perform(as(get("/api/complaints?activeOnly=true"), "APPROVER"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(0));
+    mvc.perform(as(get("/api/complaints/" + id), "APPROVER")).andExpect(status().isForbidden());
+    var citizenSession = new org.springframework.mock.web.MockHttpSession();
+    citizenSession.setAttribute("admin_role", "CITIZEN");
+    mvc.perform(as(get("/api/complaints/" + id).session(citizenSession), "ADMIN"))
+        .andExpect(status().isForbidden());
+    var recipientSession = new org.springframework.mock.web.MockHttpSession();
+    recipientSession.setAttribute("admin_role", "APPROVER");
+    mvc.perform(
+            get("/api/complaints?activeOnly=true")
+                .session(recipientSession)
+                .with(user("approvalRecipient")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].id").value(id.toString()));
+    mvc.perform(
+            get("/api/complaints/" + id).session(recipientSession).with(user("approvalRecipient")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.actions[?(@.action == 'APPROVE')]").isNotEmpty());
+    mvc.perform(
+            post("/api/complaints/" + id + "/actions")
+                .session(recipientSession)
+                .with(user("approvalRecipient"))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(
+                        Map.of(
+                            "action",
+                            "APPROVE",
+                            "reason",
+                            "Assigned approval",
+                            "version",
+                            version(id)))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("TRIAGED"));
+    UUID otherTown = UUID.randomUUID();
+    db.run("INSERT INTO municipality(id,name) VALUES(?,'Other approval town')", otherTown);
+    db.run(
+        "UPDATE app_user SET municipality_id=?,department_id=NULL WHERE id=?",
+        otherTown,
+        users.get("ADMIN"));
+    mvc.perform(as(get("/api/complaints?activeOnly=true").session(otherSession), "ADMIN"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(0));
+    mvc.perform(as(get("/api/complaints/" + id).session(otherSession), "ADMIN"))
+        .andExpect(status().isNotFound());
+    assertEquals(
+        1L,
+        ((Number)
+                db.one(
+                        "SELECT count(*) n FROM notification WHERE user_id=? AND complaint_id=?",
+                        recipient,
+                        id)
+                    .get("n"))
+            .longValue());
+  }
+
+  @Test
   void preAssignmentResourceNeedsEveryApprovalBeforeAssignment() throws Exception {
     db.run("UPDATE workflow_version SET approval_stages=2 WHERE id=?", wf);
     UUID second = UUID.randomUUID();

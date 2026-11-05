@@ -192,12 +192,15 @@ public class ComplaintController {
                   + " wm.user_id=?)) AND w.status NOT IN ('DECLINED','CANCELLED'))";
           case "APPROVER" ->
               "EXISTS(SELECT 1 FROM resource_request r WHERE r.complaint_id=c.id AND"
-                  + " r.approver_id=?)";
+                  + (Access.approvalOverview(u)
+                      ? " r.approver_id IS NOT NULL)"
+                      : " r.approver_id=?)");
           default -> "false";
         };
     var args = new ArrayList<Object>();
     args.add(u.get("municipality_id"));
-    if (!List.of("ADMIN", "OFFICER").contains(u.get("role"))) args.add(u.get("id"));
+    if (!List.of("ADMIN", "OFFICER").contains(u.get("role")) && !Access.approvalOverview(u))
+      args.add(u.get("id"));
     if (u.get("role").equals("FIELD")) args.add(u.get("id"));
     String base =
         " FROM complaint c JOIN category k ON k.id=c.category_id WHERE c.municipality_id=? AND "
@@ -307,9 +310,9 @@ public class ComplaintController {
     result.put(
         "resources",
         db.list(
-            "SELECT r.*,COALESCE((SELECT json_agg(v ORDER BY v.revision) FROM resource_revision v"
+            "SELECT r.*,u.display_name approver_name,COALESCE((SELECT json_agg(v ORDER BY v.revision) FROM resource_revision v"
                 + " WHERE v.resource_id=r.id),'[]'::json)::text revisions FROM resource_request r"
-                + " WHERE complaint_id=? ORDER BY created_at",
+                + " LEFT JOIN app_user u ON u.id=r.approver_id WHERE r.complaint_id=? ORDER BY r.created_at",
             id));
     result.put(
         "reports",
@@ -345,9 +348,12 @@ public class ComplaintController {
                     id,
                     u.get("id"))
                 .isEmpty();
+    boolean approvalRecipient =
+        !"APPROVER".equals(u.get("role"))
+            || u.get("id").equals(workflow.resource(id).get("approver_id"));
     result.put(
         "actions",
-        representative
+        representative && approvalRecipient
             ? db.list(
                 "SELECT action FROM workflow_transition WHERE workflow_id=? AND from_status=? AND"
                     + " role=?",

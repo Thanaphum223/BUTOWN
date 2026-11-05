@@ -309,6 +309,7 @@ export default function Detail({
   );
   const c = data.complaint;
   const citizen = user.role === "CITIZEN";
+  const latestResource = data.resources?.at(-1);
   const uploadAllowed =
     (citizen && c.status === "NEW") ||
     (user.role === "FIELD" && ["IN_PROGRESS", "FIELD_REVISION"].includes(c.status)) ||
@@ -354,6 +355,21 @@ export default function Detail({
           โหลดใหม่
         </Button>
       </div>
+      {!citizen && c.status === "RESOURCE_APPROVAL" && latestResource?.status === "PENDING" && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 20 }}
+          message={"รออนุมัติโดย " + (latestResource.approver_name || "ผู้อนุมัติที่ได้รับมอบหมาย")}
+          description={
+            latestResource.approver_id === user.id
+              ? user.role === "ADMIN"
+                ? "งานนี้ส่งถึงบัญชีของคุณ สลับเป็นบทบาทผู้อนุมัติเพื่อพิจารณา"
+                : "งานนี้ส่งถึงบัญชีของคุณ"
+              : "ผู้รับที่ระบุจะเห็นงานนี้ในคิวผู้อนุมัติของตน"
+          }
+        />
+      )}
       {embedded && (
         <section className="split-case-summary">
           <div className="split-case-facts">

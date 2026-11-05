@@ -126,6 +126,23 @@ export default function StaffWorkspace({
           </Button>
         </Space>
       </div>
+      {user.role === "APPROVER" && !history && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 20 }}
+          message={
+            user.account_role === "ADMIN"
+              ? "งานอนุมัติทั้งหมดในเทศบาล"
+              : "งานที่ส่งถึงบัญชี “" + user.display_name + "”"
+          }
+          description={
+            user.account_role === "ADMIN"
+              ? "ผู้ดูแลดูงานของผู้อนุมัติทุกคนได้ และอนุมัติได้เฉพาะงานที่ส่งถึงบัญชีของตน"
+              : "แสดงเฉพาะงานที่ระบุคุณเป็นผู้อนุมัติ"
+          }
+        />
+      )}
       {dashboard && !history && !selected && (
         <div className="workspace-stats">
           {[
@@ -268,6 +285,7 @@ export default function StaffWorkspace({
                   { value: "NEW", label: "รอรับเรื่อง" },
                   { value: "IN_PROGRESS", label: "กำลังดำเนินการ" },
                   { value: "OFFICER_REVIEW", label: "รอเจ้าหน้าที่ตรวจ" },
+                  { value: "RESOURCE_APPROVAL", label: "รออนุมัติ" },
                 ]
             ).map((option) => (
               <Button

@@ -166,7 +166,27 @@ test("full approved resource workflow across all municipal and field roles close
       .getByText("บัญชีทดสอบ APPROVER", { exact: true })
       .click();
   });
+  await expect(page.getByRole("alert").filter({ hasText: "บัญชีทดสอบ APPROVER" })).toContainText(
+    "รออนุมัติโดย",
+  );
+  await switchUser("admin");
+  await page
+    .getByRole("combobox", { name: "สลับบทบาทผู้ดูแลระบบ", exact: true })
+    .press("ArrowDown");
+  await page
+    .locator(".ant-select-dropdown:visible")
+    .getByText("ผู้อนุมัติ", { exact: true })
+    .click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "งานอนุมัติทั้งหมดในเทศบาล" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "รออนุมัติ", exact: true }).click();
+  await page.getByRole("searchbox", { name: "ค้นหาเลขเรื่อง / หัวข้อ" }).fill(title);
+  await page.getByRole("button", { name: new RegExp("เปิดงาน " + title) }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "บัญชีทดสอบ APPROVER" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "อนุมัติทรัพยากร", exact: true })).toHaveCount(0);
   await switchUser("approver");
+  await expect(page.getByText(/งานที่ส่งถึงบัญชี.*บัญชีทดสอบ APPROVER/)).toBeVisible();
   expect((await (await page.request.get("/api/auth/me")).json()).department_id).toBeNull();
   await page.getByRole("button", { name: /ดูเอกสาร/ }).click();
   const proposalPdf = page.getByRole("dialog", { name: "approved-proposal.pdf", exact: true });

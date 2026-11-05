@@ -42,6 +42,10 @@ public class Access {
     return Set.of("LEADER", "FIELD").contains(role);
   }
 
+  public static boolean approvalOverview(Map<String, Object> user) {
+    return "APPROVER".equals(user.get("role")) && "ADMIN".equals(user.get("account_role"));
+  }
+
   public void role(Map<String, Object> u, String... roles) {
     if (!List.of(roles).contains(u.get("role"))) deny();
   }
@@ -77,9 +81,9 @@ public class Access {
                   .isEmpty();
           case "APPROVER" ->
               !db.list(
-                      "SELECT id FROM resource_request WHERE complaint_id=? AND approver_id=?",
-                      id,
-                      u.get("id"))
+                      "SELECT id FROM resource_request WHERE complaint_id=? AND "
+                          + (approvalOverview(u) ? "approver_id IS NOT NULL" : "approver_id=?"),
+                      approvalOverview(u) ? new Object[] {id} : new Object[] {id, u.get("id")})
                   .isEmpty();
           default -> false;
         };
