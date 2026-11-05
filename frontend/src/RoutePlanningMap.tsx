@@ -168,7 +168,8 @@ export default function RoutePlanningMap(props: Props) {
   return (
     <div
       ref={element}
-      className={`route-map mode-${props.mode}`}
+      className="route-map"
+      data-mode={props.mode}
       role="region"
       aria-label="แผนที่วางแผนเส้นทาง"
       style={{ touchAction: props.mode === "draw" ? "none" : undefined }}

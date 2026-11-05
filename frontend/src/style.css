@@ -3207,8 +3207,8 @@ button.queue-item .queue-item-top .ant-tag {
   border-radius: 12px;
   z-index: 0;
 }
-.route-map.mode-draw,
-.route-map.mode-start {
+.route-map[data-mode="draw"],
+.route-map[data-mode="start"] {
   cursor: crosshair;
 }
 .route-marker {

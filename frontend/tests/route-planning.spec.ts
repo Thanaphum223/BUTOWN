@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
-async function fixture(page: Page) {
+async function fixture(page: Page, empty = false) {
   const state: any = { role: "OFFICER", plan: null, writes: [] };
-  const candidates = Array.from({ length: 5 }, (_, i) => ({
+  const candidates = Array.from({ length: empty ? 0 : 5 }, (_, i) => ({
     id: "case-" + i,
     title: "จุดซ่อมที่ " + (i + 1),
     address: "ถนนทดสอบ " + (i + 1),
@@ -232,6 +232,36 @@ test("calculation locks its starting point and selections until the road result 
     release();
   }
 });
+
+for (const width of [390, 1440]) {
+  test(`map stays clipped while changing selection modes at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await fixture(page, width === 1440);
+    const map = page.getByRole("region", { name: "แผนที่วางแผนเส้นทาง", exact: true });
+    await expect(map).toHaveCSS("overflow", "hidden");
+    for (const label of ["วาดพื้นที่เลือกงาน", "เลือกจุดเริ่มบนแผนที่"]) {
+      const button = page.getByRole("button", { name: label, exact: true });
+      await button.click();
+      await expect(map).toHaveClass(/leaflet-container/);
+      await expect(map).toHaveCSS("overflow", "hidden");
+      await button.click();
+      await expect(map).toHaveClass(/leaflet-container/);
+      await expect(map).toHaveCSS("overflow", "hidden");
+    }
+    await page.getByRole("button", { name: "เลือกจุดเริ่มบนแผนที่", exact: true }).click();
+    const bounds = await map.boundingBox();
+    if (!bounds) throw new Error("Map is missing");
+    await map.click({ position: { x: bounds.width / 2, y: bounds.height / 2 } });
+    await expect(map).toHaveClass(/leaflet-container/);
+    await expect(map).toHaveCSS("overflow", "hidden");
+    if (width === 1440) await page.getByRole("menuitem", { name: /คิวงาน/ }).click({ trial: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.evaluate(() => scrollTo(0, 0));
+    await page.screenshot({ path: `../work/screenshots/route-map-layout-fixed-${width}.png` });
+  });
+}
 
 test("opening a saved draft restores its optimization choice", async ({ page }) => {
   await fixture(page);
