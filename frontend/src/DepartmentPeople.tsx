@@ -12,7 +12,7 @@ type Person = {
   department_id: string | null;
   enabled: boolean;
 };
-type Assignment = { department: Department; role: "LEADER" | "APPROVER" };
+type Assignment = { department: Department; role: "LEADER" | "FIELD" };
 
 export default function DepartmentPeople({
   departments,
@@ -88,7 +88,7 @@ export default function DepartmentPeople({
     <>
       <Space wrap style={{ display: "flex", margin: "12px 0" }}>
         <Typography.Text type="secondary">
-          เลือกบัญชีที่เคยเข้าสู่ระบบผ่าน Gov Center เพื่อเพิ่มหัวหน้าหรือผู้อนุมัติประจำหน่วยงาน
+          เลือกบัญชีที่เคยเข้าสู่ระบบผ่าน Gov Center เพื่อเพิ่มหัวหน้าหรือผู้ลงพื้นที่ประจำหน่วยงาน
         </Typography.Text>
         <Button icon={<ReloadOutlined />} loading={refreshing} onClick={() => void onRefresh()}>
           โหลดรายชื่อใหม่
@@ -101,7 +101,7 @@ export default function DepartmentPeople({
         columns={[
           { title: "ชื่อหน่วยงาน", dataIndex: "name", width: 180 },
           { title: "หัวหน้าทีมลงพื้นที่", render: (_, department) => roster(department, "LEADER") },
-          { title: "ผู้อนุมัติ", render: (_, department) => roster(department, "APPROVER") },
+          { title: "ผู้ลงพื้นที่", render: (_, department) => roster(department, "FIELD") },
           {
             title: "จัดการ",
             width: 310,
@@ -115,9 +115,9 @@ export default function DepartmentPeople({
                 </Button>
                 <Button
                   icon={<UserAddOutlined aria-hidden="true" />}
-                  onClick={() => open(department, "APPROVER")}
+                  onClick={() => open(department, "FIELD")}
                 >
-                  เพิ่มผู้อนุมัติ
+                  เพิ่มผู้ลงพื้นที่
                 </Button>
               </Space>
             ),
@@ -126,7 +126,7 @@ export default function DepartmentPeople({
       />
       <Modal
         open={!!assignment}
-        title={assignment?.role === "LEADER" ? "เพิ่มหัวหน้า" : "เพิ่มผู้อนุมัติ"}
+        title={assignment?.role === "LEADER" ? "เพิ่มหัวหน้า" : "เพิ่มผู้ลงพื้นที่"}
         footer={null}
         onCancel={() => {
           if (!submitting.current) setAssignment(undefined);

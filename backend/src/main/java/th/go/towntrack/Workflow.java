@@ -155,8 +155,7 @@ public class Workflow {
     }
     switch (action) {
       case "TRIAGE" -> {
-        var leader = access.target(b.get("leaderId"), u, "LEADER", u.get("department_id"));
-        if (u.get("department_id") == null) Access.deny();
+        var leader = access.target(b.get("leaderId"), u, "LEADER", c.get("department_id"));
         db.run(
             "UPDATE complaint SET officer_id=?,leader_id=?,department_id=? WHERE id=?",
             u.get("id"),
@@ -202,6 +201,22 @@ public class Workflow {
                   u.get("id"),
                   c.get("department_id"));
           assignee = team.get("representative_id");
+          var members =
+              db.list(
+                  "SELECT p.id,p.role,p.enabled,p.department_id FROM team_member m JOIN app_user p ON p.id=m.user_id WHERE m.team_id=? FOR SHARE OF p",
+                  teamId);
+          if (members.isEmpty()
+              || members.stream()
+                  .noneMatch(member -> member.get("id").equals(team.get("representative_id"))))
+            throw new IllegalArgumentException("ทีมนี้ไม่มีผู้แทนในรายชื่อสมาชิก กรุณาจัดทีมใหม่");
+          for (var member : members) {
+            if (!Boolean.TRUE.equals(member.get("enabled"))
+                || !List.of("FIELD", "ADMIN").contains(member.get("role"))
+                || !Objects.equals(c.get("department_id"), member.get("department_id")))
+              throw new IllegalArgumentException(
+                  "สมาชิกทีมมีการเปลี่ยนกอง บทบาท หรือปิดบัญชีแล้ว กรุณาจัดทีมใหม่ก่อนมอบหมายงาน");
+            access.target(member.get("id"), u, "FIELD", c.get("department_id"));
+          }
         }
         var target = access.target(assignee, u, "FIELD", c.get("department_id"));
         UUID workId = UUID.randomUUID();
@@ -409,7 +424,7 @@ public class Workflow {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST, "กรุณาเลือกผู้อนุมัติให้ครบตามลำดับและไม่ซ้ำคน");
           for (int i = 0; i < ids.size(); i++) {
-            var target = access.target(ids.get(i), u, "APPROVER", c.get("department_id"));
+            var target = access.target(ids.get(i), u, "APPROVER", null);
             db.run(
                 "INSERT INTO approval_assignment(resource_id,step,approver_id) VALUES(?,?,?)",
                 r.get("id"),

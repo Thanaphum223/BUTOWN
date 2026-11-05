@@ -2,6 +2,7 @@ package th.go.towntrack;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,16 +39,25 @@ public class AdminController {
     return u;
   }
 
+  Map<String, Object> lockedAdmin(Authentication a) {
+    var u = admin(a);
+    db.one("SELECT id FROM municipality WHERE id=? FOR UPDATE", u.get("municipality_id"));
+    // The actor may have been removed, disabled or demoted while waiting.
+    return admin(a);
+  }
+
   @GetMapping
   public Object config(Authentication a) {
     var u = admin(a);
     return Map.of(
+        "currentUserId",
+        u.get("id"),
         "municipality",
         db.one("SELECT id,name FROM municipality WHERE id=?", u.get("municipality_id")),
         "users",
         db.list(
             "SELECT id,username,display_name,role,department_id,enabled FROM app_user WHERE"
-                + " municipality_id=? ORDER BY created_at",
+                + " municipality_id=? AND deleted_at IS NULL ORDER BY created_at",
             u.get("municipality_id")),
         "departments",
         db.list("SELECT id,name FROM department WHERE municipality_id=?", u.get("municipality_id")),
@@ -94,7 +104,9 @@ public class AdminController {
     String password = Workflow.text(b, "password", 72);
     if (password.length() < 12) throw new IllegalArgumentException();
     UUID dept = b.get("departmentId") == null ? null : Db.id(b.get("departmentId"));
-    if (!role.equals("CITIZEN") && dept == null) throw new IllegalArgumentException();
+    if (List.of("OFFICER", "APPROVER", "CITIZEN").contains(role)) dept = null;
+    if (Access.departmentRole(role) && dept == null)
+      throw new IllegalArgumentException("กรุณาเลือกกองสำหรับหัวหน้าหรือผู้ลงพื้นที่");
     if (dept != null)
       db.one(
           "SELECT id FROM department WHERE id=? AND municipality_id=?",
@@ -120,10 +132,10 @@ public class AdminController {
   @Transactional
   public void assignRole(
       @PathVariable UUID id, @RequestBody Map<String, Object> b, Authentication a) {
-    var u = admin(a);
+    var u = lockedAdmin(a);
     var target =
         db.one(
-            "SELECT id,username,role,department_id FROM app_user WHERE id=? AND municipality_id=? FOR UPDATE",
+            "SELECT id,username,role,department_id FROM app_user WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR UPDATE",
             id,
             u.get("municipality_id"));
     String role = Workflow.text(b, "role", 20);
@@ -132,8 +144,8 @@ public class AdminController {
     if (u.get("id").equals(id) && !role.equals("ADMIN"))
       throw new IllegalArgumentException("ไม่สามารถลดสิทธิ์ผู้ดูแลระบบของตนเองได้");
     UUID department = b.get("departmentId") == null ? null : Db.id(b.get("departmentId"));
-    if (role.equals("CITIZEN")) department = null;
-    if (!List.of("ADMIN", "CITIZEN").contains(role) && department == null)
+    if (List.of("OFFICER", "APPROVER", "CITIZEN").contains(role)) department = null;
+    if (Access.departmentRole(role) && department == null)
       throw new IllegalArgumentException("กรุณาเลือกหน่วยงานสำหรับบุคลากร");
     if (department != null)
       db.one(
@@ -166,13 +178,14 @@ public class AdminController {
   }
 
   @PostMapping("/users/{id}/enabled")
+  @Transactional
   public void enabled(
       @PathVariable UUID id, @RequestBody Map<String, Boolean> b, Authentication a) {
-    var u = admin(a);
+    var u = lockedAdmin(a);
     if (u.get("id").equals(id)) throw new IllegalArgumentException();
     var target =
         db.one(
-            "SELECT id,username FROM app_user WHERE id=? AND municipality_id=?",
+            "SELECT id,username FROM app_user WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR UPDATE",
             id,
             u.get("municipality_id"));
     if (b.get("enabled") == null) throw new IllegalArgumentException();
@@ -180,6 +193,24 @@ public class AdminController {
     sessions.revoke(target.get("username").toString());
     workflow.audit(
         u, null, "USER_ENABLED", null, null, "บัญชี " + id + " enabled=" + b.get("enabled"));
+  }
+
+  @DeleteMapping("/users/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Transactional
+  public void deleteUser(@PathVariable UUID id, Authentication a) {
+    var u = lockedAdmin(a);
+    if (u.get("id").equals(id))
+      throw new IllegalArgumentException("ไม่สามารถลบบัญชีผู้ดูแลระบบของตนเองได้");
+    var target =
+        db.one(
+            "SELECT id,username,deleted_at FROM app_user WHERE id=? AND municipality_id=? FOR UPDATE",
+            id,
+            u.get("municipality_id"));
+    if (target.get("deleted_at") != null) return;
+    db.run("UPDATE app_user SET enabled=false,deleted_at=now() WHERE id=?", id);
+    sessions.revoke(target.get("username").toString());
+    workflow.audit(u, null, "USER_DELETE", null, null, "ลบบัญชี " + target.get("username"));
   }
 
   @PostMapping("/workflows")

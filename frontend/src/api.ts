@@ -132,7 +132,7 @@ export const actionNames: Record<string, string> = {
 };
 export const roleNames: Record<string, string> = {
   CITIZEN: "ประชาชน",
-  OFFICER: "เจ้าหน้าที่",
+  OFFICER: "เจ้าหน้าที่ตรวจสอบ",
   LEADER: "หัวหน้าทีมลงพื้นที่",
   FIELD: "ผู้ลงพื้นที่",
   APPROVER: "ผู้อนุมัติ",

@@ -15,9 +15,11 @@ import {
   Tabs,
   Typography,
 } from "antd";
-import { ReloadOutlined } from "@ant-design/icons";
+import { DeleteOutlined, ReloadOutlined } from "@ant-design/icons";
 import { api, post, roleNames } from "./api";
 import DepartmentPeople from "./DepartmentPeople";
+import AccountDeletion from "./AccountDeletion";
+import GovRoleSettings from "./GovRoleSettings";
 type D = Record<string, any>;
 const { Title, Text } = Typography;
 export default function Admin() {
@@ -28,6 +30,11 @@ export default function Admin() {
     [userQuery, setUserQuery] = useState(""),
     [userRoleFilter, setUserRoleFilter] = useState<string>(),
     [refreshing, setRefreshing] = useState(false);
+  const [deleteAccount, setDeleteAccount] = useState<{
+    id: string;
+    username: string;
+    display_name: string;
+  }>();
   const loadRequest = useRef<AbortController | undefined>(undefined);
   const [form] = Form.useForm();
   const { message } = App.useApp();
@@ -197,22 +204,38 @@ export default function Admin() {
                           data.departments.find((d: D) => d.id === id)?.name || "—",
                       },
                       {
-                        title: "จัดการบทบาท",
+                        title: "จัดการ",
                         key: "editRole",
                         render: (_, r) => (
-                          <Button
-                            onClick={() => {
-                              form.resetFields();
-                              form.setFieldsValue({
-                                userId: r.id,
-                                role: r.role,
-                                departmentId: r.department_id || undefined,
-                              });
-                              setKind("roles");
-                            }}
-                          >
-                            กำหนดบทบาท
-                          </Button>
+                          <Space wrap>
+                            <Button
+                              onClick={() => {
+                                form.resetFields();
+                                form.setFieldsValue({
+                                  userId: r.id,
+                                  role: r.role,
+                                  departmentId: r.department_id || undefined,
+                                });
+                                setKind("roles");
+                              }}
+                            >
+                              กำหนดบทบาท
+                            </Button>
+                            <Button
+                              danger
+                              icon={<DeleteOutlined aria-hidden="true" />}
+                              disabled={r.id === data.currentUserId}
+                              onClick={() =>
+                                setDeleteAccount({
+                                  id: r.id,
+                                  username: r.username,
+                                  display_name: r.display_name,
+                                })
+                              }
+                            >
+                              ลบบัญชี
+                            </Button>
+                          </Space>
                         ),
                       },
                       {
@@ -236,6 +259,11 @@ export default function Admin() {
                   />
                 </>
               ),
+            },
+            {
+              key: "gov-roles",
+              label: "บทบาท Gov Center",
+              children: <GovRoleSettings departments={data.departments} />,
             },
             {
               key: "departments",
@@ -328,6 +356,12 @@ export default function Admin() {
           ]}
         />
       </Card>
+      <AccountDeletion
+        account={deleteAccount}
+        currentUserId={data.currentUserId}
+        onClose={() => setDeleteAccount(undefined)}
+        onDeleted={load}
+      />
       <Modal
         open={!!kind}
         title={kind === "roles" ? "กำหนดบทบาทให้บัญชีที่มีอยู่" : "ตั้งค่าระบบ"}
@@ -390,27 +424,37 @@ export default function Admin() {
                 <Select
                   options={Object.entries(roleNames).map(([value, label]) => ({ value, label }))}
                   onChange={(role) => {
-                    if (role === "CITIZEN") form.setFieldValue("departmentId", undefined);
+                    if (!["LEADER", "FIELD"].includes(role))
+                      form.setFieldValue("departmentId", undefined);
                   }}
                 />
               </Form.Item>
               <Form.Item
                 name="departmentId"
-                label="หน่วยงาน"
+                label="กอง / หน่วยงาน"
+                hidden={!["LEADER", "FIELD"].includes(selectedRole)}
                 rules={[
                   {
-                    required: !!selectedRole && !["ADMIN", "CITIZEN"].includes(selectedRole),
+                    required: ["LEADER", "FIELD"].includes(selectedRole),
                     message: "กรุณาเลือกหน่วยงาน",
                   },
                 ]}
               >
                 <Select
-                  disabled={selectedRole === "CITIZEN"}
+                  disabled={!["LEADER", "FIELD"].includes(selectedRole)}
                   allowClear
                   placeholder="เลือกหน่วยงาน"
                   options={departments}
                 />
               </Form.Item>
+              {["OFFICER", "APPROVER"].includes(selectedRole) && (
+                <Alert
+                  type="info"
+                  showIcon
+                  message="บทบาทนี้ดูแลงานระดับเทศบาล ไม่สังกัดกอง"
+                  style={{ marginBottom: 16 }}
+                />
+              )}
             </>
           ) : kind === "users" ? (
             <>

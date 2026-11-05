@@ -25,6 +25,8 @@ class TownTrackIntegrationTest {
   @Autowired Db db;
   @Autowired Workflow workflow;
   @Autowired ObjectMapper json;
+  @Autowired GovIdentityService govIdentities;
+  @Autowired org.springframework.security.core.session.SessionRegistry loginSessions;
   UUID town, dept, cat, wf;
   Map<String, UUID> users = new HashMap<>();
 
@@ -103,7 +105,7 @@ class TownTrackIntegrationTest {
         "INSERT INTO app_user(id,municipality_id,department_id,username,password_hash,display_name,role) VALUES(?,?,?,'preAssignmentSecond','x','Second','APPROVER')",
         second,
         town,
-        dept);
+        null);
     UUID id = create();
     action(id, "OFFICER", "TRIAGE", Map.of("leaderId", users.get("LEADER")))
         .andExpect(status().isOk());
@@ -229,7 +231,7 @@ class TownTrackIntegrationTest {
               + " VALUES(?,?,?,?,?,'Test',?)",
           id,
           town,
-          r.equals("CITIZEN") ? null : dept,
+          List.of("CITIZEN", "OFFICER", "APPROVER").contains(r) ? null : dept,
           "test" + r,
           "not-a-login-hash",
           r);
@@ -295,7 +297,7 @@ class TownTrackIntegrationTest {
     var changed =
         db.one("SELECT username,role,department_id,password_hash FROM app_user WHERE id=?", target);
     assertEquals("OFFICER", changed.get("role"));
-    assertEquals(dept, changed.get("department_id"));
+    assertNull(changed.get("department_id"));
     assertEquals(before, changed.get("password_hash"));
     assertEquals("testCITIZEN", changed.get("username"));
     assertEquals(
@@ -338,6 +340,178 @@ class TownTrackIntegrationTest {
                     .content(body),
                 "ADMIN"))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void accountDeletionPreservesHistoryButGovRejoinStartsWithFreshIdentity() throws Exception {
+    UUID target = users.get("CITIZEN");
+    UUID complaint = create();
+    var before = db.one("SELECT username,password_hash FROM app_user WHERE id=?", target);
+    db.run(
+        "INSERT INTO iam_user_profile(municipality_id,iam_user_id,local_user_id,email) VALUES(?,'gov-delete-test',?,'delete-test@example.invalid')",
+        town,
+        target);
+    String sessionId = "delete-test-" + target;
+    var principal =
+        org.springframework.security.core.userdetails.User.withUsername("testCITIZEN")
+            .password("not-a-login-hash")
+            .roles("CITIZEN")
+            .build();
+    loginSessions.registerNewSession(sessionId, principal);
+    try {
+      mvc.perform(as(delete("/api/admin/users/" + target).with(csrf()), "ADMIN"))
+          .andExpect(status().isNoContent());
+      var archived =
+          db.one(
+              "SELECT username,password_hash,enabled,deleted_at FROM app_user WHERE id=?", target);
+      assertEquals(before.get("username"), archived.get("username"));
+      assertEquals(before.get("password_hash"), archived.get("password_hash"));
+      assertEquals(false, archived.get("enabled"));
+      assertNotNull(archived.get("deleted_at"));
+      assertTrue(loginSessions.getSessionInformation(sessionId).isExpired());
+      assertEquals(
+          target,
+          db.one("SELECT reporter_id FROM complaint WHERE id=?", complaint).get("reporter_id"));
+      assertFalse(db.list("SELECT id FROM attachment WHERE complaint_id=?", complaint).isEmpty());
+      assertEquals(
+          target,
+          db.one(
+                  "SELECT local_user_id FROM iam_user_profile WHERE municipality_id=? AND iam_user_id='gov-delete-test'",
+                  town)
+              .get("local_user_id"));
+      var config =
+          mvc.perform(as(get("/api/admin"), "ADMIN")).andExpect(status().isOk()).andReturn();
+      assertFalse(
+          json.readTree(config.getResponse().getContentAsString())
+              .path("users")
+              .toString()
+              .contains(target.toString()));
+      mvc.perform(as(get("/api/auth/me"), "CITIZEN")).andExpect(status().is4xxClientError());
+      mvc.perform(
+              as(
+                  post("/api/admin/users/" + target + "/enabled")
+                      .with(csrf())
+                      .contentType(MediaType.APPLICATION_JSON)
+                      .content("{\"enabled\":true}"),
+                  "ADMIN"))
+          .andExpect(status().isNotFound());
+      mvc.perform(
+              as(
+                  post("/api/admin/users/" + target + "/role")
+                      .with(csrf())
+                      .contentType(MediaType.APPLICATION_JSON)
+                      .content(
+                          json.writeValueAsString(Map.of("role", "LEADER", "departmentId", dept))),
+                  "ADMIN"))
+          .andExpect(status().isNotFound());
+      mvc.perform(as(delete("/api/admin/users/" + target).with(csrf()), "ADMIN"))
+          .andExpect(status().isNoContent());
+      assertEquals(
+          1L,
+          ((Number)
+                  db.one(
+                          "SELECT count(*) n FROM audit_event WHERE municipality_id=? AND action='USER_DELETE'",
+                          town)
+                      .get("n"))
+              .longValue());
+      var verified =
+          json.readTree("{\"user\":{\"id\":\"gov-delete-test\",\"name\":\"Existing person\"}}");
+      var fresh = govIdentities.sync(town, verified, null);
+      assertNotEquals(target, fresh.get("id"));
+      assertNotEquals(before.get("username"), fresh.get("username"));
+      assertEquals("CITIZEN", fresh.get("role"));
+      assertNull(fresh.get("department_id"));
+      assertEquals(fresh.get("id"), govIdentities.sync(town, verified, null).get("id"));
+      var freshPrincipal = user(fresh.get("username").toString()).roles("CITIZEN");
+      mvc.perform(get("/api/complaints").with(freshPrincipal))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.items").isEmpty());
+      mvc.perform(get("/api/following").with(freshPrincipal))
+          .andExpect(status().isOk())
+          .andExpect(content().json("[]"));
+      mvc.perform(get("/api/notifications").with(freshPrincipal))
+          .andExpect(status().isOk())
+          .andExpect(content().json("[]"));
+      mvc.perform(get("/api/complaints/" + complaint).with(freshPrincipal))
+          .andExpect(status().isForbidden());
+      UUID oldFile =
+          (UUID)
+              db.one("SELECT id FROM attachment WHERE complaint_id=? LIMIT 1", complaint).get("id");
+      mvc.perform(get("/api/files/" + oldFile).with(freshPrincipal))
+          .andExpect(status().isForbidden());
+      assertEquals(
+          target,
+          db.one("SELECT reporter_id FROM complaint WHERE id=?", complaint).get("reporter_id"));
+      assertEquals(
+          fresh.get("id"),
+          db.one(
+                  "SELECT local_user_id FROM iam_user_profile WHERE municipality_id=? AND iam_user_id='gov-delete-test'",
+                  town)
+              .get("local_user_id"));
+      assertEquals(
+          1L,
+          ((Number)
+                  db.one(
+                          "SELECT count(*) n FROM iam_user_profile WHERE municipality_id=? AND iam_user_id='gov-delete-test'",
+                          town)
+                      .get("n"))
+              .longValue());
+    } finally {
+      loginSessions.removeSessionInformation(sessionId);
+    }
+  }
+
+  @Test
+  void accountDeletionEnforcesActorCsrfSelfAndMunicipalityBoundaries() throws Exception {
+    UUID target = users.get("FIELD");
+    mvc.perform(as(delete("/api/admin/users/" + target).with(csrf()), "OFFICER"))
+        .andExpect(status().isForbidden());
+    mvc.perform(as(delete("/api/admin/users/" + target), "ADMIN"))
+        .andExpect(status().isForbidden());
+    mvc.perform(as(delete("/api/admin/users/" + users.get("ADMIN")).with(csrf()), "ADMIN"))
+        .andExpect(status().isBadRequest());
+    UUID foreignTown = UUID.randomUUID(), foreignUser = UUID.randomUUID();
+    db.run("INSERT INTO municipality(id,name) VALUES(?,'Foreign town')", foreignTown);
+    db.run(
+        "INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role) VALUES(?,?,?,'unused','Foreign','CITIZEN')",
+        foreignUser,
+        foreignTown,
+        "foreign-delete-" + foreignUser);
+    mvc.perform(as(delete("/api/admin/users/" + foreignUser).with(csrf()), "ADMIN"))
+        .andExpect(status().isNotFound());
+    mvc.perform(as(delete("/api/admin/users/" + UUID.randomUUID()).with(csrf()), "ADMIN"))
+        .andExpect(status().isNotFound());
+    assertEquals(true, db.one("SELECT enabled FROM app_user WHERE id=?", target).get("enabled"));
+    assertEquals(
+        true, db.one("SELECT enabled FROM app_user WHERE id=?", foreignUser).get("enabled"));
+    assertEquals(
+        true, db.one("SELECT enabled FROM app_user WHERE id=?", users.get("ADMIN")).get("enabled"));
+  }
+
+  @Test
+  void deletingAnotherAdministratorKeepsActingAdministratorAndBlocksDeletedActor()
+      throws Exception {
+    UUID other = UUID.randomUUID();
+    db.run(
+        "INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role) VALUES(?,?,?,'unused','Other admin','ADMIN')",
+        other,
+        town,
+        "other-delete-" + other);
+    mvc.perform(as(delete("/api/admin/users/" + other).with(csrf()), "ADMIN"))
+        .andExpect(status().isNoContent());
+    mvc.perform(
+            delete("/api/admin/users/" + users.get("ADMIN"))
+                .with(user("other-delete-" + other).roles("ADMIN"))
+                .with(csrf()))
+        .andExpect(status().is4xxClientError());
+    assertEquals(
+        1L,
+        ((Number)
+                db.one(
+                        "SELECT count(*) n FROM app_user WHERE municipality_id=? AND role='ADMIN' AND enabled=true",
+                        town)
+                    .get("n"))
+            .longValue());
   }
 
   @Test
@@ -1009,10 +1183,20 @@ class TownTrackIntegrationTest {
     action(id, "LEADER", "FORWARD_REPORT", Map.of()).andExpect(status().isOk());
     action(id, "OFFICER", "RETURN_LEADER", Map.of()).andExpect(status().isOk());
     action(id, "LEADER", "FORWARD_REPORT", Map.of()).andExpect(status().isOk());
+    // An officer can also return the correction to the field through its leader.
+    action(id, "OFFICER", "RETURN_LEADER", Map.of()).andExpect(status().isOk());
+    action(id, "LEADER", "RETURN_FIELD", Map.of()).andExpect(status().isOk());
+    action(id, "FIELD", "REPORT", Map.of("content", "Missing fresh evidence"))
+        .andExpect(status().isBadRequest());
+    evidence(id, "FIELD");
+    action(id, "FIELD", "REPORT", Map.of("content", "Final corrected report"))
+        .andExpect(status().isOk());
+    action(id, "LEADER", "FORWARD_REPORT", Map.of()).andExpect(status().isOk());
     action(id, "OFFICER", "VERIFY", Map.of()).andExpect(status().isOk());
     action(id, "OFFICER", "CLOSE", Map.of()).andExpect(status().isOk());
     assertEquals("CLOSED", state(id));
-    assertEquals(2, db.list("SELECT id FROM field_report WHERE complaint_id=?", id).size());
+    action(id, "OFFICER", "CLOSE", Map.of()).andExpect(status().is4xxClientError());
+    assertEquals(3, db.list("SELECT id FROM field_report WHERE complaint_id=?", id).size());
     assertTrue(db.list("SELECT id FROM audit_event WHERE complaint_id=?", id).size() >= 12);
   }
 
@@ -1215,6 +1399,43 @@ class TownTrackIntegrationTest {
                     + " WHERE r.complaint_id=?",
                 id)
             .size());
+  }
+
+  @Test
+  void everyWorkflowTransitionRejectsAllOtherRolesWithoutChangingData() throws Exception {
+    UUID id = create();
+    db.run(
+        "UPDATE complaint SET leader_id=?,officer_id=? WHERE id=?",
+        users.get("LEADER"),
+        users.get("OFFICER"),
+        id);
+    db.run(
+        "INSERT INTO work_order(id,complaint_id,assignee_id,assigned_by,due_at,status) VALUES(?,?,?,?,now()+interval '1 day','ACCEPTED')",
+        UUID.randomUUID(),
+        id,
+        users.get("FIELD"),
+        users.get("LEADER"));
+    db.run(
+        "INSERT INTO resource_request(id,complaint_id,status,approver_id,requested_by) VALUES(?,?,'PENDING',?,?)",
+        UUID.randomUUID(),
+        id,
+        users.get("APPROVER"),
+        users.get("FIELD"));
+    Object originalAuditCount =
+        db.one("SELECT count(*) n FROM audit_event WHERE complaint_id=?", id).get("n");
+    for (String[] transition : Workflow.DEFAULT) {
+      db.run("UPDATE complaint SET status=? WHERE id=?", transition[0], id);
+      long before = version(id);
+      for (String role : List.of("CITIZEN", "OFFICER", "LEADER", "FIELD", "APPROVER", "ADMIN")) {
+        if (role.equals(transition[3])) continue;
+        action(id, role, transition[1], Map.of()).andExpect(status().isForbidden());
+        assertEquals(transition[0], state(id));
+        assertEquals(before, version(id));
+      }
+    }
+    assertEquals(
+        originalAuditCount,
+        db.one("SELECT count(*) n FROM audit_event WHERE complaint_id=?", id).get("n"));
   }
 
   @Test
@@ -1434,7 +1655,7 @@ class TownTrackIntegrationTest {
             + " VALUES(?,?,?,'secondApprover','x','Second','APPROVER')",
         second,
         town,
-        dept);
+        null);
     UUID id = create();
     assign(id);
     action(id, "FIELD", "REQUEST_RESOURCE", Map.of()).andExpect(status().isOk());
@@ -1534,22 +1755,172 @@ class TownTrackIntegrationTest {
   }
 
   @Test
-  void departmentScopeEnforced() throws Exception {
+  void newTeamAssignmentRejectsMovedDisabledOrRepurposedMembers() throws Exception {
+    UUID member = UUID.randomUUID(), other = UUID.randomUUID(), id = create();
+    db.run(
+        "INSERT INTO department(id,municipality_id,name) VALUES(?,?,'Another department')",
+        other,
+        town);
+    db.run(
+        "INSERT INTO app_user(id,municipality_id,department_id,username,password_hash,display_name,role) VALUES(?,?,?,'stale-member','unused','Saved team member','FIELD')",
+        member,
+        town,
+        dept);
+    var result =
+        mvc.perform(
+                as(
+                    post("/api/teams")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                            json.writeValueAsString(
+                                Map.of(
+                                    "name",
+                                    "Saved team",
+                                    "representativeId",
+                                    users.get("FIELD"),
+                                    "memberIds",
+                                    List.of(users.get("FIELD"), member)))),
+                    "LEADER"))
+            .andExpect(status().isOk())
+            .andReturn();
+    UUID team =
+        UUID.fromString(
+            json.readTree(result.getResponse().getContentAsString()).path("id").asText());
+    action(id, "OFFICER", "TRIAGE", Map.of("leaderId", users.get("LEADER")))
+        .andExpect(status().isOk());
+    for (String invalid : List.of("MOVED", "DISABLED", "DELETED", "ROLE")) {
+      db.run(
+          "UPDATE app_user SET role=?,department_id=?,enabled=?,deleted_at=? WHERE id=?",
+          invalid.equals("ROLE") ? "OFFICER" : "FIELD",
+          invalid.equals("ROLE") ? null : invalid.equals("MOVED") ? other : dept,
+          !List.of("DISABLED", "DELETED").contains(invalid),
+          invalid.equals("DELETED") ? java.sql.Timestamp.from(java.time.Instant.now()) : null,
+          member);
+      action(id, "LEADER", "ASSIGN", Map.of("teamId", team)).andExpect(status().is4xxClientError());
+      assertEquals("TRIAGED", state(id));
+      assertTrue(db.list("SELECT id FROM work_order WHERE complaint_id=?", id).isEmpty());
+    }
+    db.run(
+        "UPDATE app_user SET role='FIELD',department_id=?,enabled=true,deleted_at=NULL WHERE id=?",
+        dept,
+        member);
+    action(id, "LEADER", "ASSIGN", Map.of("teamId", team)).andExpect(status().isOk());
+    assertEquals(
+        2,
+        db.list(
+                "SELECT wm.user_id FROM work_member wm JOIN work_order w ON w.id=wm.work_order_id WHERE w.complaint_id=?",
+                id)
+            .size());
+  }
+
+  @Test
+  void municipalOfficerSeesEveryDepartmentButFieldRolesRemainAssignedAndScoped() throws Exception {
     UUID id = create();
     UUID otherDept = UUID.randomUUID();
     db.run(
         "INSERT INTO department(id,municipality_id,name) VALUES(?,?,'Other department')",
         otherDept,
         town);
-    db.run(
-        "INSERT INTO"
-            + " app_user(id,municipality_id,department_id,username,password_hash,display_name,role)"
-            + " VALUES(?,?,?,'otherOfficer','x','Other officer','OFFICER')",
-        UUID.randomUUID(),
-        town,
-        otherDept);
-    mvc.perform(get("/api/complaints/" + id).with(user("otherOfficer")))
+    db.run("UPDATE complaint SET department_id=? WHERE id=?", otherDept, id);
+    mvc.perform(as(get("/api/complaints/" + id), "OFFICER")).andExpect(status().isOk());
+    mvc.perform(as(get("/api/complaints"), "OFFICER"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(1));
+    action(id, "OFFICER", "TRIAGE", Map.of("leaderId", users.get("LEADER")))
         .andExpect(status().isForbidden());
+    db.run("UPDATE app_user SET department_id=? WHERE id=?", otherDept, users.get("LEADER"));
+    action(id, "OFFICER", "TRIAGE", Map.of("leaderId", users.get("LEADER")))
+        .andExpect(status().isOk());
+    action(id, "LEADER", "ASSIGN", Map.of("assigneeId", users.get("FIELD")))
+        .andExpect(status().isForbidden());
+    mvc.perform(as(get("/api/complaints/" + id), "FIELD")).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void municipalRolesNeverRequireOrKeepDepartmentWhileFieldRolesDo() throws Exception {
+    UUID target = users.get("CITIZEN");
+    for (String role : List.of("OFFICER", "APPROVER")) {
+      for (Map<String, Object> body :
+          List.of(
+              Map.<String, Object>of("role", role),
+              Map.<String, Object>of("role", role, "departmentId", dept))) {
+        mvc.perform(
+                as(
+                    post("/api/admin/users/" + target + "/role")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(body)),
+                    "ADMIN"))
+            .andExpect(status().isOk());
+        assertNull(
+            db.one("SELECT department_id FROM app_user WHERE id=?", target).get("department_id"));
+        var session = new org.springframework.mock.web.MockHttpSession();
+        session.setAttribute("admin_role", "FIELD");
+        session.setAttribute("admin_department", dept);
+        mvc.perform(
+                as(
+                    post("/api/auth/admin-role")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(body)),
+                    "ADMIN"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.role").value(role))
+            .andExpect(jsonPath("$.department_id").doesNotExist());
+        assertNull(session.getAttribute("admin_department"));
+      }
+    }
+    for (String role : List.of("LEADER", "FIELD"))
+      mvc.perform(
+              as(
+                  post("/api/auth/admin-role")
+                      .with(csrf())
+                      .contentType(MediaType.APPLICATION_JSON)
+                      .content(json.writeValueAsString(Map.of("role", role))),
+                  "ADMIN"))
+          .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void peoplePickerUsesCaseDepartmentForFieldRolesAndMunicipalityForApprovers() throws Exception {
+    UUID other = UUID.randomUUID();
+    db.run(
+        "INSERT INTO department(id,municipality_id,name) VALUES(?,?,'Other department')",
+        other,
+        town);
+    for (String role : List.of("LEADER", "FIELD")) {
+      db.run(
+          "INSERT INTO app_user(id,municipality_id,department_id,username,password_hash,display_name,role) VALUES(?,?,?,?,'unused','Other staff',?)",
+          UUID.randomUUID(),
+          town,
+          other,
+          "other-" + role,
+          role);
+      var people =
+          mvc.perform(
+                  as(
+                      get("/api/people").param("role", role).param("departmentId", dept.toString()),
+                      "OFFICER"))
+              .andExpect(status().isOk())
+              .andReturn();
+      var names = json.readTree(people.getResponse().getContentAsString());
+      assertTrue(names.toString().contains(users.get(role).toString()));
+      assertFalse(names.toString().contains("Other staff"));
+    }
+    mvc.perform(as(get("/api/people").param("role", "APPROVER"), "OFFICER"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[?(@.id=='" + users.get("APPROVER") + "')]").isNotEmpty());
+    mvc.perform(
+            as(
+                get("/api/people").param("role", "FIELD").param("departmentId", other.toString()),
+                "LEADER"))
+        .andExpect(status().isForbidden());
+    mvc.perform(as(get("/api/people").param("role", "APPROVER"), "LEADER"))
+        .andExpect(status().isForbidden());
+    mvc.perform(as(get("/api/people").param("role", "ADMIN"), "OFFICER"))
+        .andExpect(status().isBadRequest());
   }
 
   @Test

@@ -183,9 +183,8 @@ public class ComplaintController {
     var u = access.user(a);
     String scope =
         switch ((String) u.get("role")) {
-          case "ADMIN" -> "true";
+          case "ADMIN", "OFFICER" -> "true";
           case "CITIZEN" -> "c.reporter_id=?";
-          case "OFFICER" -> "(c.department_id IS NULL OR c.department_id=?)";
           case "LEADER" -> "c.leader_id=?";
           case "FIELD" ->
               "EXISTS(SELECT 1 FROM work_order w WHERE w.complaint_id=c.id AND (w.assignee_id=? OR"
@@ -198,8 +197,7 @@ public class ComplaintController {
         };
     var args = new ArrayList<Object>();
     args.add(u.get("municipality_id"));
-    if (!u.get("role").equals("ADMIN"))
-      args.add(u.get(u.get("role").equals("OFFICER") ? "department_id" : "id"));
+    if (!List.of("ADMIN", "OFFICER").contains(u.get("role"))) args.add(u.get("id"));
     if (u.get("role").equals("FIELD")) args.add(u.get("id"));
     String base =
         " FROM complaint c JOIN category k ON k.id=c.category_id WHERE c.municipality_id=? AND "
@@ -379,16 +377,33 @@ public class ComplaintController {
   }
 
   @GetMapping("/people")
-  public Object people(@RequestParam String role, Authentication a) {
+  public Object people(
+      @RequestParam String role,
+      @RequestParam(required = false) UUID departmentId,
+      Authentication a) {
     var u = access.user(a);
     access.role(u, "OFFICER", "LEADER", "ADMIN");
+    if (!List.of("LEADER", "FIELD", "APPROVER").contains(role))
+      throw new IllegalArgumentException();
+    UUID department = Access.departmentRole(role) ? departmentId : null;
+    if ("LEADER".equals(u.get("role"))) {
+      if (!"FIELD".equals(role)
+          || (departmentId != null && !departmentId.equals(u.get("department_id")))) Access.deny();
+      department = (UUID) u.get("department_id");
+      if (department == null) Access.deny();
+    }
+    if (department != null)
+      db.one(
+          "SELECT id FROM department WHERE id=? AND municipality_id=?",
+          department,
+          u.get("municipality_id"));
     return db.list(
         "SELECT id,display_name,department_id FROM app_user WHERE municipality_id=? AND role IN (?,'ADMIN') AND"
-            + " enabled=true AND (department_id=? OR ?='ADMIN') ORDER BY display_name",
+            + " enabled=true AND (?::uuid IS NULL OR department_id=?) ORDER BY display_name",
         u.get("municipality_id"),
         role,
-        u.get("department_id"),
-        u.get("role"));
+        department,
+        department);
   }
 
   @GetMapping("/community/complaints")

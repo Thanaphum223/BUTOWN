@@ -169,7 +169,9 @@ export default function Detail({
             : null;
     if (role) {
       try {
-        setPeople(await api("/people?role=" + role));
+        const department =
+          role === "APPROVER" ? "" : `&departmentId=${data?.complaint.department_id}`;
+        setPeople(await api("/people?role=" + role + department));
       } catch (e) {
         message.error((e as Error).message);
       }
@@ -1066,6 +1068,8 @@ export default function Detail({
             >
               <Select
                 allowClear
+                showSearch
+                optionFilterProp="label"
                 mode={action === "SEND_APPROVAL" ? "multiple" : undefined}
                 options={people.map((p) => ({
                   value: p.id,

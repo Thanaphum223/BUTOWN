@@ -151,7 +151,10 @@ function TownTrackApp() {
     try {
       const next = await api<RowData>("/auth/admin-role", {
         method: "POST",
-        body: JSON.stringify({ role, departmentId }),
+        body: JSON.stringify({
+          role,
+          departmentId: ["LEADER", "FIELD"].includes(role) ? departmentId : null,
+        }),
       });
       setUser(next);
       setPendingAdminRole(null);
@@ -364,15 +367,17 @@ function TownTrackApp() {
                       "admin-role-controls" + (!screens.lg && !showRoleControls ? " is-hidden" : "")
                     }
                   >
-                    <Select
-                      aria-label="หน่วยงานสำหรับบทบาท"
-                      placeholder="เลือกหน่วยงาน"
-                      style={{ minWidth: 150 }}
-                      value={user.department_id || undefined}
-                      disabled={switchingRole}
-                      options={adminDepartments.map((d) => ({ value: d.id, label: d.name }))}
-                      onChange={(department) => void switchAdminRole(user.role, department)}
-                    />
+                    {["LEADER", "FIELD"].includes(user.role) && (
+                      <Select
+                        aria-label="หน่วยงานสำหรับบทบาท"
+                        placeholder="เลือกหน่วยงาน"
+                        style={{ minWidth: 150 }}
+                        value={user.department_id || undefined}
+                        disabled={switchingRole}
+                        options={adminDepartments.map((d) => ({ value: d.id, label: d.name }))}
+                        onChange={(department) => void switchAdminRole(user.role, department)}
+                      />
+                    )}
                     <Select
                       aria-label="สลับบทบาทผู้ดูแลระบบ"
                       style={{ minWidth: 150 }}
@@ -384,7 +389,7 @@ function TownTrackApp() {
                         label,
                       }))}
                       onChange={(role) => {
-                        if (!["ADMIN", "CITIZEN"].includes(role) && !user.department_id) {
+                        if (["LEADER", "FIELD"].includes(role) && !user.department_id) {
                           setPendingDepartment(
                             adminDepartments.length === 1 ? adminDepartments[0].id : undefined,
                           );

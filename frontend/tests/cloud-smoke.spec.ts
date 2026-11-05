@@ -98,9 +98,8 @@ test("new citizen registration appears to admin and keeps password after promoti
     await page.getByText(`${username} — New citizen test`, { exact: true }).click();
     await expect(dialog).toContainText("บทบาทปัจจุบัน: ประชาชน");
     await dialog.getByRole("combobox", { name: "บทบาทที่ต้องการ" }).press("ArrowDown");
-    await page.getByText("เจ้าหน้าที่", { exact: true }).last().click();
-    await dialog.getByRole("combobox", { name: "หน่วยงาน" }).press("ArrowDown");
-    await page.getByText("กองช่าง", { exact: true }).last().click();
+    await page.getByText("เจ้าหน้าที่ตรวจสอบ", { exact: true }).last().click();
+    await expect(dialog.getByRole("combobox", { name: "กอง / หน่วยงาน" })).not.toBeVisible();
     await dialog.getByRole("button", { name: "บันทึก", exact: true }).click();
     await expect(dialog).not.toBeVisible();
     const freshCsrf = await (await newcomer.get("/api/auth/csrf")).json();
@@ -112,6 +111,7 @@ test("new citizen registration appears to admin and keeps password after promoti
     expect(signedIn.ok()).toBeTruthy();
     const user = await (await newcomer.get("/api/auth/me")).json();
     expect(user.role).toBe("OFFICER");
+    expect(user.department_id).toBeNull();
     expect(user.username).toBe(username);
   } finally {
     await newcomer.dispose();

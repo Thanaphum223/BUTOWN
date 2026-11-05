@@ -23,7 +23,7 @@ async function setup(page: Page) {
       username: "iam_officer",
       display_name: "สมหญิง ใจดี",
       role: "OFFICER",
-      department_id: "engineering",
+      department_id: null,
       enabled: true,
     },
     {
@@ -37,8 +37,8 @@ async function setup(page: Page) {
     {
       id: "approver",
       username: "iam_approver",
-      display_name: "ผู้อนุมัติเดิม",
-      role: "APPROVER",
+      display_name: "ผู้ลงพื้นที่เดิม",
+      role: "FIELD",
       department_id: "health",
       enabled: true,
     },
@@ -83,6 +83,7 @@ async function setup(page: Page) {
         stats: { total: 0, in_progress: 0, closed: 0, overdue: 0 },
       },
       "/api/admin": {
+        currentUserId: "admin",
         municipality: { id: "town", name: "เทศบาลทดสอบ" },
         users,
         departments,
@@ -137,10 +138,10 @@ for (const assignment of [
   },
   {
     department: "กองสาธารณสุข",
-    button: "เพิ่มผู้อนุมัติ",
+    button: "เพิ่มผู้ลงพื้นที่",
     name: "สมหญิง ใจดี",
     id: "officer",
-    role: "APPROVER",
+    role: "FIELD",
     departmentId: "health",
   },
 ]) {
@@ -166,7 +167,7 @@ for (const assignment of [
     ]);
     await expect(row).toContainText(assignment.name);
     await expect(department(page, "กองช่าง")).toContainText("หัวหน้าเดิม");
-    await expect(department(page, "กองสาธารณสุข")).toContainText("ผู้อนุมัติเดิม");
+    await expect(department(page, "กองสาธารณสุข")).toContainText("ผู้ลงพื้นที่เดิม");
   });
 }
 
@@ -248,3 +249,63 @@ for (const width of [440, 1280]) {
     });
   });
 }
+
+for (const role of [
+  { value: "OFFICER", label: "เจ้าหน้าที่ตรวจสอบ" },
+  { value: "APPROVER", label: "ผู้อนุมัติ" },
+]) {
+  test(`municipal ${role.value} assignment clears department and needs no department selector`, async ({
+    page,
+  }) => {
+    const state = await setup(page);
+    await page.getByRole("tab", { name: "บัญชีผู้ใช้", exact: true }).click();
+    const row = page
+      .getByRole("row")
+      .filter({ has: page.getByRole("cell", { name: "หัวหน้าเดิม", exact: true }) });
+    await row.getByRole("button", { name: "กำหนดบทบาท", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("combobox", { name: /บทบาทที่ต้องการ/ }).press("ArrowDown");
+    await page
+      .locator(".ant-select-dropdown:visible")
+      .getByText(role.label, { exact: true })
+      .click();
+    await expect(dialog).toContainText("บทบาทนี้ดูแลงานระดับเทศบาล ไม่สังกัดกอง");
+    await expect(dialog.getByRole("combobox", { name: /กอง \/ หน่วยงาน/ })).not.toBeVisible();
+    await dialog.getByRole("button", { name: "บันทึก", exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    expect(state.writes).toEqual([
+      { path: "/api/admin/users/leader/role", body: { role: role.value, departmentId: null } },
+    ]);
+  });
+}
+
+test("administrator switches to municipal reviewers without a department prompt", async ({
+  page,
+}) => {
+  await setup(page);
+  await page.route("**/api/auth/admin-role", async (route) => {
+    const body = route.request().postDataJSON();
+    expect(body.departmentId).toBeNull();
+    await route.fulfill({
+      json: {
+        id: "admin",
+        username: "iam_admin",
+        display_name: "ผู้ดูแล",
+        role: body.role,
+        account_role: "ADMIN",
+        department_id: null,
+      },
+    });
+  });
+  for (const label of ["เจ้าหน้าที่ตรวจสอบ", "ผู้อนุมัติ"]) {
+    await page
+      .getByRole("combobox", { name: "สลับบทบาทผู้ดูแลระบบ", exact: true })
+      .press("ArrowDown");
+    await page.locator(".ant-select-dropdown:visible").getByText(label, { exact: true }).click();
+    await expect(page.getByRole("dialog")).not.toBeVisible();
+    await expect(
+      page.getByRole("combobox", { name: "หน่วยงานสำหรับบทบาท", exact: true }),
+    ).not.toBeVisible();
+    await expect(page.locator(".header-identity small")).toContainText(label);
+  }
+});

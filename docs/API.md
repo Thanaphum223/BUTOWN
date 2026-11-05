@@ -59,3 +59,8 @@ GET /geocoding/search?q=... และ /geocoding/reverse?latitude=...&longitude=
 
 ## เหตุฉุกเฉิน
 GET /emergency/nearby?latitude=...&longitude=...&type=hospital&radiusKm=5 เปิดอ่านได้โดยไม่ต้องเข้าสู่ระบบ รองรับ hospital, police, fire_station, clinic และรัศมี 5/10/20 กม. ตอบ places พร้อมชื่อ ที่อยู่ ระยะเส้นตรง เบอร์ตรง และแหล่งข้อมูล ไม่ส่งข้อมูลคำร้องหรือข้อมูลผู้ใช้
+
+## บทบาทและการลบบัญชี
+GET/POST /admin/gov-roles สำหรับผู้ดูแล: จับคู่รหัสบทบาท Gov กับ role/departmentId ของ TownTrack โดยตั้ง municipalityId ของ Gov และ serviceId (ถ้าระบุบริการด้วย ID) การเปลี่ยนค่านี้ใช้กับบัญชีใหม่เท่านั้น
+DELETE /admin/users/{id}: ผู้ดูแลลบบัญชีในเทศบาลตนเองได้ ยกเว้นตนเอง ซ่อนบัญชีและยกเลิก Session โดยเก็บคำร้อง/ไฟล์/ประวัติงาน ครั้งถัดไปที่ Gov ยืนยันตัวตนเดิม จะได้บัญชี TownTrack ID ใหม่ ไม่รับข้อมูลส่วนตัวหรือสิทธิ์เดิมกลับมา การระงับบัญชีโดยไม่ลบยังคงบล็อกการเข้าสู่ระบบ
+OFFICER/APPROVER ดูแลงานระดับเทศบาล ไม่มี departmentId; LEADER/FIELD ต้องมี departmentId ที่อยู่ในเทศบาลเดียวกัน

@@ -64,7 +64,7 @@ public class Bootstrap implements CommandLineRunner {
             + " VALUES(?,?,?,?,?,?,?)",
         UUID.randomUUID(),
         m,
-        role.equals("CITIZEN") ? null : dept,
+        List.of("CITIZEN", "OFFICER", "APPROVER").contains(role) ? null : dept,
         username,
         encoder.encode(password),
         name,

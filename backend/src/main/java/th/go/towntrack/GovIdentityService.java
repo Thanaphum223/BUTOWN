@@ -13,10 +13,12 @@ import org.springframework.web.server.ResponseStatusException;
 public class GovIdentityService {
   final Db db;
   final PasswordEncoder passwords;
+  final GovRoleMapping roles;
 
-  public GovIdentityService(Db db, PasswordEncoder passwords) {
+  public GovIdentityService(Db db, PasswordEncoder passwords, GovRoleMapping roles) {
     this.db = db;
     this.passwords = passwords;
+    this.roles = roles;
   }
 
   static String text(JsonNode n, String key, int max, boolean required) {
@@ -122,14 +124,17 @@ public class GovIdentityService {
         name = text(user, "name", 200, false),
         email = text(user, "email", 320, false);
     var homes = residences(data);
-    db.one("SELECT id FROM municipality WHERE id=?", town);
+    db.one("SELECT id FROM municipality WHERE id=? FOR KEY SHARE", town);
     db.one("SELECT pg_advisory_xact_lock(hashtextextended(?,0)) locked", town + ":" + iamId);
     var bindings =
         db.list(
-            "SELECT local_user_id FROM iam_user_profile WHERE municipality_id=? AND iam_user_id=?",
+            "SELECT p.local_user_id,u.deleted_at FROM iam_user_profile p JOIN app_user u ON u.id=p.local_user_id WHERE p.municipality_id=? AND p.iam_user_id=? FOR UPDATE OF u",
             town,
             iamId);
-    UUID local = bindings.isEmpty() ? null : (UUID) bindings.getFirst().get("local_user_id");
+    UUID local =
+        bindings.isEmpty() || bindings.getFirst().get("deleted_at") != null
+            ? null
+            : (UUID) bindings.getFirst().get("local_user_id");
     if (linkUser != null) {
       db.one(
           "SELECT id FROM app_user WHERE id=? AND municipality_id=? AND enabled=true FOR UPDATE",
@@ -148,14 +153,17 @@ public class GovIdentityService {
       local = linkUser;
     }
     if (local == null) {
+      var initial = roles.initial(town, user);
       local = UUID.randomUUID();
       db.run(
-          "INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role) VALUES(?,?,?,?,?,'CITIZEN')",
+          "INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role,department_id) VALUES(?,?,?,?,?,?,?)",
           local,
           town,
           "iam_" + local.toString().replace("-", ""),
           passwords.encode((UUID.randomUUID().toString() + UUID.randomUUID()).replace("-", "")),
-          name == null || name.isBlank() ? "ผู้ใช้ Gov Center" : name);
+          name == null || name.isBlank() ? "ผู้ใช้ Gov Center" : name,
+          initial.role(),
+          initial.department());
     }
     var rows =
         db.list(
@@ -165,7 +173,7 @@ public class GovIdentityService {
     if (rows.isEmpty())
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "บัญชี TownTrack ถูกระงับการใช้งาน");
     db.run(
-        "INSERT INTO iam_user_profile(municipality_id,iam_user_id,local_user_id,email,display_name) VALUES(?,?,?,?,?) ON CONFLICT(municipality_id,iam_user_id) DO UPDATE SET email=excluded.email,display_name=excluded.display_name,last_sso_at=now()",
+        "INSERT INTO iam_user_profile(municipality_id,iam_user_id,local_user_id,email,display_name) VALUES(?,?,?,?,?) ON CONFLICT(municipality_id,iam_user_id) DO UPDATE SET local_user_id=excluded.local_user_id,email=excluded.email,display_name=excluded.display_name,last_sso_at=now()",
         town,
         iamId,
         local,

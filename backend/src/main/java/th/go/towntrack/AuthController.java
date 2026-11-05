@@ -44,17 +44,21 @@ public class AuthController {
     if (!"ADMIN".equals(account.get("role"))) Access.deny();
     if (!Set.of("ADMIN", "CITIZEN", "OFFICER", "LEADER", "FIELD", "APPROVER").contains(body.role()))
       throw new IllegalArgumentException("บทบาทไม่ถูกต้อง");
-    if (!Set.of("ADMIN", "CITIZEN").contains(body.role()) && body.departmentId() == null)
+    UUID department =
+        List.of("OFFICER", "APPROVER", "CITIZEN").contains(body.role())
+            ? null
+            : body.departmentId();
+    if (Access.departmentRole(body.role()) && department == null)
       throw new IllegalArgumentException("กรุณาเลือกหน่วยงาน");
-    if (body.departmentId() != null)
+    if (department != null)
       db.one(
           "SELECT id FROM department WHERE id=? AND municipality_id=?",
-          body.departmentId(),
+          department,
           account.get("municipality_id"));
     var session = request.getSession();
     session.setAttribute("admin_role", body.role());
-    if (body.departmentId() == null) session.removeAttribute("admin_department");
-    else session.setAttribute("admin_department", body.departmentId());
+    if (department == null) session.removeAttribute("admin_department");
+    else session.setAttribute("admin_department", department);
     db.run(
         "INSERT INTO audit_event(id,municipality_id,actor_id,action,reason) VALUES(?,?,?,'ADMIN_ROLE_SWITCH',?)",
         UUID.randomUUID(),

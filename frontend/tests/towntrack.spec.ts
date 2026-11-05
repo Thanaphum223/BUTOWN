@@ -71,13 +71,14 @@ test("mobile citizen screen fits viewport and supports manual address", async ({
   ).toBeTruthy();
 });
 
-test("full workflow across citizen and staff sessions closes a real complaint", async ({
+test("full approved resource workflow across all municipal and field roles closes a real complaint", async ({
   page,
   context,
 }) => {
   await context.grantPermissions(["geolocation"]);
   await context.setGeolocation({ latitude: 13.75, longitude: 100.5 });
-  test.setTimeout(120000);
+  test.setTimeout(240000);
+  page.setDefaultTimeout(15000);
   const title = "E2E เทศบาล " + Date.now();
   await login(page, "citizen");
   const id = await createThroughWizard(
@@ -109,27 +110,77 @@ test("full workflow across citizen and staff sessions closes a real complaint", 
     await dialog
       .getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true })
       .fill("ตรวจสอบและดำเนินการตามหน้าที่");
+    const completed = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/api/complaints/${id}/actions`) &&
+        response.request().method() === "POST",
+      { timeout: 30000 },
+    );
     await dialog.getByRole("button", { name: "ยืนยัน" + label, exact: true }).click();
-    if (["ปิดเรื่อง", "ไม่อนุมัติและยุติคำร้อง"].includes(label)) {
+    if (["ปิดเรื่อง", "อนุมัติทรัพยากร", "ไม่อนุมัติและยุติคำร้อง"].includes(label)) {
       await page
         .getByRole("dialog", { name: "ตรวจสอบก่อนยืนยัน" })
         .getByRole("button", { name: "ยืนยัน", exact: true })
         .click();
     }
-    await expect(dialog).not.toBeVisible();
+    const response = await completed;
+    expect(response.ok(), await response.text()).toBeTruthy();
+    await expect(dialog).not.toBeVisible({ timeout: 15000 });
   }
   await switchUser("officer");
   await perform("รับเรื่องและส่งหน่วยงาน", async (d) => {
-    await d.getByLabel("หัวหน้าหน่วยงาน", { exact: true }).click();
-    await page.getByText("บัญชีทดสอบ LEADER", { exact: true }).click();
+    await d.getByLabel("หัวหน้าหน่วยงาน", { exact: true }).fill("บัญชีทดสอบ LEADER");
+    await page
+      .locator(".ant-select-dropdown:visible")
+      .getByText("บัญชีทดสอบ LEADER", { exact: true })
+      .click();
   });
   await switchUser("leader");
   await perform("มอบหมายทีม", async (d) => {
-    await d.getByLabel("ผู้ลงพื้นที่", { exact: true }).click();
-    await page.getByText("บัญชีทดสอบ FIELD", { exact: true }).click();
+    await d.getByLabel("ผู้ลงพื้นที่", { exact: true }).fill("บัญชีทดสอบ FIELD");
+    await page
+      .locator(".ant-select-dropdown:visible")
+      .getByText("บัญชีทดสอบ FIELD", { exact: true })
+      .click();
   });
   await switchUser("field");
   await perform("รับงาน");
+  await perform("ขอใช้ทรัพยากร");
+  await switchUser("leader");
+  await perform("ส่งข้อเสนอทรัพยากร", async (d) => {
+    await d.getByLabel("ชื่อคำขอทรัพยากร", { exact: true }).fill("ขอวัสดุซ่อมทางเท้า");
+    await d.getByRole("textbox", { name: "ชื่อรายการ 1", exact: true }).fill("วัสดุซ่อมทางเท้า");
+    await d.getByRole("spinbutton", { name: "ราคารายการ 1", exact: true }).fill("2500");
+    await d.getByLabel("ระยะเวลาดำเนินการ (วัน)", { exact: true }).fill("2");
+    await d.locator("input[type=file]").setInputFiles(pdfEvidence("approved-proposal.pdf"));
+    await expect(d.getByRole("link", { name: "approved-proposal.pdf", exact: true })).toBeVisible();
+  });
+  await switchUser("officer");
+  expect((await (await page.request.get("/api/auth/me")).json()).department_id).toBeNull();
+  await perform("ส่งพิจารณาอนุมัติ", async (d) => {
+    const approver = d.getByLabel("ผู้อนุมัติตามลำดับ (เลือก 1 คน)", { exact: true });
+    await approver.click();
+    await approver.fill("บัญชีทดสอบ APPROVER");
+    await page
+      .locator(".ant-select-dropdown:visible")
+      .getByText("บัญชีทดสอบ APPROVER", { exact: true })
+      .click();
+  });
+  await switchUser("approver");
+  expect((await (await page.request.get("/api/auth/me")).json()).department_id).toBeNull();
+  await page.getByRole("button", { name: /ดูเอกสาร/ }).click();
+  const proposalPdf = page.getByRole("dialog", { name: "approved-proposal.pdf", exact: true });
+  await expect(proposalPdf.locator("canvas")).toBeVisible();
+  await expect
+    .poll(() =>
+      proposalPdf.locator("canvas").evaluate((canvas) => (canvas as HTMLCanvasElement).width),
+    )
+    .toBeGreaterThan(0);
+  await page.screenshot({ path: "../work/screenshots/journey-proposal-pdf.png", fullPage: true });
+  await proposalPdf.getByRole("button", { name: "Close", exact: true }).click();
+  await page.screenshot({ path: "../work/screenshots/journey-approval.png", fullPage: true });
+  await perform("อนุมัติทรัพยากร");
+  await switchUser("field");
   await perform("เริ่มปฏิบัติงาน");
   await perform("ส่งรายงานผล", async (d) => {
     for (const [index, stage] of ["before", "after"].entries()) {
@@ -152,6 +203,41 @@ test("full workflow across citizen and staff sessions closes a real complaint", 
   const saved = await (await page.request.get("/api/complaints/" + id)).json();
   expect(saved.complaint.status).toBe("CLOSED");
   expect(saved.reports).toHaveLength(1);
+  expect(saved.resources).toHaveLength(1);
+  expect(saved.resources[0].status).toBe("APPROVED");
+  expect(saved.history.map((event: any) => event.action)).toEqual(
+    expect.arrayContaining([
+      "CREATE",
+      "TRIAGE",
+      "ASSIGN",
+      "ACCEPT",
+      "REQUEST_RESOURCE",
+      "PROPOSE",
+      "SEND_APPROVAL",
+      "APPROVE",
+      "START",
+      "REPORT",
+      "FORWARD_REPORT",
+      "VERIFY",
+      "CLOSE",
+    ]),
+  );
+  await test.info().attach("persisted-journey", {
+    body: JSON.stringify(
+      {
+        complaintId: id,
+        status: saved.complaint.status,
+        history: saved.history.map((event: any) => ({
+          action: event.action,
+          to_status: event.to_status,
+        })),
+        resourceStatus: saved.resources[0].status,
+      },
+      null,
+      2,
+    ),
+    contentType: "application/json",
+  });
   expect(
     saved.files.filter((file: any) => file.report_id).map((file: any) => file.evidence_stage),
   ).toEqual(expect.arrayContaining(["BEFORE", "AFTER"]));
@@ -162,6 +248,16 @@ test("full workflow across citizen and staff sessions closes a real complaint", 
     path: "../work/screenshots/closed-complaint.png",
     fullPage: true,
   });
+  await page.getByRole("button", { name: "ออกจากระบบ", exact: true }).click();
+  await login(page, "citizen");
+  await page.getByRole("link", { name: /ติดตามเรื่อง/ }).click();
+  const tracked = page.locator(".ant-list-item").filter({ hasText: "#" + id.slice(0, 8) });
+  await expect(tracked).toContainText("ปิดเรื่องแล้ว");
+  await tracked.getByRole("button", { name: "ดูรายละเอียด", exact: true }).click();
+  await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
+  await expect(
+    page.locator(".page-heading").getByText("ปิดเรื่องแล้ว", { exact: true }),
+  ).toBeVisible();
 });
 
 test("resource refusal by approver terminates a real complaint", async ({ page, context }) => {
@@ -200,7 +296,7 @@ test("resource refusal by approver terminates a real complaint", async ({ page, 
       .getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true })
       .fill("ทดสอบตามขั้นตอนที่กำหนด");
     await dialog.getByRole("button", { name: "ยืนยัน" + label, exact: true }).click();
-    if (["ปิดเรื่อง", "ไม่อนุมัติและยุติคำร้อง"].includes(label)) {
+    if (["ปิดเรื่อง", "อนุมัติทรัพยากร", "ไม่อนุมัติและยุติคำร้อง"].includes(label)) {
       await page
         .getByRole("dialog", { name: "ตรวจสอบก่อนยืนยัน" })
         .getByRole("button", { name: "ยืนยัน", exact: true })
@@ -210,13 +306,19 @@ test("resource refusal by approver terminates a real complaint", async ({ page, 
   }
   await switchUser("officer");
   await perform("รับเรื่องและส่งหน่วยงาน", async (d) => {
-    await d.getByLabel("หัวหน้าหน่วยงาน", { exact: true }).click();
-    await page.getByText("บัญชีทดสอบ LEADER", { exact: true }).click();
+    await d.getByLabel("หัวหน้าหน่วยงาน", { exact: true }).fill("บัญชีทดสอบ LEADER");
+    await page
+      .locator(".ant-select-dropdown:visible")
+      .getByText("บัญชีทดสอบ LEADER", { exact: true })
+      .click();
   });
   await switchUser("leader");
   await perform("มอบหมายทีม", async (d) => {
-    await d.getByLabel("ผู้ลงพื้นที่", { exact: true }).click();
-    await page.getByText("บัญชีทดสอบ FIELD", { exact: true }).click();
+    await d.getByLabel("ผู้ลงพื้นที่", { exact: true }).fill("บัญชีทดสอบ FIELD");
+    await page
+      .locator(".ant-select-dropdown:visible")
+      .getByText("บัญชีทดสอบ FIELD", { exact: true })
+      .click();
   });
   await switchUser("field");
   await perform("รับงาน");
@@ -233,8 +335,13 @@ test("resource refusal by approver terminates a real complaint", async ({ page, 
   });
   await switchUser("officer");
   await perform("ส่งพิจารณาอนุมัติ", async (d) => {
-    await d.getByLabel("ผู้อนุมัติตามลำดับ (เลือก 1 คน)", { exact: true }).click();
-    await page.getByText("บัญชีทดสอบ APPROVER", { exact: true }).click();
+    const approver = d.getByLabel("ผู้อนุมัติตามลำดับ (เลือก 1 คน)", { exact: true });
+    await approver.click();
+    await approver.fill("บัญชีทดสอบ APPROVER");
+    await page
+      .locator(".ant-select-dropdown:visible")
+      .getByText("บัญชีทดสอบ APPROVER", { exact: true })
+      .click();
   });
   await switchUser("approver");
   await perform("ไม่อนุมัติและยุติคำร้อง");
