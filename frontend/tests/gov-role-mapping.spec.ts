@@ -70,10 +70,12 @@ for (const width of [440, 1280]) {
       .getByText("กองช่าง", { exact: true })
       .click();
     fail = true;
-    await page.getByRole("button", { name: "บันทึกการจับคู่บทบาท", exact: true }).click();
+    // The exiting loading icon can remain in the accessible name after the button is enabled.
+    const saveButton = page.getByRole("button", { name: /บันทึกการจับคู่บทบาท$/ });
+    await saveButton.click();
     await expect(page.getByText("บันทึกไม่สำเร็จ ลองอีกครั้ง", { exact: true })).toBeVisible();
     fail = false;
-    await page.getByRole("button", { name: "บันทึกการจับคู่บทบาท", exact: true }).click();
+    await saveButton.click();
     await expect(page.getByText("บันทึกการจับคู่บทบาทแล้ว", { exact: true })).toBeVisible();
     expect(writes).toHaveLength(2);
     expect(writes[1].body.mappings).toEqual([
