@@ -293,7 +293,7 @@ function TownTrackApp() {
               }}
             />
             <div className="sidebar-bottom">
-              <Tag color="cyan">{roleNames[user.role]}</Tag>
+              <Tag color="green">{roleNames[user.role]}</Tag>
               <p>
                 ประสานงานอย่างเป็นระบบ
                 <br />
@@ -407,9 +407,7 @@ function TownTrackApp() {
                 </Button>
               )}
               <GovProfile />
-              <Avatar style={{ background: "#d9eeea", color: "#075c54" }}>
-                {user.display_name?.[0]}
-              </Avatar>
+              <Avatar className="account-avatar">{user.display_name?.[0]}</Avatar>
               <span className="account-name">{user.display_name}</span>
               <Button
                 aria-label="ออกจากระบบ"

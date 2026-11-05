@@ -23,7 +23,7 @@ export default function ResourceReview({
     <Card
       className="resource-review-card"
       title="คำขอทรัพยากรและเอกสารประกอบ"
-      extra={<Tag color="cyan">ฉบับที่ {revision.revision}</Tag>}
+      extra={<Tag color="green">ฉบับที่ {revision.revision}</Tag>}
     >
       <Typography.Title level={4}>{revision.proposal}</Typography.Title>
       <div className="resource-review-summary">

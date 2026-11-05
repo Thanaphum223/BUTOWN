@@ -6,6 +6,7 @@ export const govTokens = {
   "brand-primary": "#1E7D55",
   "brand-secondary": "#80D897",
   "brand-dark": "#14543B",
+  "brand-soft": "#EDF5F1",
   "brand-surface": "#F3F8F5",
   "brand-text-dark": "#123D2D",
   "semantic-success": "#95C135",
@@ -45,6 +46,8 @@ export function installGovTokens() {
 export const govTheme: ThemeConfig = {
   token: {
     colorPrimary: govTokens["brand-primary"],
+    colorPrimaryBg: govTokens["brand-soft"],
+    colorPrimaryBgHover: "#DFEEE5",
     // Shared hover affects outlined text and radio labels as well as fills.
     colorPrimaryHover: govTokens["brand-dark"],
     colorPrimaryActive: govTokens["brand-dark"],
@@ -54,6 +57,7 @@ export const govTheme: ThemeConfig = {
     colorWarning: govTokens["semantic-warning"],
     colorError: govTokens["semantic-critical"],
     colorInfo: govTokens["brand-primary"],
+    colorInfoBg: govTokens["brand-soft"],
     colorText: govTokens["text-primary"],
     colorTextSecondary: govTokens["text-tertiary"],
     colorTextPlaceholder: govTokens["text-placeholder"],

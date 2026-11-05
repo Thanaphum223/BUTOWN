@@ -23,14 +23,14 @@
 ### Task 1: Shared palette and application chrome
 **Files:** frontend/src/govTheme.ts, frontend/src/style.css, frontend/src/GovAuthPage.tsx, frontend/tests/green-theme.spec.ts.
 **Interfaces:** existing govTokens CSS variables and govTheme ConfigProvider object.
-- [ ] Add browser checks using mocked API boundaries for green staff sidebar, shared header/link/form colors, citizen selected navigation, auth card, mobile drawer and contrast. Observe failure for navy staff sidebar and non-green neutrals.
-- [ ] Change shared tokens and CSS; remove auth color overrides while preserving control sizing.
-- [ ] Run focused theme/navigation/auth tests; expected all pass and no viewport overflow. Inspect representative mobile/desktop screenshots.
+- [x] Add browser checks using mocked API boundaries for green staff sidebar, shared header/link/form colors, citizen selected navigation, auth card, mobile drawer and contrast. Observe failure for navy staff sidebar and non-green neutrals.
+- [x] Change shared tokens and CSS; remove auth color overrides while preserving control sizing.
+- [x] Run focused theme/navigation/auth tests; expected all pass and no viewport overflow. Inspect representative mobile/desktop screenshots.
 
 ### Task 2: Finish whole-app color audit and release
 **Files:** App.tsx, ResourceReview.tsx, Detail.tsx, LocationMap.tsx, MapboxLocationMap.tsx where hardcoded decorative colors conflict.
 **Interfaces:** consume govTokens from Task 1 for identity and map selection; semantic status markers remain unchanged.
-- [ ] Replace conflicting identity/decorative colors with shared tokens. Keep destructive/status colors.
-- [ ] Run focused tests, formatting/build/source hygiene; expected exit 0.
+- [x] Replace conflicting identity/decorative colors with shared tokens. Keep destructive/status colors.
+- [x] Run focused tests, formatting/build/source hygiene; expected exit 0.
 - [ ] One fresh whole-branch review, then commit, PR, merge and full main CI/CD.
 - [ ] Verify live release, admin grant and existing data; save representative UI proof. No live signup.

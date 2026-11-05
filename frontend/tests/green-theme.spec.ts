@@ -89,6 +89,13 @@ for (const width of [440, 1280]) {
     const header = page.locator(".topbar");
     await green(header, "background-color");
     await readable(page.locator(".header-identity strong"), header);
+    await readable(
+      page.locator(".staff-workspace > .page-heading .ant-typography-secondary"),
+      page.locator("body"),
+    );
+    expect(await paint(page.locator(".staff-workspace > .page-heading .ant-tag"))).toEqual(
+      await paint(page.locator(".staff-workspace > .page-heading .eyebrow")),
+    );
     if (width >= 1024) {
       await green(page.locator(".staff-shell .sidebar"), "background-color");
       await readable(page.locator(".sidebar .ant-menu-item-selected"));
@@ -96,6 +103,7 @@ for (const width of [440, 1280]) {
       await page.getByRole("button", { name: "เปิดเมนูหลัก", exact: true }).click();
       await expect(page.getByRole("dialog")).toBeVisible();
       await green(page.getByRole("dialog").locator(".ant-menu-item-selected"), "color");
+      await readable(page.getByRole("dialog").locator(".ant-menu-item-selected"));
     }
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),

@@ -280,7 +280,7 @@ body {
 }
 
 :root {
-  --gov-surface-soft: color-mix(in srgb, var(--gov-brand-primary) 8%, white);
+  --gov-surface-soft: var(--gov-brand-soft);
   --gov-page-surface: color-mix(in srgb, var(--gov-brand-surface) 45%, white);
   --municipal-green: var(--gov-brand-primary);
   --municipal-dark: var(--gov-brand-dark);
@@ -2314,7 +2314,7 @@ button.queue-item {
   appearance: none;
 }
 button.queue-item:hover {
-  border-color: #70a18a;
+  border-color: var(--gov-brand-primary);
   background: var(--gov-surface-soft);
 }
 button.queue-item:focus-visible {
@@ -2519,7 +2519,7 @@ button.queue-item .queue-item-top .ant-tag {
   box-shadow: none;
 }
 .staff-shell .ant-btn:focus-visible {
-  outline: 3px solid #70a995;
+  outline: 3px solid var(--gov-brand-primary);
   outline-offset: 3px;
 }
 .staff-shell .ant-tag {
@@ -2887,7 +2887,7 @@ button.queue-item .queue-item-top .ant-tag {
 }
 .staff-shell .split-workspace .queue-item.selected {
   background: var(--gov-surface-soft);
-  border-color: #c1e5d3;
+  border-color: var(--gov-brand-secondary);
   box-shadow: inset 4px 0 var(--gov-brand-primary);
 }
 .staff-shell .split-workspace .queue-card-title {
@@ -3146,8 +3146,14 @@ button.queue-item .queue-item-top .ant-tag {
   background: var(--gov-surface-soft);
   color: var(--gov-brand-primary);
 }
-.ant-tag-green {
+.ant-tag.ant-tag-green {
   background: var(--gov-surface-soft);
   border-color: var(--gov-brand-secondary);
   color: var(--gov-brand-primary);
+}
+
+.ant-input:autofill,
+.ant-input:-webkit-autofill {
+  -webkit-text-fill-color: var(--gov-text-primary);
+  box-shadow: 0 0 0 1000px var(--gov-surface-soft) inset;
 }
