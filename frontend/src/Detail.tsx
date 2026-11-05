@@ -38,7 +38,15 @@ import {
   EnvironmentOutlined,
   CalendarOutlined,
 } from "@ant-design/icons";
-import { api, post, statusNames, actionNames, date } from "./api";
+import {
+  api,
+  post,
+  statusNames,
+  actionNames,
+  date,
+  requiredReasonActions,
+  progressLabel,
+} from "./api";
 import LocationMap from "./LocationMap";
 import { ATTACHMENT_ACCEPT, ATTACHMENT_HELP, attachmentError } from "./attachments";
 type D = Record<string, any>;
@@ -48,12 +56,14 @@ export default function Detail({
   user,
   back,
   embedded = false,
+  historyOnly = false,
   onChanged,
 }: {
   id: string;
   user: D;
   back: () => void;
   embedded?: boolean;
+  historyOnly?: boolean;
   onChanged?: () => void;
 }) {
   const [data, setData] = useState<D>(),
@@ -62,6 +72,7 @@ export default function Detail({
     [teams, setTeams] = useState<D[]>([]),
     [people, setPeople] = useState<D[]>([]),
     [busy, setBusy] = useState(false);
+  const [transferDepartments, setTransferDepartments] = useState<D[]>([]);
   const [publishSource, setPublishSource] = useState<D>();
   const [publishFile, setPublishFile] = useState<File>();
   const [confirmedClean, setConfirmedClean] = useState(false);
@@ -104,7 +115,7 @@ export default function Detail({
   async function load() {
     setError("");
     try {
-      setData(await api("/complaints/" + id));
+      setData(await api("/complaints/" + id + (historyOnly ? "?historyOnly=true" : "")));
     } catch (e) {
       setError((e as Error).message);
     }
@@ -112,13 +123,29 @@ export default function Detail({
   useEffect(() => {
     setData(undefined);
     void load();
-  }, [id]);
+  }, [id, historyOnly]);
   async function choose(a: string) {
+    if (data?.readOnlyHistory) return;
     form.resetFields();
     operationKey.current = crypto.randomUUID();
     setPeople([]);
     setTeams([]);
     setAction(a);
+    if (["REQUEST_TRANSFER", "TRANSFER_DEPARTMENT"].includes(a)) {
+      try {
+        const catalog = await api<D>("/catalog");
+        setTransferDepartments(
+          catalog.departments.filter((d: D) => d.id !== data?.complaint.department_id),
+        );
+        const pending = data?.transfers?.find((t: D) => t.state === "PENDING");
+        if (a === "TRANSFER_DEPARTMENT" && pending) {
+          form.setFieldsValue({ targetDepartmentId: pending.target_department_id });
+          setPeople(await api("/people?role=LEADER&departmentId=" + pending.target_department_id));
+        }
+      } catch (e) {
+        message.error((e as Error).message);
+      }
+    }
     if (a === "PROPOSE") {
       const revisions = (data?.resources || []).flatMap((resource: D) =>
         JSON.parse(resource.revisions || "[]"),
@@ -189,6 +216,7 @@ export default function Detail({
     }
   }
   async function submit(v: D) {
+    if (data?.readOnlyHistory) return;
     if (submitting.current) return;
     if (uploadBusy) {
       message.warning("กรุณารอให้อัปโหลดไฟล์เสร็จก่อน");
@@ -308,18 +336,36 @@ export default function Detail({
     />
   );
   const c = data.complaint;
+  const returnReasons = Array.from(
+    new Set<string>(
+      [
+        ...(data.workOrders || []).map((w: D) => w.reason),
+        ...(data.history || [])
+          .filter((h: D) => ["DECLINE", "RETURN_ASSIGNMENT"].includes(h.action))
+          .map((h: D) => h.reason),
+      ].filter(
+        (reason: unknown): reason is string => typeof reason === "string" && !!reason.trim(),
+      ),
+    ),
+  );
   const citizen = user.role === "CITIZEN";
   const latestResource = data.resources?.at(-1);
   const uploadAllowed =
-    (citizen && c.status === "NEW") ||
-    (user.role === "FIELD" && ["IN_PROGRESS", "FIELD_REVISION"].includes(c.status)) ||
-    (user.role === "LEADER" && ["RESOURCE_DRAFT", "RESOURCE_REVISION"].includes(c.status));
+    !data.readOnlyHistory &&
+    ((citizen && c.status === "NEW") ||
+      (user.role === "FIELD" && ["IN_PROGRESS", "FIELD_REVISION"].includes(c.status)) ||
+      (user.role === "LEADER" && ["RESOURCE_DRAFT", "RESOURCE_REVISION"].includes(c.status)));
   const stages = ["NEW", "TRIAGED", "ASSIGNED", "IN_PROGRESS", "LEADER_REVIEW", "CLOSED"];
   let current = ["CLOSED"].includes(c.status)
     ? 5
-    : ["RESOLVED", "OFFICER_REVIEW", "LEADER_REVISION", "LEADER_REVIEW", "FIELD_REVISION"].includes(
-          c.status,
-        )
+    : [
+          "RESOLVED",
+          "OFFICER_REVIEW",
+          "LEADER_REVISION",
+          "LEADER_REVIEW",
+          "FIELD_REVISION",
+          "TRANSFER_PENDING",
+        ].includes(c.status)
       ? 4
       : c.status === "IN_PROGRESS"
         ? 3
@@ -347,7 +393,7 @@ export default function Detail({
           <Space wrap>
             <Text type="secondary">#{id.slice(0, 8).toUpperCase()}</Text>
             <Tag color={["REJECTED", "TERMINATED"].includes(c.status) ? "red" : "cyan"}>
-              {statusNames[c.status]}
+              {progressLabel(c)}
             </Tag>
           </Space>
         </div>
@@ -418,7 +464,33 @@ export default function Detail({
           />
         </Card>
       </details>
-      {!citizen && (
+      {data.routeReservation?.length > 0 && (
+        <Alert
+          type="info"
+          showIcon
+          message={`งานนี้อยู่ในรอบ ${data.routeReservation[0].name} กรุณาเปิดเมนูวางแผนเส้นทางเพื่อยืนยันทีมหรือส่งกลับรอบ`}
+        />
+      )}
+      {data.readOnlyHistory && (
+        <Alert
+          type="info"
+          showIcon
+          message={
+            data.limitedHistory
+              ? "ประวัติการทำงานของคุณ แสดงเฉพาะข้อมูลที่เคยดำเนินการและไม่สามารถแก้ไขได้"
+              : "ประวัติงาน เปิดดูข้อมูลได้ ไม่สามารถดำเนินการจากหน้านี้"
+          }
+        />
+      )}
+      {data.readOnlyHistory && returnReasons.length > 0 && (
+        <Card title={<Title level={5}>เหตุผลส่งคืนงาน</Title>}>
+          <List
+            dataSource={returnReasons}
+            renderItem={(reason) => <List.Item>{reason}</List.Item>}
+          />
+        </Card>
+      )}
+      {!citizen && !data.limitedHistory && (
         <details
           className="split-section"
           open={
@@ -431,9 +503,41 @@ export default function Detail({
           <ResourceReview resources={data.resources} files={data.files} />
         </details>
       )}
+      {!citizen && data.transfers?.length > 0 && (
+        <Card title="การส่งต่อหน่วยงาน">
+          <List
+            dataSource={data.transfers}
+            renderItem={(t: D) => (
+              <List.Item>
+                <div>
+                  <Text strong>
+                    {t.source_department_name} → {t.target_department_name}
+                  </Text>
+                  <Paragraph>{t.reason}</Paragraph>
+                  <Text type="secondary">
+                    {t.state === "PENDING"
+                      ? "รอเจ้าหน้าที่ส่งต่อ"
+                      : t.state === "ACCEPTED"
+                        ? "ส่งต่อแล้ว"
+                        : "ส่งกลับแก้ไข"}{" "}
+                    · {date(t.created_at)}
+                  </Text>
+                  {t.review_reason && <Paragraph>{t.review_reason}</Paragraph>}
+                </div>
+              </List.Item>
+            )}
+          />
+        </Card>
+      )}
       {!citizen &&
         data.reports?.length > 0 &&
-        ["LEADER_REVIEW", "OFFICER_REVIEW", "LEADER_REVISION", "RESOLVED"].includes(c.status) && (
+        [
+          "LEADER_REVIEW",
+          "OFFICER_REVIEW",
+          "LEADER_REVISION",
+          "RESOLVED",
+          "TRANSFER_PENDING",
+        ].includes(c.status) && (
           <Card className="report-review-card" title="รายงานล่าสุดและหลักฐานประกอบ">
             <Paragraph>{data.reports.at(-1).content}</Paragraph>
             <EvidenceGallery
@@ -765,6 +869,7 @@ export default function Detail({
               <AttachmentList
                 files={data.files}
                 extraActions={(f: D) =>
+                  !data.readOnlyHistory &&
                   ["OFFICER", "ADMIN"].includes(user.role) &&
                   (f.content_type?.startsWith("image/") || f.content_type?.startsWith("video/")) ? (
                     f.public_copy_of ? (
@@ -800,7 +905,7 @@ export default function Detail({
             </Card>
           </Col>
           <Col xs={24} xl={embedded ? 24 : 8}>
-            {!embedded && data.actions?.length > 0 && (
+            {!data.readOnlyHistory && !embedded && data.actions?.length > 0 && (
               <Card title="ดำเนินการ" style={{ marginBottom: 20 }}>
                 <Space direction="vertical" style={{ width: "100%" }}>
                   {data.actions.map((r: D) => (
@@ -853,7 +958,7 @@ export default function Detail({
           />
         </Card>
       </details>
-      {embedded && data.actions?.length > 0 && (
+      {!data.readOnlyHistory && embedded && data.actions?.length > 0 && (
         <Card className="embedded-actions split-action-dock" title="ดำเนินการ">
           <Space wrap>
             {data.actions.map((r: D) => (
@@ -881,14 +986,14 @@ export default function Detail({
         </Card>
       )}
       <Modal
-        open={!!publishSource}
+        open={!data.readOnlyHistory && !!publishSource}
         title="เผยแพร่สำเนาหลักฐานในชุมชน"
         onCancel={() => setPublishSource(undefined)}
         okText="ยืนยันเผยแพร่สำเนา"
         confirmLoading={publishing}
         okButtonProps={{ disabled: !publishFile || !confirmedClean }}
         onOk={async () => {
-          if (!publishFile || !publishSource || !confirmedClean) return;
+          if (data.readOnlyHistory || !publishFile || !publishSource || !confirmedClean) return;
           setPublishing(true);
           try {
             const body = new FormData();
@@ -1026,6 +1131,39 @@ export default function Detail({
               message="การไม่อนุมัติจะยุติคำร้องทั้งเรื่องและยกเลิกงานที่ค้าง"
             />
           )}
+          {["REQUEST_TRANSFER", "TRANSFER_DEPARTMENT"].includes(action) && (
+            <>
+              <Form.Item
+                name="targetDepartmentId"
+                label="หน่วยงานที่จะรับช่วงต่อ"
+                rules={[{ required: true, message: "กรุณาเลือกหน่วยงาน" }]}
+              >
+                <Select
+                  disabled={action === "TRANSFER_DEPARTMENT" && c.status === "TRANSFER_PENDING"}
+                  options={transferDepartments.map((d) => ({ value: d.id, label: d.name }))}
+                  onChange={async (department) => {
+                    form.setFieldsValue({ leaderId: undefined });
+                    setPeople([]);
+                    if (action === "TRANSFER_DEPARTMENT")
+                      try {
+                        setPeople(await api("/people?role=LEADER&departmentId=" + department));
+                      } catch (e) {
+                        message.error((e as Error).message);
+                      }
+                  }}
+                />
+              </Form.Item>
+              {action === "TRANSFER_DEPARTMENT" && (
+                <Form.Item
+                  name="leaderId"
+                  label="หัวหน้าหน่วยงานที่รับช่วงต่อ"
+                  rules={[{ required: true, message: "กรุณาเลือกหัวหน้า" }]}
+                >
+                  <Select options={people.map((p) => ({ value: p.id, label: p.display_name }))} />
+                </Form.Item>
+              )}
+            </>
+          )}
           {action === "TRIAGE" && (
             <>
               <Form.Item name="operationMethod" label="วิธีดำเนินงาน" rules={[{ required: true }]}>
@@ -1155,19 +1293,35 @@ export default function Detail({
                               min={0}
                               max={999999999999.99}
                               precision={2}
+                              inputMode="decimal"
+                              onKeyDown={(e) => {
+                                if (
+                                  !e.ctrlKey &&
+                                  !e.metaKey &&
+                                  e.key.length === 1 &&
+                                  !/[0-9.]/.test(e.key)
+                                )
+                                  e.preventDefault();
+                              }}
+                              onPaste={(e) => {
+                                if (!/^\d*(\.\d{0,2})?$/.test(e.clipboardData.getData("text")))
+                                  e.preventDefault();
+                              }}
                               placeholder="0.00"
                               style={{ width: "100%" }}
                             />
                           </Form.Item>
-                          <Button
-                            className="resource-remove"
-                            icon={<DeleteOutlined />}
-                            danger
-                            aria-label={"ลบรายการ " + (index + 1)}
-                            onClick={() => remove(field.name)}
-                          >
-                            ลบ
-                          </Button>
+                          {index > 0 && (
+                            <Button
+                              className="resource-remove"
+                              icon={<DeleteOutlined />}
+                              danger
+                              aria-label={"ลบรายการ " + (index + 1)}
+                              onClick={() => remove(field.name)}
+                            >
+                              ลบ
+                            </Button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1253,17 +1407,28 @@ export default function Detail({
                   onBusy={setUploadBusy}
                   onFailed={saveFailedFile}
                 />
+                {evidenceList("GENERAL")}
               </details>
               <Text type="secondary">ภาพก่อนและหลังต้องเป็น PNG/JPEG · {ATTACHMENT_HELP}</Text>
             </>
           )}
-          <Form.Item
-            label="เหตุผล / บันทึกการดำเนินการ"
-            name="reason"
-            rules={[{ required: true, max: 4000 }]}
-          >
-            <Input.TextArea rows={3} />
-          </Form.Item>
+          {!["ACCEPT", "START", "PROPOSE", "REPORT"].includes(action) && (
+            <Form.Item
+              label="เหตุผล / บันทึกการดำเนินการ"
+              name="reason"
+              rules={[
+                {
+                  required: requiredReasonActions.has(action),
+                  whitespace: true,
+                  max: 4000,
+                  message: "กรุณาระบุเหตุผลให้ครบถ้วน",
+                },
+              ]}
+              extra={requiredReasonActions.has(action) ? undefined : "ไม่บังคับกรอก"}
+            >
+              <Input.TextArea rows={3} />
+            </Form.Item>
+          )}
           <Button
             htmlType="submit"
             type="primary"

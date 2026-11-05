@@ -1,4 +1,4 @@
-import { Card, List, Tag, Typography } from "antd";
+import { Card, List, Tag, Typography, Empty } from "antd";
 import AttachmentList from "./AttachmentList";
 import { date } from "./api";
 type D = Record<string, any>;
@@ -13,7 +13,13 @@ export default function ResourceReview({
     .map((resource): D => ({ ...resource, revisions: JSON.parse(resource.revisions || "[]") }))
     .filter((resource) => resource.revisions.length);
   const latest = submitted.at(-1);
-  if (!latest) return null;
+  if (!latest)
+    return (
+      <Empty
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+        description="ยังไม่มีข้อเสนอทรัพยากร หัวหน้าสามารถจัดทำและแนบเอกสารจากปุ่มส่งข้อเสนอทรัพยากร"
+      />
+    );
   const revision = latest.revisions.at(-1);
   const current = files.filter((file) => file.resource_revision_id === revision.id);
   const legacy = files.filter(

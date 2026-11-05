@@ -107,7 +107,10 @@ class TownTrackIntegrationTest {
     UUID id = create();
     action(id, "OFFICER", "TRIAGE", Map.of("leaderId", users.get("LEADER")))
         .andExpect(status().isOk());
-    action(id, "LEADER", "REQUEST_RESOURCE", Map.of()).andExpect(status().isOk());
+    action(id, "LEADER", "ASSIGN", Map.of("assigneeId", users.get("FIELD")))
+        .andExpect(status().isOk());
+    action(id, "FIELD", "ACCEPT", Map.of()).andExpect(status().isOk());
+    action(id, "FIELD", "REQUEST_RESOURCE", Map.of()).andExpect(status().isOk());
     evidence(id, "LEADER");
     action(
             id,
@@ -182,7 +185,7 @@ class TownTrackIntegrationTest {
                             "version",
                             version(id)))))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("TRIAGED"));
+        .andExpect(jsonPath("$.status").value("READY"));
     UUID otherTown = UUID.randomUUID();
     db.run("INSERT INTO municipality(id,name) VALUES(?,'Other approval town')", otherTown);
     db.run(
@@ -217,7 +220,7 @@ class TownTrackIntegrationTest {
     UUID id = create();
     action(id, "OFFICER", "TRIAGE", Map.of("leaderId", users.get("LEADER")))
         .andExpect(status().isOk());
-    action(id, "LEADER", "REQUEST_RESOURCE", Map.of()).andExpect(status().isOk());
+    legacyPreAssignmentResource(id);
     evidence(id, "LEADER");
     action(
             id,
@@ -923,8 +926,7 @@ class TownTrackIntegrationTest {
     UUID id = create();
     action(id, "OFFICER", "TRIAGE", Map.of("leaderId", users.get("LEADER")))
         .andExpect(status().isOk());
-    action(id, "LEADER", "REQUEST_RESOURCE", Map.of("workflow_origin", "POST_ACCEPT"))
-        .andExpect(status().isOk());
+    legacyPreAssignmentResource(id);
     assertEquals("PRE_ASSIGN", workflow.resource(id).get("workflow_origin"));
     evidence(id, "LEADER");
     action(
@@ -1213,6 +1215,8 @@ class TownTrackIntegrationTest {
   ResultActions action(UUID id, String role, String action, Map<String, Object> extras)
       throws Exception {
     var b = new HashMap<String, Object>(extras);
+    if (action.equals("PROPOSE") && !b.containsKey("lineItems") && b.containsKey("amount"))
+      b.put("lineItems", List.of(Map.of("name", "Test materials", "amount", b.get("amount"))));
     b.put("version", version(id));
     b.put("action", action);
     b.put("reason", "Integration test reason");
@@ -1260,6 +1264,16 @@ class TownTrackIntegrationTest {
                 .with(user("test" + role).roles(role))
                 .with(csrf()))
         .andExpect(status().isOk());
+  }
+
+  void legacyPreAssignmentResource(UUID id) {
+    // Existing open requests must still finish after FIELD-only initiation is enforced.
+    db.run(
+        "INSERT INTO resource_request(id,complaint_id,requested_by,workflow_origin) VALUES(?,?,?,'PRE_ASSIGN')",
+        UUID.randomUUID(),
+        id,
+        users.get("LEADER"));
+    db.run("UPDATE complaint SET status='RESOURCE_DRAFT',version=version+1 WHERE id=?", id);
   }
 
   void requestResource(UUID id) throws Exception {

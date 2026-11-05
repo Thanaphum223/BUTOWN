@@ -23,7 +23,7 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
 } from "@ant-design/icons";
-import { api, statusNames } from "./api";
+import { api, progressLabel } from "./api";
 import { useGeo } from "./GeoContext";
 import CommunityDetail from "./CommunityDetail";
 import CommunityActions from "./CommunityActions";
@@ -142,7 +142,7 @@ export default function CitizenHome({
   );
   const statusTag = (item: D) => (
     <Tag color={item.status === "CLOSED" ? "green" : item.status === "NEW" ? "orange" : "blue"}>
-      {statusNames[item.status] || item.status}
+      {progressLabel(item) || item.status}
     </Tag>
   );
   const renderIssue = (item: D) => (

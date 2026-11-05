@@ -30,9 +30,11 @@ export default function EvidenceUpload({
   const [percent, setPercent] = useState(0);
   const [error, setError] = useState("");
   const [lastFile, setLastFile] = useState("");
+  const [success, setSuccess] = useState("");
   const accept = pdf ? ".pdf" : photos ? ".jpg,.jpeg,.png" : ATTACHMENT_ACCEPT;
   const send = async (file: File) => {
     if (busy || disabled) return false;
+    setSuccess("");
     const problem =
       attachmentError(file, used) ||
       (pdf && (!/\.pdf$/i.test(file.name) || file.size > 15_000_000)
@@ -56,6 +58,7 @@ export default function EvidenceUpload({
       body.append("evidenceStage", stage);
       await uploadFile(`/complaints/${complaintId}/files`, body, setPercent);
       await onUploaded();
+      setSuccess(`แนบไฟล์แล้ว: ${file.name}`);
     } catch (e) {
       setError((e as Error).message);
       if (onFailed) await onFailed(file, stage);
@@ -101,6 +104,11 @@ export default function EvidenceUpload({
               ? "กำลังตรวจสอบและบันทึกไฟล์ กรุณารอสักครู่"
               : "กำลังอัปโหลด กรุณาเปิดหน้านี้ไว้"}
           </Typography.Text>
+        </div>
+      )}
+      {success && (
+        <div role="status">
+          <Alert type="success" showIcon message={success} />
         </div>
       )}
       {error && <Alert type="error" showIcon message={error} />}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Alert, Button, Card, List, Pagination, Space, Tabs, Tag, Typography } from "antd";
-import { api, date, statusNames } from "./api";
+import { api, date, progressLabel } from "./api";
 import CommunityDetail from "./CommunityDetail";
 type D = Record<string, any>;
 export default function CitizenTracking({
@@ -91,7 +91,7 @@ export default function CitizenTracking({
                   title={item.category_name}
                   description={
                     <Space wrap>
-                      <Tag>{statusNames[item.status]}</Tag>
+                      <Tag>{progressLabel(item)}</Tag>
                       <span>
                         #{item.id.slice(0, 8)} · {date(item.updated_at)}
                       </span>

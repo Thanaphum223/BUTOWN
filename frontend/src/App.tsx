@@ -9,6 +9,7 @@ import CommunityDetail from "./CommunityDetail";
 import NewCase from "./NewCase";
 import { lazy } from "react";
 const EmergencyContacts = lazy(() => import("./EmergencyContacts"));
+const RoutePlanning = lazy(() => import("./RoutePlanning"));
 const Teams = lazy(() => import("./Teams"));
 const Admin = lazy(() => import("./Admin"));
 const Detail = lazy(() => import("./Detail"));
@@ -225,6 +226,20 @@ function TownTrackApp() {
       : []),
     ...(user.role === "LEADER"
       ? [{ key: "teams", icon: <TeamOutlined />, label: "ทีมลงพื้นที่" }]
+      : []),
+    ...(["OFFICER", "LEADER", "FIELD", "ADMIN"].includes(user.role)
+      ? [
+          {
+            key: "routes",
+            icon: <EnvironmentOutlined />,
+            label:
+              user.role === "FIELD"
+                ? "รอบงานของฉัน"
+                : user.role === "ADMIN"
+                  ? "รอบงานลงพื้นที่"
+                  : "วางแผนเส้นทาง",
+          },
+        ]
       : []),
     { key: "notifications", icon: <BellOutlined />, label: "การแจ้งเตือน" },
     ...(user.role === "ADMIN"
@@ -468,6 +483,8 @@ function TownTrackApp() {
               <Notifications open={open} citizen={user.role === "CITIZEN"} />
             ) : view === "emergency" ? (
               <EmergencyContacts />
+            ) : view === "routes" ? (
+              <RoutePlanning key={`${user.id}:${user.role}`} user={user} />
             ) : view === "teams" ? (
               <Teams />
             ) : view === "admin" ? (

@@ -20,6 +20,10 @@ public class ComplaintController {
   final FileController files;
   @org.springframework.beans.factory.annotation.Autowired EvidenceMedia media;
   @org.springframework.beans.factory.annotation.Autowired SubmissionKeys keys;
+  @org.springframework.beans.factory.annotation.Autowired WorkflowPolicy policy;
+  @org.springframework.beans.factory.annotation.Autowired WorkHistory workHistory;
+  @org.springframework.beans.factory.annotation.Autowired DepartmentTransfers transfers;
+  @org.springframework.beans.factory.annotation.Autowired RoleQueues queues;
 
   public ComplaintController(Db d, Access a, Workflow w, ObjectMapper j, FileController files) {
     db = d;
@@ -40,6 +44,8 @@ public class ComplaintController {
     return Map.of(
         "categories",
         categories,
+        "queues",
+        queues.options((String) u.get("role")),
         "departments",
         db.list(
             "SELECT id,name FROM department WHERE municipality_id=?", u.get("municipality_id")));
@@ -169,11 +175,13 @@ public class ComplaintController {
       @RequestParam(defaultValue = "10") int size,
       @RequestParam(defaultValue = "") String q,
       @RequestParam(defaultValue = "") String status,
+      @RequestParam(defaultValue = "") String queue,
       @RequestParam(required = false) UUID categoryId,
       @RequestParam(defaultValue = "") String area,
       @RequestParam(defaultValue = "newest") String sort,
       @RequestParam(defaultValue = "false") boolean activeOnly,
-      @RequestParam(defaultValue = "false") boolean completedOnly) {
+      @RequestParam(defaultValue = "false") boolean completedOnly,
+      @RequestParam(defaultValue = "false") boolean historyOnly) {
     if (page < 0
         || page > 1000000
         || size < 1
@@ -189,12 +197,12 @@ public class ComplaintController {
           case "FIELD" ->
               "EXISTS(SELECT 1 FROM work_order w WHERE w.complaint_id=c.id AND (w.assignee_id=? OR"
                   + " EXISTS(SELECT 1 FROM work_member wm WHERE wm.work_order_id=w.id AND"
-                  + " wm.user_id=?)) AND w.status NOT IN ('DECLINED','CANCELLED'))";
+                  + " wm.user_id=?)) AND NOT w.handed_off AND w.status NOT IN ('DECLINED','CANCELLED'))";
           case "APPROVER" ->
               "EXISTS(SELECT 1 FROM resource_request r WHERE r.complaint_id=c.id AND"
                   + (Access.approvalOverview(u)
-                      ? " r.approver_id IS NOT NULL)"
-                      : " r.approver_id=?)");
+                      ? " NOT r.handed_off AND r.approver_id IS NOT NULL)"
+                      : " NOT r.handed_off AND r.approver_id=?)");
           default -> "false";
         };
     var args = new ArrayList<Object>();
@@ -202,6 +210,18 @@ public class ComplaintController {
     if (!List.of("ADMIN", "OFFICER").contains(u.get("role")) && !Access.approvalOverview(u))
       args.add(u.get("id"));
     if (u.get("role").equals("FIELD")) args.add(u.get("id"));
+    if (historyOnly) {
+      if (activeOnly || completedOnly) throw new IllegalArgumentException();
+      scope =
+          "(("
+              + scope
+              + ") AND c.status IN ('CLOSED','REJECTED','TERMINATED') OR "
+              + WorkHistory.OWN_OUTCOME
+              + ")";
+      args.add(u.get("id"));
+      args.add(u.get("id"));
+      args.add(u.get("id"));
+    }
     String base =
         " FROM complaint c JOIN category k ON k.id=c.category_id WHERE c.municipality_id=? AND "
             + scope;
@@ -215,6 +235,13 @@ public class ComplaintController {
             args.toArray());
     if (completedOnly) base += " AND c.status IN ('CLOSED','REJECTED','TERMINATED')";
     if (activeOnly) base += " AND c.status NOT IN ('CLOSED','REJECTED','TERMINATED')";
+    if (!queue.isBlank()) {
+      if (historyOnly || queue.length() > 40) throw new IllegalArgumentException();
+      var states = queues.statuses((String) u.get("role"), queue);
+      base +=
+          " AND c.status IN (" + String.join(",", Collections.nCopies(states.size(), "?")) + ")";
+      args.addAll(states);
+    }
     if (!q.isBlank()) {
       base += " AND (c.title ILIKE ? OR c.id::text ILIKE ?)";
       args.add("%" + q + "%");
@@ -253,11 +280,23 @@ public class ComplaintController {
   }
 
   @GetMapping("/complaints/{id}")
-  public Object detail(@PathVariable UUID id, Authentication a) {
+  public Object detail(
+      @PathVariable UUID id,
+      Authentication a,
+      @RequestParam(defaultValue = "false") boolean historyOnly) {
     var u = access.user(a);
-    var c = access.complaint(id, u, false);
+    Map<String, Object> c;
+    try {
+      c = access.complaint(id, u, false);
+    } catch (ResponseStatusException denied) {
+      if (historyOnly && denied.getStatusCode().value() == 403 && workHistory.hasOutcome(id, u))
+        return workHistory.detail(id, u);
+      throw denied;
+    }
     boolean citizen = u.get("role").equals("CITIZEN");
+    transfers.publicProgress(c);
     var result = new LinkedHashMap<String, Object>();
+    result.put("readOnlyHistory", historyOnly);
     if (citizen) {
       var clean = new LinkedHashMap<String, Object>();
       for (String k :
@@ -272,7 +311,8 @@ public class ComplaintController {
               "due_at",
               "latitude",
               "longitude",
-              "version")) clean.put(k, c.get(k));
+              "version",
+              "transfer_department_name")) clean.put(k, c.get(k));
       result.put("complaint", clean);
       result.put(
           "history",
@@ -291,10 +331,20 @@ public class ComplaintController {
       result.put("actions", List.of());
       return result;
     }
+    result.put(
+        "transfers",
+        db.list(
+            "SELECT t.*,s.name source_department_name,d.name target_department_name FROM department_transfer t JOIN department s ON s.id=t.source_department_id JOIN department d ON d.id=t.target_department_id WHERE t.complaint_id=? ORDER BY t.created_at",
+            id));
     c.put("assignment_details", c.get("assignment_details").toString());
     c.put("answers", c.get("answers").toString());
     c.put("form_schema", c.get("form_schema").toString());
     result.put("complaint", c);
+    result.put(
+        "routeReservation",
+        db.list(
+            "SELECT p.id,p.name FROM route_stop rs JOIN route_plan p ON p.id=rs.plan_id WHERE rs.complaint_id=? AND rs.reserved",
+            id));
     result.put(
         "history",
         db.list(
@@ -312,11 +362,13 @@ public class ComplaintController {
         db.list(
             "SELECT r.*,u.display_name approver_name,COALESCE((SELECT json_agg(v ORDER BY v.revision) FROM resource_revision v"
                 + " WHERE v.resource_id=r.id),'[]'::json)::text revisions FROM resource_request r"
-                + " LEFT JOIN app_user u ON u.id=r.approver_id WHERE r.complaint_id=? ORDER BY r.created_at",
+                + " LEFT JOIN app_user u ON u.id=r.approver_id WHERE r.complaint_id=? ORDER BY r.handed_off DESC,r.created_at",
             id));
     result.put(
         "reports",
-        db.list("SELECT * FROM field_report WHERE complaint_id=? ORDER BY revision", id));
+        db.list(
+            "SELECT r.* FROM field_report r JOIN work_order w ON w.id=r.work_order_id WHERE r.complaint_id=? ORDER BY w.handed_off DESC,r.created_at,r.revision",
+            id));
     result.put(
         "reviews",
         db.list(
@@ -353,14 +405,7 @@ public class ComplaintController {
             || u.get("id").equals(workflow.resource(id).get("approver_id"));
     result.put(
         "actions",
-        representative && approvalRecipient
-            ? db.list(
-                "SELECT action FROM workflow_transition WHERE workflow_id=? AND from_status=? AND"
-                    + " role=?",
-                c.get("workflow_id"),
-                c.get("status"),
-                u.get("role"))
-            : List.of());
+        !historyOnly && representative && approvalRecipient ? policy.actions(c, u) : List.of());
     return result;
   }
 
@@ -477,6 +522,8 @@ public class ComplaintController {
                 + " AND EXISTS(SELECT 1 FROM complaint_vote v WHERE v.complaint_id=c.id)"
                 + " ORDER BY votes DESC,c.created_at DESC,c.id LIMIT 5",
             readerParameters.toArray());
+    items.forEach(transfers::publicProgress);
+    top.forEach(transfers::publicProgress);
     media.decorate(items, u);
     media.decorate(top, u);
     return Map.of(
@@ -504,6 +551,7 @@ public class ComplaintController {
                 + "(c.external_id LIKE 'mock-community-v1:%') mock"
                 + " FROM complaint c JOIN category k ON k.id=c.category_id WHERE c.id=? AND c.municipality_id=?",
             id, u.get("municipality_id"));
+    transfers.publicProgress(c);
     return Map.of(
         "complaint",
         c,

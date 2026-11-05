@@ -90,6 +90,8 @@ export async function uploadFile<T = any>(
 export const post = (url: string, data: unknown) =>
   api(url, { method: "POST", body: JSON.stringify(data) });
 export const statusNames: Record<string, string> = {
+  DEPARTMENT_RETURNED: "รอเจ้าหน้าที่จ่ายงานใหม่",
+  TRANSFER_PENDING: "รอส่งต่อให้หน่วยงานอื่น",
   NEW: "รอรับเรื่อง",
   TRIAGED: "รอจัดทีม",
   ASSIGNED: "รอทีมรับงาน",
@@ -110,6 +112,10 @@ export const statusNames: Record<string, string> = {
   REJECTED: "ไม่รับคำร้อง",
 };
 export const actionNames: Record<string, string> = {
+  RETURN_ASSIGNMENT: "ส่งคืนงานที่จ่ายผิด",
+  REQUEST_TRANSFER: "ส่งต่อหน่วยงานอื่น",
+  TRANSFER_DEPARTMENT: "จ่ายงานให้หน่วยงานถัดไป",
+  RETURN_TRANSFER: "ส่งกลับแก้ไขคำขอส่งต่อ",
   CREATE: "ยื่นคำร้อง",
   TRIAGE: "รับเรื่องและส่งหน่วยงาน",
   REJECT: "ไม่รับคำร้อง",
@@ -146,3 +152,24 @@ export const date = (v: string) =>
         timeStyle: "short",
       })
     : "—";
+
+export const requiredReasonActions = new Set([
+  "REJECT",
+  "DECLINE",
+  "RETURN_ASSIGNMENT",
+  "REQUEST_RESOURCE",
+  "RETURN_RESOURCE",
+  "RETURN_FIELD",
+  "RETURN_LEADER",
+  "REQUEST_TRANSFER",
+  "TRANSFER_DEPARTMENT",
+  "RETURN_TRANSFER",
+  "APPROVE",
+  "DENY",
+  "CLOSE",
+]);
+export function progressLabel(item: Record<string, any>) {
+  return item.transfer_department_name
+    ? `กำลังดำเนินการ · ส่งต่อให้${item.transfer_department_name}รับช่วงต่อ`
+    : statusNames[item.status] || item.status;
+}

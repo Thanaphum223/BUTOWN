@@ -64,9 +64,9 @@ export default function StaffWorkspace({
     api<D>(
       "/complaints?page=" +
         (page - 1) +
-        `&size=10&${history ? "completedOnly" : "activeOnly"}=true&q=` +
+        `&size=10&${history ? "historyOnly" : "activeOnly"}=true&q=` +
         encodeURIComponent(query) +
-        "&status=" +
+        (history ? "&status=" : "&queue=") +
         encodeURIComponent(status || "") +
         `&sort=${sort}&area=${encodeURIComponent(area)}${category ? `&categoryId=${category}` : ""}`,
     )
@@ -203,14 +203,13 @@ export default function StaffWorkspace({
                   setStatus(v);
                   setPage(1);
                 }}
-                options={Object.entries(statusNames)
-                  .filter(
-                    ([value]) => history === ["CLOSED", "REJECTED", "TERMINATED"].includes(value),
-                  )
-                  .map(([value, label]) => ({
-                    value,
-                    label,
-                  }))}
+                options={
+                  history
+                    ? Object.entries(statusNames)
+                        .filter(([value]) => ["CLOSED", "REJECTED", "TERMINATED"].includes(value))
+                        .map(([value, label]) => ({ value, label }))
+                    : catalog?.queues || []
+                }
               />
               <Space direction="vertical" style={{ width: "100%", marginTop: 12 }}>
                 <Select
@@ -280,13 +279,7 @@ export default function StaffWorkspace({
                   { value: "REJECTED", label: "ปฏิเสธ" },
                   { value: "TERMINATED", label: "ยุติเรื่อง" },
                 ]
-              : [
-                  { value: undefined, label: "ทั้งหมด" },
-                  { value: "NEW", label: "รอรับเรื่อง" },
-                  { value: "IN_PROGRESS", label: "กำลังดำเนินการ" },
-                  { value: "OFFICER_REVIEW", label: "รอเจ้าหน้าที่ตรวจ" },
-                  { value: "RESOURCE_APPROVAL", label: "รออนุมัติ" },
-                ]
+              : [{ value: undefined, label: "งานทั้งหมด" }, ...(catalog?.queues || [])]
             ).map((option) => (
               <Button
                 key={option.value || "all"}
@@ -391,6 +384,7 @@ export default function StaffWorkspace({
               id={selected}
               user={user}
               embedded
+              historyOnly={history}
               onChanged={reload}
               back={() => {
                 setSelected("");

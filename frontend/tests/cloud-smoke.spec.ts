@@ -1,15 +1,22 @@
 import { test, expect } from "@playwright/test";
 import { signIn as login } from "./product-flow";
 import { waitForLoginSlot } from "./login-rate";
-for (const role of ["officer", "leader", "field", "approver", "admin"]) {
+for (const role of ["officer", "leader", "field", "approver", "admin"] as const) {
   test(`${role}: queue and completed history remain accessible`, async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await login(page, role);
     await page.getByRole("menuitem", { name: /คิวงาน/ }).click();
     await expect(page.getByRole("searchbox", { name: "ค้นหาเลขเรื่อง / หัวข้อ" })).toBeVisible();
-    await page.getByRole("button", { name: "รอรับเรื่อง", exact: true }).click();
-    await expect(page.getByRole("button", { name: "รอรับเรื่อง", exact: true })).toHaveAttribute(
+    const queueLabel = {
+      officer: "รอรับเรื่อง",
+      leader: "รอจัดทีม",
+      field: "รอรับงาน",
+      approver: "รอพิจารณาทรัพยากร",
+      admin: "รับเรื่อง / จัดทีม",
+    }[role];
+    await page.getByRole("button", { name: queueLabel, exact: true }).click();
+    await expect(page.getByRole("button", { name: queueLabel, exact: true })).toHaveAttribute(
       "aria-pressed",
       "true",
     );

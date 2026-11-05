@@ -14,6 +14,9 @@ public class Workflow {
   @org.springframework.beans.factory.annotation.Autowired
   com.fasterxml.jackson.databind.ObjectMapper json;
 
+  @org.springframework.beans.factory.annotation.Autowired WorkflowPolicy policy;
+  @org.springframework.beans.factory.annotation.Autowired DepartmentTransfers transfers;
+
   public Workflow(Db d, Access a) {
     db = d;
     access = a;
@@ -23,7 +26,6 @@ public class Workflow {
     {"NEW", "TRIAGE", "TRIAGED", "OFFICER"},
     {"NEW", "REJECT", "REJECTED", "OFFICER"},
     {"TRIAGED", "ASSIGN", "ASSIGNED", "LEADER"},
-    {"TRIAGED", "REQUEST_RESOURCE", "RESOURCE_DRAFT", "LEADER"},
     {"ASSIGNED", "ACCEPT", "ACCEPTED", "FIELD"},
     {"ASSIGNED", "DECLINE", "TRIAGED", "FIELD"},
     {"ACCEPTED", "REQUEST_RESOURCE", "RESOURCE_DRAFT", "FIELD"},
@@ -75,10 +77,14 @@ public class Workflow {
 
   public void audit(
       Map<String, Object> u, UUID id, String action, String from, String to, String reason) {
+    var details = new LinkedHashMap<String, Object>();
+    details.put("actorRole", u.get("role"));
+    details.put("actorName", u.get("display_name"));
+    if (u.get("department_id") != null) details.put("actorDepartmentId", u.get("department_id"));
     db.run(
         "INSERT INTO"
-            + " audit_event(id,complaint_id,municipality_id,actor_id,action,from_status,to_status,reason)"
-            + " VALUES(?,?,?,?,?,?,?,?)",
+            + " audit_event(id,complaint_id,municipality_id,actor_id,action,from_status,to_status,reason,details)"
+            + " VALUES(?,?,?,?,?,?,?,?,?::jsonb)",
         UUID.randomUUID(),
         id,
         u.get("municipality_id"),
@@ -86,7 +92,8 @@ public class Workflow {
         action,
         from,
         to,
-        reason);
+        reason,
+        json.valueToTree(details).toString());
   }
 
   public void notifyUser(Object user, UUID id, String message) {
@@ -107,6 +114,18 @@ public class Workflow {
 
   @Transactional
   public Map<String, Object> act(UUID id, Map<String, Object> b, Map<String, Object> u) {
+    return actInternal(id, b, u, null);
+  }
+
+  @Transactional
+  public Map<String, Object> actForRoute(
+      UUID id, Map<String, Object> b, Map<String, Object> u, UUID routePlan) {
+    if (!"ASSIGN".equals(b.get("action"))) Access.deny();
+    return actInternal(id, b, u, routePlan);
+  }
+
+  private Map<String, Object> actInternal(
+      UUID id, Map<String, Object> b, Map<String, Object> u, UUID routePlan) {
     var c = access.complaint(id, u, true);
     if (!(b.get("version") instanceof Number inputVersion)
         || inputVersion.longValue() < 0
@@ -115,22 +134,23 @@ public class Workflow {
     long expected = inputVersion.longValue();
     if (expected != ((Number) c.get("version")).longValue())
       throw new ResponseStatusException(HttpStatus.CONFLICT, "ข้อมูลเปลี่ยนแล้ว กรุณาโหลดใหม่");
+    var reservation =
+        db.list("SELECT plan_id FROM route_stop WHERE complaint_id=? AND reserved", id);
+    if (!reservation.isEmpty()
+        && (routePlan == null || !routePlan.equals(reservation.getFirst().get("plan_id"))))
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT, "งานอยู่ในรอบที่รอหัวหน้ายืนยันทีม กรุณาตรวจหรือส่งกลับรอบงานก่อน");
+    if (routePlan != null
+        && (reservation.isEmpty() || !routePlan.equals(reservation.getFirst().get("plan_id"))))
+      Access.deny();
     String action = text(b, "action", 40),
-        reason = text(b, "reason", 4000),
+        reason = policy.reason(b, action),
         from = (String) c.get("status");
-    var tr =
-        db.one(
-            "SELECT * FROM workflow_transition WHERE workflow_id=? AND from_status=? AND action=?",
-            c.get("workflow_id"),
-            from,
-            action);
+    var tr = policy.transition(c, action, u);
     access.role(u, (String) tr.get("role"));
     String to = (String) tr.get("to_status");
-    if (List.of("FORWARD_REPORT", "VERIFY", "CLOSE").contains(action)) {
-      var latest =
-          db.one(
-              "SELECT id FROM field_report WHERE complaint_id=? ORDER BY created_at DESC,revision DESC LIMIT 1",
-              id);
+    if (List.of("FORWARD_REPORT", "VERIFY", "CLOSE", "REQUEST_TRANSFER").contains(action)) {
+      var latest = latestReport(id);
       Object reportId = latest.get("id");
       var evidence =
           db.one(
@@ -154,6 +174,22 @@ public class Workflow {
             HttpStatus.BAD_REQUEST, "รายงานฉบับล่าสุดยังไม่ผ่านการตรวจรับของเจ้าหน้าที่");
     }
     switch (action) {
+      case "REQUEST_TRANSFER" -> {
+        transfers.request(c, b, u, reason, latestReport(id).get("id"));
+        notifyUser(c.get("officer_id"), id, "มีงานรอส่งต่อให้หน่วยงานอื่น");
+      }
+      case "TRANSFER_DEPARTMENT" -> {
+        var leader = transfers.dispatch(c, b, u, reason);
+        notifyUser(leader.get("id"), id, "มีงานรับช่วงต่อ รอจัดทีมลงพื้นที่");
+      }
+      case "RETURN_TRANSFER" -> {
+        transfers.returnRequest(id, u, reason);
+        notifyUser(c.get("leader_id"), id, "เจ้าหน้าที่ส่งกลับคำขอส่งต่อ กรุณาตรวจหมายเหตุ");
+      }
+      case "RETURN_ASSIGNMENT" -> {
+        db.run("UPDATE complaint SET leader_id=NULL WHERE id=?", id);
+        notifyUser(c.get("officer_id"), id, "หัวหน้าส่งคืนงาน กรุณาตรวจหน่วยงานที่รับผิดชอบ");
+      }
       case "TRIAGE" -> {
         var leader = access.target(b.get("leaderId"), u, "LEADER", c.get("department_id"));
         db.run(
@@ -329,6 +365,8 @@ public class Workflow {
         String proposal = text(b, "proposal", 20000);
         var lineItems = new ArrayList<Map<String, Object>>();
         java.math.BigDecimal itemTotal = java.math.BigDecimal.ZERO;
+        if (!b.containsKey("lineItems"))
+          throw new IllegalArgumentException("กรุณาระบุรายการทรัพยากรอย่างน้อย 1 รายการ");
         if (b.containsKey("lineItems")) {
           if (!(b.get("lineItems") instanceof List<?> items)
               || items.isEmpty()
@@ -500,10 +538,7 @@ public class Workflow {
               id);
       }
       case "RETURN_FIELD", "FORWARD_REPORT", "RETURN_LEADER", "VERIFY" -> {
-        var report =
-            db.one(
-                "SELECT id FROM field_report WHERE complaint_id=? ORDER BY created_at DESC,revision DESC LIMIT 1",
-                id);
+        var report = latestReport(id);
         db.run(
             "INSERT INTO review(id,complaint_id,report_id,actor_id,stage,decision,reason)"
                 + " VALUES(?,?,?,?,?,?,?)",
@@ -536,6 +571,12 @@ public class Workflow {
     notifyUser(c.get("officer_id"), id, "คำร้องมีการดำเนินการ: " + action);
     notifyUser(c.get("leader_id"), id, "คำร้องมีการดำเนินการ: " + action);
     return Map.of("id", id, "status", to, "version", expected + 1);
+  }
+
+  Map<String, Object> latestReport(UUID id) {
+    return db.one(
+        "SELECT r.* FROM field_report r JOIN work_order w ON w.id=r.work_order_id WHERE r.complaint_id=? AND NOT w.handed_off ORDER BY r.created_at DESC,r.revision DESC LIMIT 1",
+        id);
   }
 
   public Map<String, Object> resource(UUID id) {

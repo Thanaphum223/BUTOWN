@@ -63,11 +63,21 @@ export default function PdfPreview({
       .then((document) => {
         if (alive) setPdf(document);
       })
-      .catch(() => {
-        if (alive)
-          setError(
-            "เปิดเอกสารไม่ได้ กรุณาลองใหม่ หรือตรวจสิทธิ์เข้าสู่ระบบและดาวน์โหลดไฟล์ต้นฉบับ",
-          );
+      .catch((failure: { name?: string; status?: number }) => {
+        if (!alive) return;
+        const message =
+          failure.status === 401
+            ? "เซสชันหมดอายุ กรุณาเข้าสู่ระบบแล้วเปิดเอกสารอีกครั้ง"
+            : failure.status === 403
+              ? "บัญชีนี้ไม่มีสิทธิ์เปิดเอกสาร กรุณาตรวจบทบาทและงานที่ได้รับมอบหมาย"
+              : failure.status === 404
+                ? "ไม่พบไฟล์เอกสารต้นฉบับ กรุณาให้ผู้แนบตรวจสอบไฟล์"
+                : ["InvalidPDFException", "MissingPDFException"].includes(failure.name || "")
+                  ? "ข้อมูลเอกสารเสียหายหรือไม่ใช่ PDF กรุณาแนบไฟล์ต้นฉบับใหม่"
+                  : failure.name === "PasswordException"
+                    ? "เอกสารนี้มีรหัสผ่าน กรุณาดาวน์โหลดเพื่อเปิดด้วยโปรแกรมอ่าน PDF"
+                    : "เปิดเอกสารไม่ได้ กรุณาลองใหม่ หรือดาวน์โหลดไฟล์ต้นฉบับ";
+        setError(message);
       });
     return () => {
       alive = false;

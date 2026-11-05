@@ -107,9 +107,9 @@ test("full approved resource workflow across all municipal and field roles close
       await dialog.getByLabel("ช่องทางประสานงาน", { exact: true }).fill("หัวหน้าทีม");
     }
     if (fill) await fill(dialog);
-    await dialog
-      .getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true })
-      .fill("ตรวจสอบและดำเนินการตามหน้าที่");
+    const reason = dialog.getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true });
+    if (!["รับงาน", "เริ่มปฏิบัติงาน", "ส่งข้อเสนอทรัพยากร", "ส่งรายงานผล"].includes(label))
+      await reason.fill("ตรวจสอบและดำเนินการตามหน้าที่");
     const completed = page.waitForResponse(
       (response) =>
         response.url().endsWith(`/api/complaints/${id}/actions`) &&
@@ -180,7 +180,7 @@ test("full approved resource workflow across all municipal and field roles close
   await expect(
     page.getByRole("alert").filter({ hasText: "งานอนุมัติทั้งหมดในเทศบาล" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "รออนุมัติ", exact: true }).click();
+  await page.getByRole("button", { name: "รอพิจารณาทรัพยากร", exact: true }).click();
   await page.getByRole("searchbox", { name: "ค้นหาเลขเรื่อง / หัวข้อ" }).fill(title);
   await page.getByRole("button", { name: new RegExp("เปิดงาน " + title) }).click();
   await expect(page.getByRole("alert").filter({ hasText: "บัญชีทดสอบ APPROVER" })).toBeVisible();
@@ -312,9 +312,9 @@ test("resource refusal by approver terminates a real complaint", async ({ page, 
       await dialog.getByLabel("ช่องทางประสานงาน", { exact: true }).fill("หัวหน้าทีม");
     }
     if (fill) await fill(dialog);
-    await dialog
-      .getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true })
-      .fill("ทดสอบตามขั้นตอนที่กำหนด");
+    const reason = dialog.getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true });
+    if (!["รับงาน", "เริ่มปฏิบัติงาน", "ส่งข้อเสนอทรัพยากร", "ส่งรายงานผล"].includes(label))
+      await reason.fill("ทดสอบตามขั้นตอนที่กำหนด");
     await dialog.getByRole("button", { name: "ยืนยัน" + label, exact: true }).click();
     if (["ปิดเรื่อง", "อนุมัติทรัพยากร", "ไม่อนุมัติและยุติคำร้อง"].includes(label)) {
       await page

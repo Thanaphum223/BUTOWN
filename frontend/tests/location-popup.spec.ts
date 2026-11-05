@@ -1,6 +1,9 @@
 import { test, expect } from "@playwright/test";
 import { accountPassword, openReport, confirmLocation } from "./product-flow";
 import { waitForLoginSlot } from "./login-rate";
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: "wait" });
+});
 for (const denied of [false, true]) {
   test(
     denied

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Alert, Descriptions, Modal, Spin, Tag, Timeline, Typography } from "antd";
-import { api, statusNames, date } from "./api";
+import { api, statusNames, progressLabel, date } from "./api";
 import EvidenceGallery from "./EvidenceGallery";
 import LocationMap from "./LocationMap";
 type D = Record<string, any>;
@@ -35,7 +35,7 @@ export default function CommunityDetail({ id, onClose }: { id?: string; onClose:
             size="small"
             items={[
               { key: "id", label: "เลขอ้างอิง", children: `#${c.id.slice(0, 8).toUpperCase()}` },
-              { key: "status", label: "สถานะ", children: statusNames[c.status] || c.status },
+              { key: "status", label: "สถานะ", children: progressLabel(c) },
               { key: "created", label: "วันที่แจ้ง", children: date(c.created_at) },
               { key: "updated", label: "อัปเดตล่าสุด", children: date(c.updated_at) },
             ]}
@@ -66,7 +66,7 @@ export default function CommunityDetail({ id, onClose }: { id?: string; onClose:
                 ? data!.history.map((h: D) => ({
                     children: `${date(h.created_at)} · ${statusNames[h.to_status] || h.to_status}`,
                   }))
-                : [{ children: `${date(c.created_at)} · ${statusNames[c.status] || c.status}` }]
+                : [{ children: `${date(c.created_at)} · ${progressLabel(c)}` }]
             }
           />
         </>

@@ -73,7 +73,7 @@ public class Access {
               !db.list(
                       "SELECT id FROM work_order WHERE complaint_id=? AND (assignee_id=? OR"
                           + " EXISTS(SELECT 1 FROM work_member wm WHERE"
-                          + " wm.work_order_id=work_order.id AND wm.user_id=?)) AND status NOT IN"
+                          + " wm.work_order_id=work_order.id AND wm.user_id=?)) AND NOT handed_off AND status NOT IN"
                           + " ('DECLINED','CANCELLED')",
                       id,
                       u.get("id"),
@@ -82,7 +82,9 @@ public class Access {
           case "APPROVER" ->
               !db.list(
                       "SELECT id FROM resource_request WHERE complaint_id=? AND "
-                          + (approvalOverview(u) ? "approver_id IS NOT NULL" : "approver_id=?"),
+                          + (approvalOverview(u)
+                              ? "NOT handed_off AND approver_id IS NOT NULL"
+                              : "NOT handed_off AND approver_id=?"),
                       approvalOverview(u) ? new Object[] {id} : new Object[] {id, u.get("id")})
                   .isEmpty();
           default -> false;

@@ -21,7 +21,7 @@ public class TeamController {
     var u = access.user(a);
     access.role(u, "LEADER");
     return db.list(
-        "SELECT t.*,u.display_name representative_name,(SELECT"
+        "SELECT t.*,u.display_name representative_name,(SELECT count(*) FROM work_order w WHERE w.team_id=t.id AND w.status NOT IN ('DECLINED','CANCELLED','COMPLETE')) active_work_count,(SELECT"
             + " json_agg(json_build_object('id',m.user_id,'name',p.display_name)) FROM team_member"
             + " m JOIN app_user p ON p.id=m.user_id WHERE m.team_id=t.id)::text members FROM"
             + " field_team t JOIN app_user u ON u.id=t.representative_id WHERE t.municipality_id=?"
