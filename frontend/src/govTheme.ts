@@ -1,22 +1,25 @@
 import type { ThemeConfig } from "antd";
 
-// Canonical palette: https://library.govcenter.co/tokens
+// Gov brand palette with TownTrack green surfaces and readable neutral colors.
+// Reference: https://library.govcenter.co/tokens
 export const govTokens = {
   "brand-primary": "#1E7D55",
   "brand-secondary": "#80D897",
-  "brand-surface": "#FAF9E5",
-  "brand-text-dark": "#05010E",
+  "brand-dark": "#14543B",
+  "brand-soft": "#EDF5F1",
+  "brand-surface": "#F3F8F5",
+  "brand-text-dark": "#123D2D",
   "semantic-success": "#95C135",
   "semantic-warning": "#F1BE25",
   "semantic-critical": "#F21515",
   "semantic-neutral": "#707993",
   "semantic-verified": "#6982E1",
-  "text-primary": "#060D26",
+  "text-primary": "#183F32",
   "text-secondary": "#1E7D55",
-  "text-tertiary": "#475272",
-  "text-placeholder": "#707993",
-  "btn-default": "#FCFCFF",
-  "border-neutral": "#C8CEDD",
+  "text-tertiary": "#526A60",
+  "text-placeholder": "#61776C",
+  "btn-default": "#FCFEFD",
+  "border-neutral": "#D5E4DC",
   "status-warning": "#F8842D",
   "status-danger": "#991D1D",
   "status-default": "#8DF0FF",
@@ -29,9 +32,9 @@ export const govTokens = {
   "space-4": "32px",
   "radius-control": "8px",
   "radius-card": "16px",
-  "shadow-low": "0 0 4px #0002091a, 0 2px 2px #00020914",
-  "shadow-medium": "0 4px 10px #060d261f, 0 2px 2px #060d2614",
-  "shadow-high": "0 8px 15px 2px #060d2626, 0 0 4px #060d2614",
+  "shadow-low": "0 0 4px #123d2d14, 0 2px 2px #123d2d0d",
+  "shadow-medium": "0 4px 10px #123d2d1f, 0 2px 2px #123d2d14",
+  "shadow-high": "0 8px 15px 2px #123d2d26, 0 0 4px #123d2d14",
 } as const;
 
 export function installGovTokens() {
@@ -43,14 +46,21 @@ export function installGovTokens() {
 export const govTheme: ThemeConfig = {
   token: {
     colorPrimary: govTokens["brand-primary"],
+    colorPrimaryBg: govTokens["brand-soft"],
+    colorPrimaryBgHover: "#DFEEE5",
     // Shared hover affects outlined text and radio labels as well as fills.
-    colorPrimaryHover: govTokens["brand-primary"],
+    colorPrimaryHover: govTokens["brand-dark"],
+    colorPrimaryActive: govTokens["brand-dark"],
+    colorLink: govTokens["brand-primary"],
+    colorLinkHover: govTokens["brand-dark"],
     colorSuccess: govTokens["semantic-success"],
     colorWarning: govTokens["semantic-warning"],
     colorError: govTokens["semantic-critical"],
-    colorInfo: govTokens["semantic-verified"],
+    colorInfo: govTokens["brand-primary"],
+    colorInfoBg: govTokens["brand-soft"],
     colorText: govTokens["text-primary"],
     colorTextSecondary: govTokens["text-tertiary"],
+    colorTextDescription: govTokens["text-tertiary"],
     colorTextPlaceholder: govTokens["text-placeholder"],
     colorBorder: govTokens["border-neutral"],
     colorBgContainer: govTokens.surface,

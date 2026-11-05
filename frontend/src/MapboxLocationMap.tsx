@@ -1,3 +1,4 @@
+import { govTokens } from "./govTheme";
 import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -92,7 +93,7 @@ export default function MapboxLocationMap({
         type: "circle",
         source: "issues",
         filter: ["has", "point_count"],
-        paint: { "circle-color": "#137455", "circle-radius": 20 },
+        paint: { "circle-color": govTokens["brand-primary"], "circle-radius": 20 },
       });
       m.addLayer({
         id: "cluster-label",
@@ -115,7 +116,7 @@ export default function MapboxLocationMap({
             "match",
             ["get", "status"],
             "CLOSED",
-            "#137455",
+            govTokens["brand-primary"],
             "NEW",
             "#b76a0a",
             "#2874a6",
@@ -148,7 +149,9 @@ export default function MapboxLocationMap({
     if (selected) {
       const [lat, lng] = selected,
         r = props.radiusMeters || 0;
-      marker.current = new mapboxgl.Marker({ color: "#137455" }).setLngLat([lng, lat]).addTo(m);
+      marker.current = new mapboxgl.Marker({ color: govTokens["brand-primary"] })
+        .setLngLat([lng, lat])
+        .addTo(m);
       const ring = Array.from({ length: 65 }, (_, i) => {
         const a = (i * 2 * Math.PI) / 64;
         return [
@@ -175,13 +178,13 @@ export default function MapboxLocationMap({
           id: "radius-fill",
           type: "fill",
           source: "radius",
-          paint: { "fill-color": "#137455", "fill-opacity": 0.08 },
+          paint: { "fill-color": govTokens["brand-primary"], "fill-opacity": 0.08 },
         });
         m.addLayer({
           id: "radius-line",
           type: "line",
           source: "radius",
-          paint: { "line-color": "#137455", "line-width": 2 },
+          paint: { "line-color": govTokens["brand-primary"], "line-width": 2 },
         });
       }
       if (r)

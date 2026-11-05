@@ -1,3 +1,4 @@
+import { govTokens } from "./govTheme";
 import { Alert, Spin } from "antd";
 import { api } from "./api";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
@@ -71,9 +72,9 @@ export function LeafletLocationMap({
     if (radiusMeters) {
       radius.current = L.circle(value, {
         radius: radiusMeters,
-        color: "#137455",
+        color: govTokens["brand-primary"],
         weight: 2,
-        fillColor: "#137455",
+        fillColor: govTokens["brand-primary"],
         fillOpacity: 0.1,
         interactive: false,
         className: "nearby-radius",
@@ -81,7 +82,7 @@ export function LeafletLocationMap({
     }
     marker.current = L.circleMarker(value, {
       radius: 9,
-      color: "#137455",
+      color: govTokens["brand-primary"],
       fillOpacity: 0.8,
       className: "selected-location",
       interactive: false,
@@ -114,7 +115,11 @@ export function LeafletLocationMap({
       icon.className = "complaint-map-symbol";
       icon.textContent = symbol;
       icon.style.background =
-        item.status === "CLOSED" ? "#137455" : item.status === "NEW" ? "#b76a0a" : "#2874a6";
+        item.status === "CLOSED"
+          ? govTokens["brand-primary"]
+          : item.status === "NEW"
+            ? "#b76a0a"
+            : "#2874a6";
       icon.setAttribute("aria-label", name || "ปัญหาที่แจ้ง");
       const dot = item.categoryName
         ? L.marker([Number(item.latitude), Number(item.longitude)], {

@@ -1,3 +1,4 @@
+import { govTokens } from "./govTheme";
 import AttachmentList from "./AttachmentList";
 import ResourceReview from "./ResourceReview";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
@@ -817,7 +818,7 @@ export default function Detail({
         <Card title="ประวัติการดำเนินการ">
           <Timeline
             items={data.history.map((h: D) => ({
-              color: ["DENY", "REJECT"].includes(h.action) ? "red" : "#087f75",
+              color: ["DENY", "REJECT"].includes(h.action) ? "red" : govTokens["brand-primary"],
               children: (
                 <>
                   <Text strong>{actionNames[h.action] || h.action}</Text>

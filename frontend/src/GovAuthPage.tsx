@@ -21,9 +21,6 @@ export default function GovAuthPage({
           controlHeight: 36,
           controlHeightLG: 36,
           fontSize: 14,
-          colorBorder: "#e5e7eb",
-          colorText: "#171717",
-          colorLink: "#1E7D55",
         },
       }}
     >

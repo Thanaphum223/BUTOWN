@@ -93,17 +93,11 @@ body {
   border-radius: var(--gov-radius-control);
   font-size: 22px;
 }
-.stat-1 {
-  background: #e9effd;
-  color: #426ab0;
-}
-.stat-2 {
-  background: #e6f6e9;
-  color: #419b60;
-}
+.stat-1,
+.stat-2,
 .stat-3 {
-  background: #fff0e2;
-  color: #c48340;
+  background: var(--gov-surface-soft);
+  color: var(--gov-brand-primary);
 }
 .ant-statistic-content {
   font-weight: 700;
@@ -140,7 +134,7 @@ body {
 }
 .revision {
   padding: 12px 0;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--gov-border-neutral);
 }
 .auth-page {
   min-height: 100vh;
@@ -148,15 +142,13 @@ body {
   display: grid;
   place-items: center;
   padding: 32px 16px;
-  background: #f7f9fa;
+  background: var(--gov-page-surface);
 }
 .auth-card.ant-card {
   width: min(400px, 100%);
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--gov-border-neutral);
   border-radius: 16px;
-  box-shadow:
-    0 8px 16px #10182812,
-    0 2px 4px #10182808;
+  box-shadow: var(--gov-shadow-medium);
 }
 .auth-card > .ant-card-body {
   padding: 24px !important;
@@ -173,7 +165,7 @@ body {
 }
 .auth-heading .ant-typography:last-child {
   margin: 0;
-  color: #757575;
+  color: var(--gov-text-tertiary);
   font-size: 14px;
 }
 .auth-card .ant-form-item {
@@ -182,7 +174,7 @@ body {
 .auth-card .ant-form-item-label > label {
   font-size: 14px;
   font-weight: 600;
-  color: #202020;
+  color: var(--gov-text-primary);
 }
 .auth-card .ant-input,
 .auth-card .ant-input-affix-wrapper,
@@ -219,14 +211,14 @@ body {
 }
 .auth-card .auth-divider {
   margin: 24px 0;
-  color: #888;
+  color: var(--gov-text-placeholder);
   font-size: 12px;
 }
 .auth-switch {
   margin: 20px 0 8px;
   text-align: center;
   font-size: 13px;
-  color: #757575;
+  color: var(--gov-text-tertiary);
 }
 .auth-switch .ant-btn {
   height: auto;
@@ -238,7 +230,7 @@ body {
 .auth-emergency.ant-btn {
   display: flex;
   margin: 0 auto;
-  color: #757575;
+  color: var(--gov-text-tertiary);
   font-size: 12px;
 }
 .loading {
@@ -288,10 +280,10 @@ body {
 }
 
 :root {
-  --gov-surface-soft: color-mix(in srgb, var(--gov-brand-primary) 8%, white);
+  --gov-surface-soft: var(--gov-brand-soft);
   --gov-page-surface: color-mix(in srgb, var(--gov-brand-surface) 45%, white);
   --municipal-green: var(--gov-brand-primary);
-  --municipal-dark: var(--gov-text-primary);
+  --municipal-dark: var(--gov-brand-dark);
   --municipal-ink: var(--gov-text-primary);
   --municipal-muted: var(--gov-text-tertiary);
   --municipal-border: var(--gov-border-neutral);
@@ -363,7 +355,8 @@ h3,
   z-index: 900;
   border-bottom: 1px solid var(--municipal-border);
   box-shadow: 0 2px 10px #18392e04;
-  background: #fff;
+  background: var(--gov-brand-primary);
+  color: white;
 }
 .header-identity {
   display: flex;
@@ -372,11 +365,12 @@ h3,
   min-width: 0;
 }
 .header-identity strong {
+  color: inherit;
   font-size: 15px;
 }
 .header-identity small {
   display: block;
-  color: var(--municipal-muted);
+  color: #fff;
   font-size: 12px;
   margin-top: 3px;
 }
@@ -386,7 +380,7 @@ h3,
   flex-shrink: 0;
   width: 42px;
   height: 42px;
-  background: var(--gov-text-primary);
+  background: var(--gov-brand-dark);
   color: white;
   border-radius: var(--gov-radius-control);
   font-size: 18px;
@@ -394,7 +388,7 @@ h3,
 }
 .account-name {
   font-size: 13px;
-  color: var(--municipal-muted);
+  color: white;
   max-width: 180px;
   display: block;
   white-space: nowrap;
@@ -508,7 +502,7 @@ h3,
   font-size: 29px;
   line-height: 1.5;
   font-weight: 650;
-  color: var(--gov-text-primary);
+  color: var(--gov-brand-primary);
 }
 .work-grid {
   display: grid;
@@ -743,11 +737,6 @@ h3,
   padding: var(--gov-space-2) var(--gov-space-4);
   min-height: 80px;
   height: auto;
-  background: linear-gradient(
-    110deg,
-    var(--gov-brand-primary),
-    color-mix(in srgb, var(--gov-brand-primary) 75%, var(--gov-brand-secondary))
-  );
   border-bottom: 0;
   color: white;
   box-shadow: var(--gov-shadow-low);
@@ -767,7 +756,7 @@ h3,
   color: white;
 }
 .citizen-shell .header-identity small {
-  color: #ffffffc2;
+  color: #fff;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -786,17 +775,17 @@ h3,
 .citizen-shell .account-controls {
   flex-shrink: 0;
 }
-.citizen-shell .topbar .ant-btn {
+.shell .topbar .ant-btn {
   color: white;
   border-color: #ffffff60;
   background: #ffffff10;
 }
-.citizen-shell .topbar .ant-btn:not(:disabled):hover {
+.shell .topbar .ant-btn:not(:disabled):hover {
   color: var(--gov-text-primary);
   background: var(--gov-brand-secondary);
   border-color: var(--gov-brand-secondary);
 }
-.citizen-shell .topbar .ant-btn:focus-visible {
+.shell .topbar .ant-btn:focus-visible {
   outline-color: white;
 }
 @media (max-width: 380px) {
@@ -1156,7 +1145,7 @@ h3,
     min-height: 74px;
     padding: 12px 16px;
   }
-  .citizen-shell .topbar .ant-btn {
+  .shell .topbar .ant-btn {
     font-size: 11px;
     padding: 6px 9px;
     min-height: 36px;
@@ -2325,7 +2314,7 @@ button.queue-item {
   appearance: none;
 }
 button.queue-item:hover {
-  border-color: #70a18a;
+  border-color: var(--gov-brand-primary);
   background: var(--gov-surface-soft);
 }
 button.queue-item:focus-visible {
@@ -2530,7 +2519,7 @@ button.queue-item .queue-item-top .ant-tag {
   box-shadow: none;
 }
 .staff-shell .ant-btn:focus-visible {
-  outline: 3px solid #70a995;
+  outline: 3px solid var(--gov-brand-primary);
   outline-offset: 3px;
 }
 .staff-shell .ant-tag {
@@ -2898,7 +2887,7 @@ button.queue-item .queue-item-top .ant-tag {
 }
 .staff-shell .split-workspace .queue-item.selected {
   background: var(--gov-surface-soft);
-  border-color: #c1e5d3;
+  border-color: var(--gov-brand-secondary);
   box-shadow: inset 4px 0 var(--gov-brand-primary);
 }
 .staff-shell .split-workspace .queue-card-title {
@@ -3151,4 +3140,20 @@ button.queue-item .queue-item-top .ant-tag {
 }
 .nearby-issue > .ant-card-body > .ant-tag {
   margin-left: 8px;
+}
+
+.account-avatar {
+  background: var(--gov-surface-soft);
+  color: var(--gov-brand-primary);
+}
+.ant-tag.ant-tag-green {
+  background: var(--gov-surface-soft);
+  border-color: var(--gov-brand-secondary);
+  color: var(--gov-brand-primary);
+}
+
+.ant-input:autofill,
+.ant-input:-webkit-autofill {
+  -webkit-text-fill-color: var(--gov-text-primary);
+  box-shadow: 0 0 0 1000px var(--gov-surface-soft) inset;
 }
