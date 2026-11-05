@@ -60,6 +60,7 @@ export const govTheme: ThemeConfig = {
     colorInfoBg: govTokens["brand-soft"],
     colorText: govTokens["text-primary"],
     colorTextSecondary: govTokens["text-tertiary"],
+    colorTextDescription: govTokens["text-tertiary"],
     colorTextPlaceholder: govTokens["text-placeholder"],
     colorBorder: govTokens["border-neutral"],
     colorBgContainer: govTokens.surface,

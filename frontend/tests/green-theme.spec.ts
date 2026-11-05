@@ -30,13 +30,20 @@ async function boundary(page: Page, role?: "ADMIN" | "CITIZEN") {
   await page.route("https://tile.openstreetmap.org/**", (route) => route.abort());
 }
 
-async function paint(el: Locator, property = "color") {
-  return el.evaluate((node, prop) => {
-    const ctx = document.createElement("canvas").getContext("2d")!;
-    ctx.fillStyle = getComputedStyle(node).getPropertyValue(prop);
-    ctx.fillRect(0, 0, 1, 1);
-    return Array.from(ctx.getImageData(0, 0, 1, 1).data).slice(0, 3);
-  }, property);
+async function paint(el: Locator, property = "color", backdrop?: number[]) {
+  return el.evaluate(
+    (node, { prop, backdrop }) => {
+      const ctx = document.createElement("canvas").getContext("2d")!;
+      if (backdrop) {
+        ctx.fillStyle = `rgb(${backdrop.join(",")})`;
+        ctx.fillRect(0, 0, 1, 1);
+      }
+      ctx.fillStyle = getComputedStyle(node).getPropertyValue(prop);
+      ctx.fillRect(0, 0, 1, 1);
+      return Array.from(ctx.getImageData(0, 0, 1, 1).data).slice(0, 3);
+    },
+    { prop: property, backdrop },
+  );
 }
 async function green(el: Locator, property = "color") {
   const [r, g, b] = await paint(el, property);
@@ -49,10 +56,10 @@ async function readable(el: Locator, background: Locator = el) {
       .map((c) => c / 255)
       .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
       .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
-  const values = [
-    luminance(await paint(el)),
-    luminance(await paint(background, "background-color")),
-  ].sort((a, b) => b - a);
+  const backdrop = await paint(background, "background-color");
+  const values = [luminance(await paint(el, "color", backdrop)), luminance(backdrop)].sort(
+    (a, b) => b - a,
+  );
   expect((values[0] + 0.05) / (values[1] + 0.05)).toBeGreaterThanOrEqual(4.5);
 }
 
@@ -89,6 +96,7 @@ for (const width of [440, 1280]) {
     const header = page.locator(".topbar");
     await green(header, "background-color");
     await readable(page.locator(".header-identity strong"), header);
+    await readable(page.locator(".header-identity small"), header);
     await readable(
       page.locator(".staff-workspace > .page-heading .ant-typography-secondary"),
       page.locator("body"),
@@ -123,6 +131,7 @@ for (const width of [440, 1280]) {
     await expect(nav).toBeVisible();
     await green(page.locator(".community-home h2"));
     await readable(page.locator(".header-identity strong"), page.locator(".topbar"));
+    await readable(page.locator(".header-identity small"), page.locator(".topbar"));
     await nav.getByRole("link", { name: /แจ้งปัญหา/ }).click();
     await green(nav.locator('[aria-current="page"]'));
     await expect(page.getByRole("heading", { name: "เกิดเหตุที่ไหน?", exact: true })).toBeVisible();

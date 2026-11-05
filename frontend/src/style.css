@@ -370,7 +370,7 @@ h3,
 }
 .header-identity small {
   display: block;
-  color: #ffffffc2;
+  color: #fff;
   font-size: 12px;
   margin-top: 3px;
 }
@@ -756,7 +756,7 @@ h3,
   color: white;
 }
 .citizen-shell .header-identity small {
-  color: #ffffffc2;
+  color: #fff;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
