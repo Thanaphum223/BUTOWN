@@ -794,7 +794,6 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
             label="เบอร์ติดต่อ (ไม่บังคับ)"
             name="contactPhone"
             rules={[{ max: 30, pattern: /^[0-9+() -]*$/ }]}
-            extra="ใช้สำหรับให้เจ้าหน้าที่ติดต่อกลับ ไม่แสดงต่อประชาชนอื่น"
           >
             <Input placeholder="เช่น 0812345678" inputMode="tel" autoComplete="tel" />
           </Form.Item>

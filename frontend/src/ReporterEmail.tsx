@@ -37,11 +37,9 @@ export default function ReporterEmail() {
           </>
         ) : state === "loading" ? (
           "กำลังโหลดอีเมลจากบัญชี Gov Center…"
-        ) : email ? (
-          "อีเมลจากบัญชี Gov Center แก้ไขไม่ได้ ใช้ติดต่อกลับและไม่แสดงต่อประชาชนอื่น"
-        ) : (
+        ) : !email ? (
           "บัญชี Gov Center ยังไม่ได้ระบุอีเมล"
-        )
+        ) : undefined
       }
     >
       <Input
