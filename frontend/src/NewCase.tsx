@@ -27,6 +27,8 @@ import LocationMap from "./LocationMap";
 import CommunityActions from "./CommunityActions";
 import CommunityDetail from "./CommunityDetail";
 import { ATTACHMENT_ACCEPT, ATTACHMENT_HELP, attachmentError } from "./attachments";
+import { reportDescriptionExample } from "./reportExamples";
+import ReporterEmail from "./ReporterEmail";
 type D = Record<string, any>;
 type Place = { place_id: number; lat: string; lon: string; display_name: string };
 const { Title, Text } = Typography;
@@ -796,6 +798,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
           >
             <Input placeholder="เช่น 0812345678" inputMode="tel" autoComplete="tel" />
           </Form.Item>
+          <ReporterEmail />
           <Form.Item label="หัวข้อปัญหา" name="title" rules={[{ required: step === 1, max: 200 }]}>
             <Input placeholder="สรุปปัญหาที่พบ" />
           </Form.Item>
@@ -804,7 +807,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
             name="description"
             rules={[{ required: step === 1, max: 20000 }]}
           >
-            <Input.TextArea rows={5} placeholder="เช่น น้ำท่วมสูงประมาณ 20 ซม. รถเล็กผ่านลำบาก" />
+            <Input.TextArea rows={5} placeholder={reportDescriptionExample(category?.name)} />
           </Form.Item>
           {fields.map((f) => (
             <Form.Item

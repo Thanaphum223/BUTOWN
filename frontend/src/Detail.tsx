@@ -651,6 +651,11 @@ export default function Detail({
                           label: "เบอร์ติดต่อ",
                           children: c.contact_phone || "ไม่ระบุ",
                         },
+                        {
+                          key: "contact_email",
+                          label: "อีเมลติดต่อ",
+                          children: c.contact_email || "ไม่ระบุ",
+                        },
                       ]
                     : []),
                   {

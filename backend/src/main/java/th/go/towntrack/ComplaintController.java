@@ -160,9 +160,11 @@ public class ComplaintController {
     db.run(
         "UPDATE complaint SET form_schema=?::jsonb WHERE id=?", cat.get("fields").toString(), id);
     db.run(
-        "UPDATE complaint SET contact_name=?,contact_phone=? WHERE id=?",
+        "UPDATE complaint SET contact_name=?,contact_phone=?,contact_email=(SELECT NULLIF(btrim(email),'') FROM iam_user_profile WHERE local_user_id=? AND municipality_id=?) WHERE id=?",
         b.contactName(),
         b.contactPhone(),
+        u.get("id"),
+        u.get("municipality_id"),
         id);
     workflow.audit(u, id, "CREATE", null, "NEW", "ยื่นคำร้อง");
     return Map.of("id", id);
