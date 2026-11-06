@@ -270,8 +270,10 @@ test("full approved resource workflow across all municipal and field roles close
   });
   await page.getByRole("button", { name: "ออกจากระบบ", exact: true }).click();
   await login(page, "citizen");
-  await page.getByRole("link", { name: /ติดตามเรื่อง/ }).click();
-  const tracked = page.locator(".ant-list-item").filter({ hasText: "#" + id.slice(0, 8) });
+  await page.getByRole("link", { name: /ติดตามสถานะ/ }).click();
+  const tracked = page
+    .locator(".ant-list-item")
+    .filter({ hasText: "#" + id.slice(0, 8).toUpperCase() });
   await expect(tracked).toContainText("ปิดเรื่องแล้ว");
   await tracked.getByRole("button", { name: "ดูรายละเอียด", exact: true }).click();
   await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
@@ -412,8 +414,8 @@ test("citizen municipal map lists real cases and follows sanitized summary", asy
     fullPage: true,
   });
   await page.getByRole("button", { name: "เรื่องที่ติดตาม", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "ติดตามสถานะปัญหา", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "ติดตามสถานะ", exact: true })).toBeVisible();
   await expect(
-    page.locator(".ant-list-item").filter({ hasText: "#" + id.slice(0, 8) }),
+    page.locator(".ant-list-item").filter({ hasText: "#" + id.slice(0, 8).toUpperCase() }),
   ).toBeVisible();
 });

@@ -1,16 +1,9 @@
 import { useState } from "react";
-import { Button, Card, ConfigProvider, Divider, Typography } from "antd";
-import { AlertOutlined } from "@ant-design/icons";
+import { Card, ConfigProvider, Divider, Typography } from "antd";
 import GovAccountForm, { type GovAccountMode } from "./GovAccountForm";
 import GovLogin from "./GovLogin";
 
-export default function GovAuthPage({
-  onLogin,
-  onEmergency,
-}: {
-  onLogin: () => void;
-  onEmergency: () => void;
-}) {
+export default function GovAuthPage({ onLogin }: { onLogin: () => void }) {
   const [mode, setMode] = useState<GovAccountMode>("login");
   const [busy, setBusy] = useState(false);
   const register = mode === "register";
@@ -48,15 +41,6 @@ export default function GovAuthPage({
             onBusyChange={setBusy}
             onLogin={onLogin}
           />
-          <Button
-            className="auth-emergency"
-            type="text"
-            disabled={busy}
-            icon={<AlertOutlined />}
-            onClick={onEmergency}
-          >
-            เบอร์ฉุกเฉิน
-          </Button>
         </Card>
       </main>
     </ConfigProvider>

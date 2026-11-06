@@ -17,18 +17,6 @@ public class BrowserTestServer {
 
   @TestConfiguration
   static class Fixtures {
-    @Bean(destroyMethod = "close")
-    BrowserRoadProvider browserRoadProvider() throws Exception {
-      return new BrowserRoadProvider();
-    }
-
-    @Bean
-    @org.springframework.context.annotation.Primary
-    OsrmRouting browserRouting(
-        BrowserRoadProvider provider, com.fasterxml.jackson.databind.ObjectMapper json) {
-      return new OsrmRouting(provider.base(), json);
-    }
-
     @Bean
     @Order(0)
     SecurityFilterChain fixtureSessions(HttpSecurity http, SessionRegistry sessions)

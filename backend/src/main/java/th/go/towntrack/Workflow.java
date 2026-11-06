@@ -114,18 +114,6 @@ public class Workflow {
 
   @Transactional
   public Map<String, Object> act(UUID id, Map<String, Object> b, Map<String, Object> u) {
-    return actInternal(id, b, u, null);
-  }
-
-  @Transactional
-  public Map<String, Object> actForRoute(
-      UUID id, Map<String, Object> b, Map<String, Object> u, UUID routePlan) {
-    if (!"ASSIGN".equals(b.get("action"))) Access.deny();
-    return actInternal(id, b, u, routePlan);
-  }
-
-  private Map<String, Object> actInternal(
-      UUID id, Map<String, Object> b, Map<String, Object> u, UUID routePlan) {
     var c = access.complaint(id, u, true);
     if (!(b.get("version") instanceof Number inputVersion)
         || inputVersion.longValue() < 0
@@ -134,15 +122,6 @@ public class Workflow {
     long expected = inputVersion.longValue();
     if (expected != ((Number) c.get("version")).longValue())
       throw new ResponseStatusException(HttpStatus.CONFLICT, "ข้อมูลเปลี่ยนแล้ว กรุณาโหลดใหม่");
-    var reservation =
-        db.list("SELECT plan_id FROM route_stop WHERE complaint_id=? AND reserved", id);
-    if (!reservation.isEmpty()
-        && (routePlan == null || !routePlan.equals(reservation.getFirst().get("plan_id"))))
-      throw new ResponseStatusException(
-          HttpStatus.CONFLICT, "งานอยู่ในรอบที่รอหัวหน้ายืนยันทีม กรุณาตรวจหรือส่งกลับรอบงานก่อน");
-    if (routePlan != null
-        && (reservation.isEmpty() || !routePlan.equals(reservation.getFirst().get("plan_id"))))
-      Access.deny();
     String action = text(b, "action", 40),
         reason = policy.reason(b, action),
         from = (String) c.get("status");

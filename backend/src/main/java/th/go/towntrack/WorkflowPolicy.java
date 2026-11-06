@@ -69,8 +69,6 @@ public class WorkflowPolicy {
   }
 
   List<Map<String, Object>> actions(Map<String, Object> c, Map<String, Object> user) {
-    if (!db.list("SELECT plan_id FROM route_stop WHERE complaint_id=? AND reserved", c.get("id"))
-        .isEmpty()) return List.of();
     var result =
         new ArrayList<>(
             db.list(

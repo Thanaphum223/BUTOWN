@@ -1,6 +1,7 @@
 import { govTokens } from "./govTheme";
 import AttachmentList from "./AttachmentList";
 import ResourceReview from "./ResourceReview";
+import CitizenOutcome from "./CitizenOutcome";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import EvidenceUpload from "./EvidenceUpload";
 import EvidenceGallery from "./EvidenceGallery";
@@ -57,6 +58,7 @@ export default function Detail({
   back,
   embedded = false,
   historyOnly = false,
+  publicView = false,
   onChanged,
 }: {
   id: string;
@@ -64,6 +66,7 @@ export default function Detail({
   back: () => void;
   embedded?: boolean;
   historyOnly?: boolean;
+  publicView?: boolean;
   onChanged?: () => void;
 }) {
   const [data, setData] = useState<D>(),
@@ -115,7 +118,13 @@ export default function Detail({
   async function load() {
     setError("");
     try {
-      setData(await api("/complaints/" + id + (historyOnly ? "?historyOnly=true" : "")));
+      setData(
+        await api(
+          (publicView ? "/community/complaints/" : "/complaints/") +
+            id +
+            (!publicView && historyOnly ? "?historyOnly=true" : ""),
+        ),
+      );
     } catch (e) {
       setError((e as Error).message);
     }
@@ -123,9 +132,9 @@ export default function Detail({
   useEffect(() => {
     setData(undefined);
     void load();
-  }, [id, historyOnly]);
+  }, [id, historyOnly, publicView]);
   async function choose(a: string) {
-    if (data?.readOnlyHistory) return;
+    if (publicView || data?.readOnlyHistory) return;
     form.resetFields();
     operationKey.current = crypto.randomUUID();
     setPeople([]);
@@ -351,37 +360,42 @@ export default function Detail({
   const citizen = user.role === "CITIZEN";
   const latestResource = data.resources?.at(-1);
   const uploadAllowed =
+    !publicView &&
     !data.readOnlyHistory &&
     ((citizen && c.status === "NEW") ||
       (user.role === "FIELD" && ["IN_PROGRESS", "FIELD_REVISION"].includes(c.status)) ||
       (user.role === "LEADER" && ["RESOURCE_DRAFT", "RESOURCE_REVISION"].includes(c.status)));
-  const stages = ["NEW", "TRIAGED", "ASSIGNED", "IN_PROGRESS", "LEADER_REVIEW", "CLOSED"];
-  let current = ["CLOSED"].includes(c.status)
-    ? 5
-    : [
-          "RESOLVED",
-          "OFFICER_REVIEW",
-          "LEADER_REVISION",
-          "LEADER_REVIEW",
-          "FIELD_REVISION",
-          "TRANSFER_PENDING",
-        ].includes(c.status)
-      ? 4
-      : c.status === "IN_PROGRESS"
-        ? 3
-        : [
-              "ASSIGNED",
-              "ACCEPTED",
-              "RESOURCE_DRAFT",
-              "RESOURCE_CHECK",
-              "RESOURCE_REVISION",
-              "RESOURCE_APPROVAL",
-              "READY",
-            ].includes(c.status)
-          ? 2
-          : c.status === "TRIAGED"
-            ? 1
-            : 0;
+  const stageStatuses = [
+    ["NEW"],
+    ["TRIAGED", "DEPARTMENT_RETURNED"],
+    [
+      "ASSIGNED",
+      "ACCEPTED",
+      "RESOURCE_DRAFT",
+      "RESOURCE_CHECK",
+      "RESOURCE_REVISION",
+      "RESOURCE_APPROVAL",
+      "READY",
+    ],
+    ["IN_PROGRESS"],
+    [
+      "RESOLVED",
+      "OFFICER_REVIEW",
+      "LEADER_REVISION",
+      "LEADER_REVIEW",
+      "FIELD_REVISION",
+      "TRANSFER_PENDING",
+    ],
+    ["CLOSED", "REJECTED", "TERMINATED"],
+  ];
+  const current = Math.max(
+    0,
+    stageStatuses.findIndex((statuses) => statuses.includes(c.status)),
+  );
+  const endedWithoutCompletion = ["REJECTED", "TERMINATED"].includes(c.status);
+  const visitedStatuses = new Set(
+    (data.history || []).flatMap((h: D) => [h.from_status, h.to_status]),
+  );
   return (
     <>
       <div className="page-heading">
@@ -389,9 +403,10 @@ export default function Detail({
           <Button type="text" icon={<ArrowLeftOutlined />} onClick={back}>
             {embedded ? "กลับคิวงาน" : "กลับรายการ"}
           </Button>
-          <Title level={embedded ? 3 : 2}>{c.title}</Title>
+          <Title level={embedded ? 3 : 2}>{c.title || c.category_name}</Title>
           <Space wrap>
             <Text type="secondary">#{id.slice(0, 8).toUpperCase()}</Text>
+            {publicView && c.mock && <Tag>MOCK · ข้อมูลจำลอง</Tag>}
             <Tag color={["REJECTED", "TERMINATED"].includes(c.status) ? "red" : "cyan"}>
               {progressLabel(c)}
             </Tag>
@@ -460,17 +475,20 @@ export default function Detail({
               "ลงพื้นที่",
               "ตรวจผลงาน",
               "ปิดเรื่อง",
-            ].map((title) => ({ title }))}
+            ].map((title, index) => {
+              if (!endedWithoutCompletion || index === 5) return { title };
+              const visited =
+                index === 0 || stageStatuses[index].some((status) => visitedStatuses.has(status));
+              return {
+                title,
+                status: visited ? ("finish" as const) : ("wait" as const),
+                description: visited ? undefined : "ไม่ได้ดำเนินการ",
+              };
+            })}
           />
         </Card>
       </details>
-      {data.routeReservation?.length > 0 && (
-        <Alert
-          type="info"
-          showIcon
-          message={`งานนี้อยู่ในรอบ ${data.routeReservation[0].name} กรุณาเปิดเมนูวางแผนเส้นทางเพื่อยืนยันทีมหรือส่งกลับรอบ`}
-        />
-      )}
+      {citizen && <CitizenOutcome status={c.status} history={data.history || []} />}
       {data.readOnlyHistory && (
         <Alert
           type="info"
@@ -564,7 +582,7 @@ export default function Detail({
       >
         <summary>ข้อมูลคำร้อง เอกสาร และรายงานทั้งหมด</summary>
         <Row gutter={[20, 20]}>
-          <Col xs={24} xl={embedded ? 24 : 16}>
+          <Col xs={24} xl={embedded || citizen ? 24 : 16}>
             {user.role !== "CITIZEN" && c.assignment_details && (
               <Card title="คำแนะนำและความปลอดภัยก่อนรับงาน" style={{ marginBottom: 16 }}>
                 <Descriptions
@@ -608,13 +626,19 @@ export default function Detail({
               <Descriptions
                 column={1}
                 items={[
-                  {
-                    key: "description",
-                    label: "ปัญหาที่แจ้ง",
-                    children: (
-                      <Paragraph style={{ whiteSpace: "pre-wrap" }}>{c.description}</Paragraph>
-                    ),
-                  },
+                  ...(publicView
+                    ? []
+                    : [
+                        {
+                          key: "description",
+                          label: "ปัญหาที่แจ้ง",
+                          children: (
+                            <Paragraph style={{ whiteSpace: "pre-wrap" }}>
+                              {c.description}
+                            </Paragraph>
+                          ),
+                        },
+                      ]),
                   ...(!citizen
                     ? [
                         {
@@ -629,7 +653,11 @@ export default function Detail({
                         },
                       ]
                     : []),
-                  { key: "address", label: "สถานที่", children: c.address },
+                  {
+                    key: "address",
+                    label: "สถานที่",
+                    children: publicView ? "ตำแหน่งโดยประมาณบนแผนที่" : c.address,
+                  },
                   {
                     key: "created",
                     label: "วันที่แจ้ง",
@@ -848,7 +876,7 @@ export default function Detail({
                 ) : undefined
               }
             >
-              <Text type="secondary">{ATTACHMENT_HELP}</Text>
+              {uploadAllowed && <Text type="secondary">{ATTACHMENT_HELP}</Text>}
               {(citizen ||
                 (data.files || []).some(
                   (f: D) =>
@@ -905,7 +933,7 @@ export default function Detail({
             </Card>
           </Col>
           <Col xs={24} xl={embedded ? 24 : 8}>
-            {!data.readOnlyHistory && !embedded && data.actions?.length > 0 && (
+            {!publicView && !data.readOnlyHistory && !embedded && data.actions?.length > 0 && (
               <Card title="ดำเนินการ" style={{ marginBottom: 20 }}>
                 <Space direction="vertical" style={{ width: "100%" }}>
                   {data.actions.map((r: D) => (
@@ -958,7 +986,7 @@ export default function Detail({
           />
         </Card>
       </details>
-      {!data.readOnlyHistory && embedded && data.actions?.length > 0 && (
+      {!publicView && !data.readOnlyHistory && embedded && data.actions?.length > 0 && (
         <Card className="embedded-actions split-action-dock" title="ดำเนินการ">
           <Space wrap>
             {data.actions.map((r: D) => (

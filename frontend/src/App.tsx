@@ -9,7 +9,6 @@ import CommunityDetail from "./CommunityDetail";
 import NewCase from "./NewCase";
 import { lazy } from "react";
 const EmergencyContacts = lazy(() => import("./EmergencyContacts"));
-const RoutePlanning = lazy(() => import("./RoutePlanning"));
 const Teams = lazy(() => import("./Teams"));
 const Admin = lazy(() => import("./Admin"));
 const Detail = lazy(() => import("./Detail"));
@@ -127,6 +126,7 @@ function TownTrackApp() {
     [view, setView] = useState("dashboard"),
     [selected, setSelected] = useState(""),
     [refresh, setRefresh] = useState(0);
+  const [selectedPublic, setSelectedPublic] = useState(false);
   const { message } = AntApp.useApp();
   const load = () =>
     api<RowData>("/auth/me")
@@ -168,7 +168,8 @@ function TownTrackApp() {
       setSwitchingRole(false);
     }
   };
-  const open = (id: string) => {
+  const open = (id: string, publicView = false) => {
+    setSelectedPublic(publicView);
     setSelected(id);
     setView("detail");
   };
@@ -178,26 +179,9 @@ function TownTrackApp() {
         <Spin size="large" />
       </div>
     );
-  if (!user && view === "emergency")
-    return (
-      <div className="content">
-        <Button
-          icon={<HomeOutlined />}
-          onClick={() => setView("dashboard")}
-          style={{ marginBottom: 16 }}
-        >
-          กลับหน้าเข้าสู่ระบบ
-        </Button>
-        <EmergencyContacts />
-      </div>
-    );
   if (!user)
     return (
       <GovAuthPage
-        onEmergency={() => {
-          setView("emergency");
-          window.scrollTo({ top: 0 });
-        }}
         onLogin={() => {
           void load();
           setView("dashboard");
@@ -209,7 +193,7 @@ function TownTrackApp() {
     {
       key: "cases",
       icon: <FileTextOutlined />,
-      label: user.role === "CITIZEN" ? "คำร้องของฉัน" : "คิวงาน",
+      label: user.role === "CITIZEN" ? "ติดตามสถานะ" : "คิวงาน",
     },
     ...(user.role !== "CITIZEN"
       ? [{ key: "history", icon: <HistoryOutlined />, label: "ประวัติงาน" }]
@@ -226,20 +210,6 @@ function TownTrackApp() {
       : []),
     ...(user.role === "LEADER"
       ? [{ key: "teams", icon: <TeamOutlined />, label: "ทีมลงพื้นที่" }]
-      : []),
-    ...(["OFFICER", "LEADER", "FIELD", "ADMIN"].includes(user.role)
-      ? [
-          {
-            key: "routes",
-            icon: <EnvironmentOutlined />,
-            label:
-              user.role === "FIELD"
-                ? "รอบงานของฉัน"
-                : user.role === "ADMIN"
-                  ? "รอบงานลงพื้นที่"
-                  : "วางแผนเส้นทาง",
-          },
-        ]
       : []),
     { key: "notifications", icon: <BellOutlined />, label: "การแจ้งเตือน" },
     ...(user.role === "ADMIN"
@@ -445,10 +415,7 @@ function TownTrackApp() {
           </Layout.Header>
           <Layout.Content className="content">
             {view === "dashboard" && user.role === "CITIZEN" ? (
-              <CitizenHome
-                onTrack={() => setView("cases")}
-                onFollowing={() => setView("following")}
-              />
+              <CitizenHome onFollowing={() => setView("following")} />
             ) : (view === "dashboard" || view === "cases" || view === "history") &&
               user.role !== "CITIZEN" ? (
               <StaffWorkspace
@@ -476,15 +443,20 @@ function TownTrackApp() {
                 }}
               />
             ) : view === "detail" ? (
-              <Detail id={selected} user={user} back={() => setView("cases")} />
+              <div className={user.role === "CITIZEN" ? "citizen-case-detail" : undefined}>
+                <Detail
+                  id={selected}
+                  user={user}
+                  publicView={user.role === "CITIZEN" && selectedPublic}
+                  back={() => setView(selectedPublic ? "following" : "cases")}
+                />
+              </div>
             ) : view === "following" ? (
               <CitizenTracking key="following" initialTab="following" open={open} />
             ) : view === "notifications" ? (
               <Notifications open={open} citizen={user.role === "CITIZEN"} />
             ) : view === "emergency" ? (
               <EmergencyContacts />
-            ) : view === "routes" ? (
-              <RoutePlanning key={`${user.id}:${user.role}`} user={user} />
             ) : view === "teams" ? (
               <Teams />
             ) : view === "admin" ? (
@@ -502,7 +474,7 @@ function TownTrackApp() {
             {[
               { key: "dashboard", icon: <HomeOutlined />, label: "หน้าหลัก" },
               { key: "new", icon: <PlusOutlined />, label: "แจ้งปัญหา" },
-              { key: "cases", icon: <FileTextOutlined />, label: "ติดตามเรื่อง" },
+              { key: "cases", icon: <FileTextOutlined />, label: "ติดตามสถานะ" },
               {
                 key: "notifications",
                 icon: <BellOutlined />,
@@ -514,7 +486,9 @@ function TownTrackApp() {
                 key={item.key}
                 href={"#" + item.key}
                 aria-current={
-                  (view === "detail" ? "cases" : view) === item.key ? "page" : undefined
+                  (["detail", "following"].includes(view) ? "cases" : view) === item.key
+                    ? "page"
+                    : undefined
                 }
                 onClick={(e) => {
                   e.preventDefault();

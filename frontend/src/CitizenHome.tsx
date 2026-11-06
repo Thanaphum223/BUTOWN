@@ -30,13 +30,7 @@ import CommunityActions from "./CommunityActions";
 import LocationMap from "./LocationMap";
 type D = Record<string, any>;
 const { Title, Text } = Typography;
-export default function CitizenHome({
-  onTrack,
-  onFollowing,
-}: {
-  onTrack: () => void;
-  onFollowing: () => void;
-}) {
+export default function CitizenHome({ onFollowing }: { onFollowing: () => void }) {
   const geo = useGeo();
   const [area, setArea] = useState<"nearby" | "municipality">("municipality");
   const municipal = area === "municipality";
@@ -414,9 +408,6 @@ export default function CitizenHome({
           onChange={setPage}
           style={{ marginTop: 16 }}
         />
-        <Button className="my-cases-link" style={{ marginTop: 16 }} onClick={onTrack}>
-          ดูคำร้องของฉันทั้งหมด
-        </Button>
       </section>
     </div>
   );

@@ -314,12 +314,7 @@ public class ComplaintController {
               "version",
               "transfer_department_name")) clean.put(k, c.get(k));
       result.put("complaint", clean);
-      result.put(
-          "history",
-          db.list(
-              "SELECT action,from_status,to_status,created_at FROM audit_event WHERE complaint_id=?"
-                  + " ORDER BY created_at",
-              id));
+      result.put("history", citizenHistory(id, (String) c.get("status")));
       result.put(
           "files",
           db.list(
@@ -340,11 +335,6 @@ public class ComplaintController {
     c.put("answers", c.get("answers").toString());
     c.put("form_schema", c.get("form_schema").toString());
     result.put("complaint", c);
-    result.put(
-        "routeReservation",
-        db.list(
-            "SELECT p.id,p.name FROM route_stop rs JOIN route_plan p ON p.id=rs.plan_id WHERE rs.complaint_id=? AND rs.reserved",
-            id));
     result.put(
         "history",
         db.list(
@@ -545,7 +535,7 @@ public class ComplaintController {
     access.role(u, "CITIZEN");
     var c =
         db.one(
-            "SELECT c.id,k.name category_name,c.status,c.created_at,c.updated_at,"
+            "SELECT c.id,k.name category_name,k.name title,c.status,c.created_at,c.updated_at,c.due_at,"
                 + "round(ST_Y(c.location::geometry)::numeric,3) latitude,"
                 + "round(ST_X(c.location::geometry)::numeric,3) longitude,"
                 + "(c.external_id LIKE 'mock-community-v1:%') mock"
@@ -558,9 +548,28 @@ public class ComplaintController {
         "media",
         media.visible(id, u),
         "history",
+        citizenHistory(id, (String) c.get("status")),
+        "files",
+        List.of(),
+        "actions",
+        List.of());
+  }
+
+  private List<Map<String, Object>> citizenHistory(UUID id, String status) {
+    var history =
         db.list(
-            "SELECT from_status,to_status,created_at FROM audit_event WHERE complaint_id=? AND to_status IS NOT NULL ORDER BY created_at",
-            id));
+            "SELECT action,from_status,to_status,created_at,reason FROM audit_event WHERE complaint_id=? AND to_status IS NOT NULL ORDER BY created_at,id",
+            id);
+    String terminalAction =
+        Map.of("REJECTED", "REJECT", "TERMINATED", "DENY", "CLOSED", "CLOSE").get(status);
+    int publicDecision = -1;
+    for (int i = 0; i < history.size(); i++)
+      if (terminalAction != null
+          && terminalAction.equals(history.get(i).get("action"))
+          && status.equals(history.get(i).get("to_status"))) publicDecision = i;
+    for (int i = 0; i < history.size(); i++)
+      if (i != publicDecision) history.get(i).remove("reason");
+    return history;
   }
 
   @PostMapping("/community/complaints/{id}/follow")
