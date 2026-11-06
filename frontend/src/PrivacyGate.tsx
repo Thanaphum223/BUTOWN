@@ -1,3 +1,5 @@
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useI18n } from "./i18n/useI18n";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Modal, Spin, Typography } from "antd";
 import { api, post } from "./api";
@@ -9,6 +11,7 @@ export default function PrivacyGate({
   user: Record<string, any>;
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   const geo = useGeo();
   const automaticLocationUser = useRef<string | null>(null);
   function requestLocationOnce() {
@@ -35,16 +38,21 @@ export default function PrivacyGate({
   if (user.role !== "CITIZEN") return children;
   if (!notice?.acknowledged)
     return (
-      <Modal open closable={false} title="ประกาศคุ้มครองข้อมูลส่วนบุคคล" footer={null}>
+      <Modal open closable={false} title={t("ประกาศคุ้มครองข้อมูลส่วนบุคคล")} footer={null}>
+        <LanguageSwitcher />
         {error ? (
-          <Alert type="error" message={error} action={<Button onClick={load}>ลองใหม่</Button>} />
+          <Alert
+            type="error"
+            message={t(error)}
+            action={<Button onClick={load}>{t("ลองใหม่")}</Button>}
+          />
         ) : !notice ? (
           <Spin />
         ) : (
           <>
             <Typography.Paragraph>{notice.text}</Typography.Paragraph>
             <Typography.Paragraph type="secondary">
-              การรับทราบประกาศนี้แยกจากการอนุญาต GPS คุณยังปักหมุดเองได้หากไม่อนุญาตตำแหน่ง
+              {t("การรับทราบประกาศนี้แยกจากการอนุญาต GPS คุณยังปักหมุดเองได้หากไม่อนุญาตตำแหน่ง")}
             </Typography.Paragraph>
             <Button
               block
@@ -63,7 +71,7 @@ export default function PrivacyGate({
                 }
               }}
             >
-              รับทราบประกาศ
+              {t("รับทราบประกาศ")}
             </Button>
           </>
         )}

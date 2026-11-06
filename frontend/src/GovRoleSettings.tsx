@@ -1,3 +1,5 @@
+import { useI18n } from "./i18n/useI18n";
+import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
 import { useEffect, useRef, useState } from "react";
 import { Alert, App, Button, Card, Form, Input, Select, Space, Typography } from "antd";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
@@ -15,7 +17,9 @@ export default function GovRoleSettings({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
+  const { t } = useI18n();
   const { message } = App.useApp();
+  useLocalizedFormErrors(form);
   const rules = Form.useWatch("mappings", form) || [];
   useEffect(() => {
     const request = new AbortController();
@@ -47,7 +51,7 @@ export default function GovRoleSettings({
       await post("/admin/gov-roles", clean);
       setSaved(clean);
       form.setFieldsValue(clean);
-      message.success("บันทึกการจับคู่บทบาทแล้ว");
+      message.success(t("บันทึกการจับคู่บทบาทแล้ว"));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -61,27 +65,36 @@ export default function GovRoleSettings({
         type="info"
         showIcon
         style={{ marginBottom: 20 }}
-        message="ใช้กับบัญชีใหม่เท่านั้น รวมถึงบัญชีที่กลับมาใช้งานหลังถูกลบ"
-        description="ใช้บทบาทของบริการ TownTrack ที่ Gov ยืนยันแล้ว บัญชีที่มีอยู่จะคงบทบาทและกองที่ผู้ดูแลตั้งไว้ในระบบนี้"
+        message={t("ใช้กับบัญชีใหม่เท่านั้น รวมถึงบัญชีที่กลับมาใช้งานหลังถูกลบ")}
+        description={t(
+          "ใช้บทบาทของบริการ TownTrack ที่ Gov ยืนยันแล้ว บัญชีที่มีอยู่จะคงบทบาทและกองที่ผู้ดูแลตั้งไว้ในระบบนี้",
+        )}
       />
-      {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
+      {error && <Alert type="error" showIcon message={t(error)} style={{ marginBottom: 16 }} />}
       {!saved ? (
         <Card loading={!error} />
       ) : (
         <Form form={form} layout="vertical" onFinish={save} disabled={busy}>
           <Form.Item
             name="municipalityId"
-            label="รหัสเทศบาลใน Gov Center"
-            extra="ใช้ยืนยันว่าบทบาทบุคลากรเป็นของเทศบาลนี้ ดูรหัสจาก Gov กลาง หากยังไม่ระบุจะไม่ให้สิทธิ์บุคลากรแก่บัญชีใหม่"
+            label={t("รหัสเทศบาลใน Gov Center")}
+            extra={t(
+              "ใช้ยืนยันว่าบทบาทบุคลากรเป็นของเทศบาลนี้ ดูรหัสจาก Gov กลาง หากยังไม่ระบุจะไม่ให้สิทธิ์บุคลากรแก่บัญชีใหม่",
+            )}
           >
-            <Input maxLength={200} placeholder="รหัสเทศบาลจาก Gov กลาง" />
+            <Input maxLength={200} placeholder={t("รหัสเทศบาลจาก Gov กลาง")} />
           </Form.Item>
           <Form.Item
             name="serviceId"
-            label="รหัส ID ของบริการ Gov (ถ้ามี)"
-            extra="กรอกเมื่อ Gov ส่งมาเฉพาะ ID โดยไม่มี service code ระบบจะรับสิทธิ์เฉพาะบริการ TownTrack"
+            label={t("รหัส ID ของบริการ Gov (ถ้ามี)")}
+            extra={t(
+              "กรอกเมื่อ Gov ส่งมาเฉพาะ ID โดยไม่มี service code ระบบจะรับสิทธิ์เฉพาะบริการ TownTrack",
+            )}
           >
-            <Input maxLength={200} placeholder="เว้นว่างได้เมื่อ Gov ส่ง service code มาด้วย" />
+            <Input
+              maxLength={200}
+              placeholder={t("เว้นว่างได้เมื่อ Gov ส่ง service code มาด้วย")}
+            />
           </Form.Item>
           <Form.List name="mappings">
             {(fields, { add, remove }) => (
@@ -94,10 +107,10 @@ export default function GovRoleSettings({
                       key={field.key}
                       size="small"
                       style={{ marginBottom: 12 }}
-                      title={`การจับคู่ ${index + 1}`}
+                      title={t("การจับคู่ {{number}}", { number: index + 1 })}
                       extra={
                         <Button
-                          aria-label={`ลบการจับคู่ ${index + 1}`}
+                          aria-label={t("ลบการจับคู่ {{number}}", { number: index + 1 })}
                           icon={<DeleteOutlined />}
                           onClick={() => remove(field.name)}
                         />
@@ -105,28 +118,33 @@ export default function GovRoleSettings({
                     >
                       <Form.Item
                         name={[field.name, "govRole"]}
-                        label="รหัสบทบาทจาก Gov"
+                        label={t("รหัสบทบาทจาก Gov")}
                         rules={[
                           {
                             required: true,
                             whitespace: true,
                             max: 100,
-                            message: "กรุณากรอกรหัสบทบาท Gov",
+                            message: t("กรุณากรอกรหัสบทบาท Gov"),
                           },
                         ]}
                       >
-                        <Input aria-label={`รหัสบทบาท Gov ${index + 1}`} maxLength={100} />
+                        <Input
+                          aria-label={t("รหัสบทบาท Gov {{number}}", { number: index + 1 })}
+                          maxLength={100}
+                        />
                       </Form.Item>
                       <Form.Item
                         name={[field.name, "role"]}
-                        label="บทบาทใน TownTrack"
+                        label={t("บทบาทใน TownTrack")}
                         rules={[{ required: true }]}
                       >
                         <Select
-                          aria-label={`บทบาทใน TownTrack ${index + 1}`}
+                          className="admin-role-select"
+                          classNames={{ popup: { root: "admin-role-options" } }}
+                          aria-label={t("บทบาทใน TownTrack {{number}}", { number: index + 1 })}
                           options={Object.entries(roleNames).map(([value, label]) => ({
                             value,
-                            label,
+                            label: t(label),
                           }))}
                           onChange={() =>
                             form.setFieldValue(["mappings", field.name, "departmentId"], null)
@@ -136,11 +154,11 @@ export default function GovRoleSettings({
                       {fieldRole ? (
                         <Form.Item
                           name={[field.name, "departmentId"]}
-                          label="กอง / หน่วยงาน"
-                          extra="ต้องเลือกกองก่อนให้บัญชีใหม่ใช้บทบาทหัวหน้าหรือผู้ลงพื้นที่"
+                          label={t("กอง / หน่วยงาน")}
+                          extra={t("ต้องเลือกกองก่อนให้บัญชีใหม่ใช้บทบาทหัวหน้าหรือผู้ลงพื้นที่")}
                         >
                           <Select
-                            aria-label={`กองสำหรับบทบาท Gov ${index + 1}`}
+                            aria-label={t("กองสำหรับบทบาท Gov {{number}}", { number: index + 1 })}
                             allowClear
                             options={departments.map((d) => ({ value: d.id, label: d.name }))}
                           />
@@ -148,8 +166,8 @@ export default function GovRoleSettings({
                       ) : (
                         <Typography.Text type="secondary">
                           {["OFFICER", "APPROVER"].includes(role)
-                            ? "ดูแลงานระดับเทศบาล ไม่สังกัดกอง"
-                            : "ไม่สังกัดกอง"}
+                            ? t("ดูแลงานระดับเทศบาล ไม่สังกัดกอง")
+                            : t("ไม่สังกัดกอง")}
                         </Typography.Text>
                       )}
                     </Card>
@@ -160,7 +178,7 @@ export default function GovRoleSettings({
                   disabled={fields.length >= 100 || busy}
                   onClick={() => add({ govRole: "", role: "CITIZEN", departmentId: null })}
                 >
-                  เพิ่มการจับคู่บทบาท
+                  {t("เพิ่มการจับคู่บทบาท")}
                 </Button>
               </>
             )}
@@ -173,10 +191,10 @@ export default function GovRoleSettings({
                 setError("");
               }}
             >
-              ยกเลิกการแก้ไข
+              {t("ยกเลิกการแก้ไข")}
             </Button>
             <Button type="primary" htmlType="submit" loading={busy} disabled={busy}>
-              บันทึกการจับคู่บทบาท
+              {t("บันทึกการจับคู่บทบาท")}
             </Button>
           </Space>
         </Form>

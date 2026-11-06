@@ -1,3 +1,6 @@
+import DialogTools from "./DialogTools";
+import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
+import { useI18n } from "./i18n/useI18n";
 import { useEffect, useRef, useState } from "react";
 import {
   App,
@@ -59,9 +62,11 @@ const icons = [
   "…",
 ];
 export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
+  const { t } = useI18n();
   const geo = useGeo();
   const submissionKey = useRef(crypto.randomUUID());
   const [form] = Form.useForm();
+  useLocalizedFormErrors(form);
   const address = Form.useWatch("address", form);
   const [categories, setCategories] = useState<D[]>([]),
     [category, setCategory] = useState<D>(),
@@ -369,7 +374,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
   }
   async function submit() {
     if (!category) {
-      message.info("กรุณาเลือกประเภทปัญหา");
+      message.info(t("กรุณาเลือกประเภทปัญหา"));
       return;
     }
     try {
@@ -379,7 +384,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
     }
     if (!files.length) {
       setAttachmentMissing(true);
-      message.error("กรุณาแนบหลักฐานอย่างน้อย 1 ไฟล์");
+      message.error(t("กรุณาแนบหลักฐานอย่างน้อย 1 ไฟล์"));
       return;
     }
     setBusy(true);
@@ -425,16 +430,16 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
         <div className="receipt-check">
           <CheckOutlined />
         </div>
-        <Title level={2}>บันทึกคำร้องแล้ว</Title>
-        <Text type="secondary">เทศบาลจะตรวจสอบและดำเนินการตามขั้นตอน</Text>
+        <Title level={2}>{t("บันทึกคำร้องแล้ว")}</Title>
+        <Text type="secondary">{t("เทศบาลจะตรวจสอบและดำเนินการตามขั้นตอน")}</Text>
         <Card className="receipt-card">
-          <Text className="eyebrow">เลขรับเรื่อง</Text>
+          <Text className="eyebrow">{t("เลขรับเรื่อง")}</Text>
           <Title level={3}>#{receipt.id.slice(0, 8).toUpperCase()}</Title>
           <Text strong>{receipt.category}</Text>
           <p>{receipt.address}</p>
         </Card>
         <Button type="primary" block size="large" onClick={() => onDone(receipt.id)}>
-          ติดตามเรื่องนี้
+          {t("ติดตามเรื่องนี้")}
         </Button>
         <Button
           block
@@ -442,38 +447,38 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
           onClick={async () => {
             try {
               await navigator.clipboard.writeText(receipt.id);
-              message.success("คัดลอกเลขเรื่องแล้ว");
+              message.success(t("คัดลอกเลขเรื่องแล้ว"));
             } catch {
               message.info(receipt.id);
             }
           }}
         >
-          คัดลอกเลขเรื่อง
+          {t("คัดลอกเลขเรื่อง")}
         </Button>
       </div>
     );
   return (
     <div className="report-wizard">
       <Text className="eyebrow" style={{ display: "block" }}>
-        แจ้งปัญหาในชุมชน
+        {t("แจ้งปัญหาในชุมชน")}
       </Text>
-      <ol className="report-stepper" aria-label="ขั้นตอนแจ้งปัญหา">
+      <ol className="report-stepper" aria-label={t("ขั้นตอนแจ้งปัญหา")}>
         {["จุดเกิดเหตุ", "รายละเอียดปัญหา"].map((label, i) => (
           <li
             key={label}
             aria-current={step === i ? "step" : undefined}
             className={i <= step ? "active" : ""}
           >
-            {i + 1} {label}
+            {i + 1} {t(label)}
           </li>
         ))}
       </ol>
-      {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
+      {error && <Alert type="error" showIcon message={t(error)} style={{ marginBottom: 16 }} />}
       <Modal
-        title="ยืนยันตำแหน่งจุดเกิดเหตุ"
+        title={t("ยืนยันตำแหน่งจุดเกิดเหตุ")}
         open={!!locationConfirmation}
-        okText="ยืนยันตำแหน่ง"
-        cancelText="กลับไปแก้ไข"
+        okText={t("ยืนยันตำแหน่ง")}
+        cancelText={t("กลับไปแก้ไข")}
         maskClosable={false}
         onCancel={() => setLocationConfirmation(undefined)}
         onOk={() => {
@@ -482,28 +487,29 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
           window.scrollTo({ top: 0, behavior: "smooth" });
         }}
       >
-        <p>กรุณาตรวจสอบว่าจุดเกิดเหตุอยู่ที่สถานที่นี้ก่อนดำเนินการต่อ</p>
-        <Text strong>สถานที่ / จุดสังเกต</Text>
+        <DialogTools />
+        <p>{t("กรุณาตรวจสอบว่าจุดเกิดเหตุอยู่ที่สถานที่นี้ก่อนดำเนินการต่อ")}</p>
+        <Text strong>{t("สถานที่ / จุดสังเกต")}</Text>
         <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
           {locationConfirmation?.address}
         </p>
-        <Text strong>พิกัดจุดเกิดเหตุ</Text>
+        <Text strong>{t("พิกัดจุดเกิดเหตุ")}</Text>
         <p>
           {locationConfirmation?.point
             ? `${locationConfirmation.point[0].toFixed(6)}, ${locationConfirmation.point[1].toFixed(6)}`
-            : "ยังไม่ได้ปักหมุด ใช้ที่อยู่ที่ระบุด้านบน"}
+            : t("ยังไม่ได้ปักหมุด ใช้ที่อยู่ที่ระบุด้านบน")}
         </p>
       </Modal>
       <Form form={form} layout="vertical" preserve>
         <div hidden={step !== 0}>
-          <Title level={2}>เกิดเหตุที่ไหน?</Title>
+          <Title level={2}>{t("เกิดเหตุที่ไหน?")}</Title>
           <Text type="secondary">{category?.name}</Text>
           <label className="control-label" htmlFor="place-query">
-            ค้นหาชื่อสถานที่ หรือพิกัด
+            {t("ค้นหาชื่อสถานที่ หรือพิกัด")}
           </label>
           <Input
             id="place-query"
-            placeholder="เช่น วัด โรงเรียน ตลาด หรือ 13.75, 100.50"
+            placeholder={t("เช่น วัด โรงเรียน ตลาด หรือ 13.75, 100.50")}
             value={placeQuery}
             onChange={(e) => {
               setPlaceQuery(e.target.value);
@@ -526,15 +532,17 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
             loading={searching}
             disabled={!placeQuery.trim()}
           >
-            ค้นหา
+            {t("ค้นหา")}
           </Button>
           <div aria-live="polite" aria-busy={searching}>
             {searchNotice && (
-              <Alert type="info" showIcon message={searchNotice} style={{ marginBottom: 16 }} />
+              <Alert type="info" showIcon message={t(searchNotice)} style={{ marginBottom: 16 }} />
             )}
             {showPlaces && places.length > 0 && (
-              <section aria-label="ผลการค้นหาสถานที่" style={{ marginBottom: 18 }}>
-                <Text strong>พบ {places.length} สถานที่ — เลือกจุดเกิดเหตุ</Text>
+              <section aria-label={t("ผลการค้นหาสถานที่")} style={{ marginBottom: 18 }}>
+                <Text strong>
+                  {t("พบ {{count}} สถานที่ — เลือกจุดเกิดเหตุ", { count: places.length })}
+                </Text>
                 <List
                   dataSource={places}
                   rowKey="place_id"
@@ -554,12 +562,12 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
                         icon={<EnvironmentOutlined />}
                       >
                         {place.display_name}
-                        {selectedPlace === place.place_id && " ✓ เลือกแล้ว"}
+                        {selectedPlace === place.place_id && t(" ✓ เลือกแล้ว")}
                       </Button>
                     </List.Item>
                   )}
                 />
-                <Text type="secondary">ข้อมูลสถานที่ © OpenStreetMap contributors</Text>
+                <Text type="secondary">{t("ข้อมูลสถานที่ © OpenStreetMap contributors")}</Text>
               </section>
             )}
           </div>
@@ -576,11 +584,11 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
               }
             }}
           >
-            ตำแหน่งของฉัน
+            {t("ตำแหน่งของฉัน")}
           </Button>
-          {geo.error && <Alert type="info" message={geo.error} style={{ marginTop: 12 }} />}
+          {geo.error && <Alert type="info" message={t(geo.error)} style={{ marginTop: 12 }} />}
           <Text className="map-help">
-            แตะบนแผนที่เพื่อย้ายหมุดให้ตรงจุดเกิดเหตุ หรือกรอกที่อยู่เอง
+            {t("แตะบนแผนที่เพื่อย้ายหมุดให้ตรงจุดเกิดเหตุ หรือกรอกที่อยู่เอง")}
           </Text>
           {step === 0 && (
             <LocationMap
@@ -600,18 +608,18 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
             />
           )}
           <Form.Item
-            label="สถานที่ / จุดสังเกต"
+            label={t("สถานที่ / จุดสังเกต")}
             name="address"
             rules={[
-              { required: true, whitespace: true, message: "กรุณาระบุสถานที่หรือจุดสังเกต" },
+              { required: true, whitespace: true, message: t("กรุณาระบุสถานที่หรือจุดสังเกต") },
               { max: 1000 },
             ]}
             extra={
               addressLoading ? (
-                <span role="status">กำลังค้นหาที่อยู่…</span>
+                <span role="status">{t("กำลังค้นหาที่อยู่…")}</span>
               ) : addressNotice ? (
                 <Space wrap>
-                  <span role="status">{addressNotice}</span>
+                  <span role="status">{t(addressNotice)}</span>
                   <Button
                     size="small"
                     onClick={() => {
@@ -619,7 +627,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
                       setAddressRevision((v) => v + 1);
                     }}
                   >
-                    ค้นหาที่อยู่อีกครั้ง
+                    {t("ค้นหาที่อยู่อีกครั้ง")}
                   </Button>
                 </Space>
               ) : undefined
@@ -627,7 +635,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
           >
             <Input.TextArea
               rows={3}
-              placeholder="ชื่อสถานที่ ถนน ซอย หรือจุดสังเกต"
+              placeholder={t("ชื่อสถานที่ ถนน ซอย หรือจุดสังเกต")}
               onChange={() => {
                 manual.current = true;
                 setAddressLoading(false);
@@ -636,10 +644,10 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
             />
           </Form.Item>
           <details className="coordinate-details">
-            <summary>ดูหรือแก้ไขพิกัด GPS</summary>
+            <summary>{t("ดูหรือแก้ไขพิกัด GPS")}</summary>
             <Space>
               <InputNumber
-                aria-label="ละติจูด"
+                aria-label={t("ละติจูด")}
                 min={-90}
                 max={90}
                 value={position?.[0]}
@@ -651,7 +659,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
                 }}
               />
               <InputNumber
-                aria-label="ลองจิจูด"
+                aria-label={t("ลองจิจูด")}
                 min={-180}
                 max={180}
                 value={position?.[1]}
@@ -665,20 +673,23 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
             </Space>
           </details>
           <div role="status" aria-live="polite" style={{ marginTop: 16 }}>
-            <Text strong>{category ? "เคสประเภทเดียวกัน" : "เคสใกล้เคียง"}ในรัศมี 100 เมตร</Text>
+            <Text strong>
+              {category ? t("เคสประเภทเดียวกัน") : t("เคสใกล้เคียง")}
+              {t("ในรัศมี 100 เมตร")}
+            </Text>
             <p>
               {!position
-                ? "เลือกจุดเกิดเหตุเพื่อค้นหาเคสใกล้เคียงอัตโนมัติ"
+                ? t("เลือกจุดเกิดเหตุเพื่อค้นหาเคสใกล้เคียงอัตโนมัติ")
                 : nearbyBusy
-                  ? "กำลังค้นหาเคสใกล้เคียง…"
+                  ? t("กำลังค้นหาเคสใกล้เคียง…")
                   : nearbyError
-                    ? nearbyError
+                    ? t(nearbyError)
                     : nearby.length
-                      ? `พบ ${nearby.length} เคสใกล้เคียง`
-                      : "ไม่พบเคสใกล้เคียงในรัศมี 100 เมตร"}
+                      ? t("พบ {{count}} เคสใกล้เคียง", { count: nearby.length })
+                      : t("ไม่พบเคสใกล้เคียงในรัศมี 100 เมตร")}
             </p>
           </div>
-          {nearbyActionError && <Alert type="error" showIcon message={nearbyActionError} />}
+          {nearbyActionError && <Alert type="error" showIcon message={t(nearbyActionError)} />}
           <List
             className="nearby-issues"
             dataSource={nearby}
@@ -689,11 +700,11 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
                   <div className="nearby-issue-heading">
                     <Text strong>{r.category_name}</Text>
                     <Tag color={r.status === "NEW" ? "orange" : "blue"}>
-                      {statusNames[r.status]}
+                      {t(statusNames[r.status] || r.status)}
                     </Tag>
                   </div>
                   <Text type="secondary">#{r.id.slice(0, 8).toUpperCase()}</Text>
-                  {r.mock && <Tag>MOCK · ข้อมูลจำลอง</Tag>}
+                  {r.mock && <Tag>{t("MOCK · ข้อมูลจำลอง")}</Tag>}
                   <CommunityActions
                     item={r as any}
                     disabled={nearbyBusy || !!nearbyAction}
@@ -710,19 +721,19 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
           <CommunityDetail id={nearbyDetail} onClose={() => setNearbyDetail(undefined)} />
         </div>
         <div hidden={step !== 1}>
-          <Title level={2}>รายละเอียดปัญหา</Title>
-          <section aria-label="ประเภทปัญหา">
-            <Title level={2}>พบปัญหาอะไร?</Title>
+          <Title level={2}>{t("รายละเอียดปัญหา")}</Title>
+          <section aria-label={t("ประเภทปัญหา")}>
+            <Title level={2}>{t("พบปัญหาอะไร?")}</Title>
             <Text type="secondary">
-              เลือกปัญหาในพื้นที่หรือบริการที่เทศบาลรับผิดชอบ หากไม่ตรงหมวดให้เลือกอื่น ๆ
+              {t("เลือกปัญหาในพื้นที่หรือบริการที่เทศบาลรับผิดชอบ หากไม่ตรงหมวดให้เลือกอื่น ๆ")}
             </Text>
             <label className="control-label" htmlFor="category-query">
-              ค้นหาประเภทปัญหา
+              {t("ค้นหาประเภทปัญหา")}
             </label>
             <Input.Search
               id="category-query"
-              placeholder="เช่น ขยะ น้ำท่วม ไฟส่องสว่าง หรืออื่น ๆ"
-              enterButton="ค้นหา"
+              placeholder={t("เช่น ขยะ น้ำท่วม ไฟส่องสว่าง หรืออื่น ๆ")}
+              enterButton={t("ค้นหา")}
               allowClear
               value={categoryQuery}
               onChange={(e) => {
@@ -740,8 +751,8 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
             />
             <p aria-live="polite">
               {categorySearch
-                ? `พบ ${filteredCategories.length} ประเภทปัญหา`
-                : `ทั้งหมด ${categories.length} ประเภทปัญหา`}
+                ? t("พบ {{count}} ประเภทปัญหา", { count: filteredCategories.length })
+                : t("ทั้งหมด {{count}} ประเภทปัญหา", { count: categories.length })}
             </p>
             <div className="report-categories" id="report-category-options">
               {visibleCategories.map((c) => (
@@ -766,7 +777,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
               <Alert
                 type="info"
                 showIcon
-                message="ไม่พบประเภทปัญหา ลองใช้คำอื่น หรือล้างคำค้นแล้วเลือกหมวดอื่น ๆ"
+                message={t("ไม่พบประเภทปัญหา ลองใช้คำอื่น หรือล้างคำค้นแล้วเลือกหมวดอื่น ๆ")}
               />
             )}
             <Pagination
@@ -777,7 +788,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
               showSizeChanger={false}
               hideOnSinglePage
               responsive
-              locale={{ prev_page: "หน้าก่อนหน้า", next_page: "หน้าถัดไป" }}
+              locale={{ prev_page: t("หน้าก่อนหน้า"), next_page: t("หน้าถัดไป") }}
               style={{ marginBottom: 20 }}
             />
           </section>
@@ -786,27 +797,42 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
             <strong>{category?.name}</strong>
             <p>{address}</p>
           </div>
-          <Title level={5}>ข้อมูลติดต่อผู้แจ้ง</Title>
-          <Form.Item label="ชื่อ–นามสกุล (ไม่บังคับ)" name="contactName" rules={[{ max: 200 }]}>
-            <Input placeholder="เช่น สมชาย ใจดี" autoComplete="name" />
+          <Title level={5}>{t("ข้อมูลติดต่อผู้แจ้ง")}</Title>
+          <Form.Item
+            label={t("ชื่อ–นามสกุล (ไม่บังคับ)")}
+            name="contactName"
+            rules={[{ max: 200 }]}
+          >
+            <Input placeholder={t("เช่น สมชาย ใจดี")} autoComplete="name" />
           </Form.Item>
           <Form.Item
-            label="เบอร์ติดต่อ (ไม่บังคับ)"
+            label={t("เบอร์ติดต่อ (ไม่บังคับ)")}
             name="contactPhone"
+            extra={
+              <span className="citizen-phone-help">
+                {t(
+                  "ไม่บังคับกรอกสำหรับการแจ้งซ่อมสาธารณูปโภคทั่วไป ระบบอ้างอิงตัวตนผ่านบัญชี Gov Center (LINE หรืออีเมล) ทั้งนี้ หากเป็นเรื่องร้องเรียนเหตุเดือดร้อนรำคาญหรือข้อพิพาททางปกครอง โปรดระบุหมายเลขโทรศัพท์เพื่อให้เจ้าหน้าที่ติดต่อกลับ",
+                )}
+              </span>
+            }
             rules={[{ max: 30, pattern: /^[0-9+() -]*$/ }]}
           >
-            <Input placeholder="เช่น 0812345678" inputMode="tel" autoComplete="tel" />
+            <Input placeholder={t("เช่น 0812345678")} inputMode="tel" autoComplete="tel" />
           </Form.Item>
           <ReporterEmail />
-          <Form.Item label="หัวข้อปัญหา" name="title" rules={[{ required: step === 1, max: 200 }]}>
-            <Input placeholder="สรุปปัญหาที่พบ" />
+          <Form.Item
+            label={t("หัวข้อปัญหา")}
+            name="title"
+            rules={[{ required: step === 1, max: 200 }]}
+          >
+            <Input placeholder={t("สรุปปัญหาที่พบ")} />
           </Form.Item>
           <Form.Item
-            label="รายละเอียด"
+            label={t("รายละเอียด")}
             name="description"
             rules={[{ required: step === 1, max: 20000 }]}
           >
-            <Input.TextArea rows={5} placeholder={reportDescriptionExample(category?.name)} />
+            <Input.TextArea rows={5} placeholder={reportDescriptionExample(category?.name, t)} />
           </Form.Item>
           {fields.map((f) => (
             <Form.Item
@@ -819,10 +845,10 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
             </Form.Item>
           ))}
           <Form.Item
-            label="ภาพ วิดีโอ หรือเอกสารประกอบ"
+            label={t("ภาพ วิดีโอ หรือเอกสารประกอบ")}
             required
             validateStatus={attachmentMissing ? "error" : undefined}
-            help={attachmentMissing ? "กรุณาแนบหลักฐานอย่างน้อย 1 ไฟล์" : undefined}
+            help={attachmentMissing ? t("กรุณาแนบหลักฐานอย่างน้อย 1 ไฟล์") : undefined}
           >
             <Upload
               multiple
@@ -837,7 +863,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
                 const used = pendingFiles.current.reduce((total, f) => total + f.size, 0);
                 const problem = attachmentError(file, used);
                 if (problem) {
-                  message.error(problem);
+                  message.error(t(problem));
                   return Upload.LIST_IGNORE;
                 }
                 setAttachmentMissing(false);
@@ -854,11 +880,14 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
                 return true;
               }}
             >
-              <Button icon={<UploadOutlined />}>แนบภาพ วิดีโอ หรือเอกสาร</Button>
+              <Button icon={<UploadOutlined />}>{t("แนบภาพ วิดีโอ หรือเอกสาร")}</Button>
             </Upload>
-            <Text type="secondary">ต้องแนบอย่างน้อย 1 ไฟล์ — {ATTACHMENT_HELP}</Text>
+            <Text type="secondary">
+              {t("ต้องแนบอย่างน้อย 1 ไฟล์ —")}
+              {t(ATTACHMENT_HELP)}
+            </Text>
             <p aria-live="polite">
-              ขนาดรวมที่เลือก:{" "}
+              {t("ขนาดรวมที่เลือก:")}{" "}
               {(files.reduce((total, f) => total + f.size, 0) / 1_000_000).toFixed(1)} / 1,000 MB
             </p>
           </Form.Item>
@@ -866,21 +895,21 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
         <div className="wizard-actions">
           {step > 0 && (
             <Button
-              aria-label="ย้อนกลับ"
+              aria-label={t("ย้อนกลับ")}
               icon={<ArrowLeftOutlined />}
               disabled={busy}
               onClick={() => setStep((v) => v - 1)}
             >
-              ย้อนกลับ
+              {t("ย้อนกลับ")}
             </Button>
           )}
           {step < 1 ? (
             <Button block type="primary" onClick={next}>
-              ถัดไป
+              {t("ถัดไป")}
             </Button>
           ) : (
             <Button block type="primary" loading={busy} onClick={submit}>
-              ส่งคำร้อง
+              {t("ส่งคำร้อง")}
             </Button>
           )}
         </div>

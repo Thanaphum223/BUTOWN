@@ -1,3 +1,5 @@
+import DialogTools from "./DialogTools";
+import { useI18n } from "./i18n/useI18n";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Modal, Space, Spin, Typography } from "antd";
 import {
@@ -25,6 +27,7 @@ export default function PdfPreview({
   onClose: () => void;
   endpoint?: "files" | "media";
 }) {
+  const { t } = useI18n();
   const [pdf, setPdf] = useState<PDFDocumentProxy>();
   const [page, setPage] = useState(1),
     [zoom, setZoom] = useState(1),
@@ -145,48 +148,49 @@ export default function PdfPreview({
       className="pdf-preview-modal"
       footer={
         <Button icon={<DownloadOutlined />} href={`/api/${endpoint}/${file.id}`}>
-          ดาวน์โหลดเอกสารต้นฉบับ
+          {t("ดาวน์โหลดเอกสารต้นฉบับ")}
         </Button>
       }
     >
+      <DialogTools />
       {error ? (
         <Alert
           type="error"
           showIcon
-          message={error}
-          action={<Button onClick={() => setRetry((v) => v + 1)}>ลองใหม่</Button>}
+          message={t(error)}
+          action={<Button onClick={() => setRetry((v) => v + 1)}>{t("ลองใหม่")}</Button>}
         />
       ) : !pdf ? (
         <div className="pdf-loading">
           <Spin />
-          <p>กำลังเปิดเอกสาร…</p>
+          <p>{t("กำลังเปิดเอกสาร…")}</p>
         </div>
       ) : (
         <>
           <Space wrap className="pdf-toolbar">
             <Button
-              aria-label="หน้าก่อนของเอกสาร"
+              aria-label={t("หน้าก่อนของเอกสาร")}
               icon={<LeftOutlined />}
               disabled={page <= 1 || rendering}
               onClick={() => setPage((v) => v - 1)}
             />
             <Typography.Text aria-live="polite">
-              หน้า {page} / {pdf.numPages}
+              {t("หน้า")} {page} / {pdf.numPages}
             </Typography.Text>
             <Button
-              aria-label="หน้าถัดไปของเอกสาร"
+              aria-label={t("หน้าถัดไปของเอกสาร")}
               icon={<RightOutlined />}
               disabled={page >= pdf.numPages || rendering}
               onClick={() => setPage((v) => v + 1)}
             />
             <Button
-              aria-label="ย่อเอกสาร"
+              aria-label={t("ย่อเอกสาร")}
               icon={<MinusOutlined />}
               disabled={zoom <= 0.5 || rendering}
               onClick={() => setZoom((v) => v - 0.25)}
             />
             <Button
-              aria-label="ขยายเอกสาร"
+              aria-label={t("ขยายเอกสาร")}
               icon={<PlusOutlined />}
               disabled={zoom >= 2 || rendering}
               onClick={() => setZoom((v) => v + 0.25)}
@@ -200,7 +204,10 @@ export default function PdfPreview({
         ref={container}
         style={{ display: error || !pdf ? "none" : undefined }}
       >
-        <canvas ref={canvas} aria-label={`เอกสาร ${file.original_name} หน้า ${page}`} />
+        <canvas
+          ref={canvas}
+          aria-label={t("เอกสาร {{name}} หน้า {{page}}", { name: file.original_name, page })}
+        />
       </div>
     </Modal>
   );

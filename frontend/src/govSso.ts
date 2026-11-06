@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { GovSsoClient } from "gov-sso-login";
-import { api } from "./api";
+import { api, AuthUnavailableError } from "./api";
 export type GovConfig = {
   mode: string;
   configured: boolean;
@@ -48,19 +48,27 @@ export function govLineLogin(config: GovConfig) {
 }
 export function useGovConfig() {
   const [config, setConfig] = useState<GovConfig>(),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [errorDetail, setErrorDetail] = useState("");
   useEffect(() => {
     let alive = true;
     api<GovConfig>("/public/gov-auth")
       .then((c) => {
         if (alive) setConfig(c);
       })
-      .catch(() => {
-        if (alive) setError("โหลดข้อมูล Gov Center ไม่สำเร็จ กรุณาลองใหม่");
+      .catch((error) => {
+        if (alive) {
+          setErrorDetail(error instanceof AuthUnavailableError ? error.detail : "");
+          setError(
+            error instanceof AuthUnavailableError
+              ? error.message
+              : "โหลดข้อมูล Gov Center ไม่สำเร็จ กรุณาลองใหม่",
+          );
+        }
       });
     return () => {
       alive = false;
     };
   }, []);
-  return { config, error };
+  return { config, error, errorDetail };
 }

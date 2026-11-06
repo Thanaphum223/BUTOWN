@@ -108,7 +108,10 @@ test("new citizen registration appears to admin and keeps password after promoti
     await page.getByText(`${username} — New citizen test`, { exact: true }).click();
     await expect(dialog).toContainText("บทบาทปัจจุบัน: ประชาชน");
     await dialog.getByRole("combobox", { name: "บทบาทที่ต้องการ" }).press("ArrowDown");
-    await page.getByText("เจ้าหน้าที่ตรวจสอบ", { exact: true }).last().click();
+    await page
+      .getByText("เจ้าหน้าที่ส่วนกลาง (สำนักปลัด/ศูนย์รับเรื่องราวร้องทุกข์)", { exact: true })
+      .last()
+      .click();
     await expect(dialog.getByRole("combobox", { name: "กอง / หน่วยงาน" })).not.toBeVisible();
     await dialog.getByRole("button", { name: "บันทึก", exact: true }).click();
     await expect(dialog).not.toBeVisible();

@@ -132,13 +132,13 @@ test("accept and start do not ask for a reason while decline still requires one"
   page,
 }) => {
   await workspace(page, "FIELD", "ASSIGNED", ["ACCEPT", "DECLINE"]);
-  await page.getByRole("button", { name: "รับงาน", exact: true }).click();
-  let dialog = page.getByRole("dialog", { name: "รับงาน", exact: true });
+  await page.getByRole("button", { name: "กดรับงานและลงพื้นที่สำรวจ", exact: true }).click();
+  let dialog = page.getByRole("dialog", { name: "กดรับงานและลงพื้นที่สำรวจ", exact: true });
   await expect(dialog.getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true })).toHaveCount(0);
   await dialog.getByRole("button", { name: "Close", exact: true }).click();
-  await page.getByRole("button", { name: "ปฏิเสธงาน", exact: true }).click();
-  dialog = page.getByRole("dialog", { name: "ปฏิเสธงาน", exact: true });
-  await dialog.getByRole("button", { name: "ยืนยันปฏิเสธงาน", exact: true }).click();
+  await page.getByRole("button", { name: "กดปฏิเสธงาน", exact: true }).click();
+  dialog = page.getByRole("dialog", { name: "กดปฏิเสธงาน", exact: true });
+  await dialog.getByRole("button", { name: "ยืนยันกดปฏิเสธงาน", exact: true }).click();
   await expect(dialog.getByText(/กรุณาระบุเหตุผล/)).toBeVisible();
 });
 
@@ -283,7 +283,9 @@ test("declined team member history shows its stored reason and stays read only",
       url.includes("/api/complaints/municipal-case?historyOnly=true"),
     ),
   ).toBe(true);
-  await expect(page.getByRole("button", { name: "รับงาน", exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "กดรับงานและลงพื้นที่สำรวจ", exact: true }),
+  ).toHaveCount(0);
 });
 
 test("current approver can still open its resource section from read only history", async ({

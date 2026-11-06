@@ -1,3 +1,6 @@
+import DialogTools from "./DialogTools";
+import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
+import { useI18n } from "./i18n/useI18n";
 import { govTokens } from "./govTheme";
 import AttachmentList from "./AttachmentList";
 import ResourceReview from "./ResourceReview";
@@ -52,6 +55,15 @@ import LocationMap from "./LocationMap";
 import { ATTACHMENT_ACCEPT, ATTACHMENT_HELP, attachmentError } from "./attachments";
 type D = Record<string, any>;
 const { Title, Text, Paragraph } = Typography;
+const denialPresets = [
+  "เกินวงเงินซ่อมบำรุงปกติ เห็นควรยุติใบงานเฉพาะกิจนี้เพื่อบรรจุเข้าแผนพัฒนาท้องถิ่น/ตั้งงบประมาณประจำปี",
+  "อยู่นอกเหนืออำนาจงบประมาณของเทศบาล ให้ยุติใบงานและทำหนังสือประสานหน่วยงานเจ้าของพื้นที่ (กฟภ./กปภ./กรมทางหลวง)",
+  "ไม่คุ้มค่าทางวิศวกรรม ให้ยุติการใช้งบประมาณพิเศษและให้กองช่างซ่อมแซมบรรเทาความเดือดร้อนชั่วคราวตามวัสดุคงคลัง",
+];
+const terminationNotice =
+  "คำร้องนี้สิ้นสุดใน TownTrack การเข้าแผนงบประมาณหรือทำหนังสือประสานหน่วยงานภายนอกเป็นแนวทางที่ผู้รับผิดชอบต้องดำเนินการต่อเอง ปุ่มนี้ไม่สร้างแผนงบประมาณหรือส่งงานภายนอกอัตโนมัติ";
+const terminalSubtitle =
+  "ยุติใบงานซ่อมด่วนตามผลพิจารณางบประมาณ (ดูเหตุผลและแนวทางดำเนินการต่อในรายละเอียด)";
 export default function Detail({
   id,
   user,
@@ -69,6 +81,24 @@ export default function Detail({
   publicView?: boolean;
   onChanged?: () => void;
 }) {
+  const { t, language } = useI18n();
+  const actionButton = (key: string) =>
+    t(
+      (
+        {
+          ACCEPT: "กดรับงานและลงพื้นที่สำรวจ",
+          DECLINE: "กดปฏิเสธงาน",
+          REQUEST_RESOURCE: "ส่งเอกสารประเมินทรัพยากร/ของบจากหน้างาน",
+          START: "เริ่มปฏิบัติงานซ่อมแซม (ใช้วัสดุ/อุปกรณ์ปกติ)",
+          APPROVE: "อนุมัติ",
+          DENY: "ไม่อนุมัติงบประมาณเฉพาะกิจ (ยุติใบงานซ่อมด่วนเพื่อนำเข้าแผนฯ / ประสานหน่วยงานภายนอก)",
+          SEND_APPROVAL: "เอกสารครบถ้วนตามระเบียบสารบรรณ - ส่งต่อผู้มีอำนาจ",
+          RETURN_LEADER: "ส่งกลับให้แก้ไข",
+        } as Record<string, string>
+      )[key] ||
+        actionNames[key] ||
+        key,
+    );
   const [data, setData] = useState<D>(),
     [error, setError] = useState(""),
     [action, setAction] = useState(""),
@@ -94,6 +124,7 @@ export default function Detail({
     };
   }, []);
   const [form] = Form.useForm();
+  useLocalizedFormErrors(form);
   const resourceItems = Form.useWatch("lineItems", form) as D[] | undefined;
   const resourceTotal =
     (resourceItems || []).reduce(
@@ -112,6 +143,10 @@ export default function Detail({
     return () => window.removeEventListener("beforeunload", warn);
   }, [uploadBusy, action, form]);
   const operationKey = useRef(crypto.randomUUID());
+  const refreshConfirmation = useRef<(() => void) | undefined>(undefined);
+  useEffect(() => {
+    refreshConfirmation.current?.();
+  }, [language]);
   const [evidenceStage, setEvidenceStage] = useState("BEFORE");
   const { message, modal } = App.useApp();
   const submitting = useRef(false);
@@ -152,7 +187,7 @@ export default function Detail({
           setPeople(await api("/people?role=LEADER&departmentId=" + pending.target_department_id));
         }
       } catch (e) {
-        message.error((e as Error).message);
+        message.error(t((e as Error).message));
       }
     }
     if (a === "PROPOSE") {
@@ -170,11 +205,10 @@ export default function Detail({
       try {
         const catalog = await api<D>("/catalog");
         setResourceDepartment(
-          catalog.departments.find((d: D) => d.id === data?.complaint.department_id)?.name ||
-            "หน่วยงานตามคำร้อง",
+          catalog.departments.find((d: D) => d.id === data?.complaint.department_id)?.name || "",
         );
       } catch {
-        setResourceDepartment("หน่วยงานตามคำร้อง");
+        setResourceDepartment("");
       }
     }
     if (a === "REPORT") {
@@ -185,14 +219,14 @@ export default function Detail({
           form.setFieldsValue(saved.values);
         }
       } catch {
-        message.warning("เปิดร่างในอุปกรณ์ไม่ได้ กรุณาตรวจพื้นที่ว่าง");
+        message.warning(t("เปิดร่างในอุปกรณ์ไม่ได้ กรุณาตรวจพื้นที่ว่าง"));
       }
     }
     if (a === "ASSIGN") {
       try {
         setTeams(await api("/teams"));
       } catch (e) {
-        message.error((e as Error).message);
+        message.error(t((e as Error).message));
       }
     }
     const role =
@@ -209,7 +243,7 @@ export default function Detail({
           role === "APPROVER" ? "" : `&departmentId=${data?.complaint.department_id}`;
         setPeople(await api("/people?role=" + role + department));
       } catch (e) {
-        message.error((e as Error).message);
+        message.error(t((e as Error).message));
       }
     }
   }
@@ -219,16 +253,16 @@ export default function Detail({
       saved.files.push({ file, stage });
       await saveDraft(draftKey, saved);
       setDraft(saved);
-      message.info("เก็บไฟล์ที่ส่งไม่สำเร็จเป็นร่างแล้ว กดส่งไฟล์อีกครั้งเมื่อเชื่อมต่อได้");
+      message.info(t("เก็บไฟล์ที่ส่งไม่สำเร็จเป็นร่างแล้ว กดส่งไฟล์อีกครั้งเมื่อเชื่อมต่อได้"));
     } catch {
-      message.error("บันทึกไฟล์ร่างไม่ได้ กรุณาเก็บไฟล์ต้นฉบับไว้");
+      message.error(t("บันทึกไฟล์ร่างไม่ได้ กรุณาเก็บไฟล์ต้นฉบับไว้"));
     }
   }
   async function submit(v: D) {
     if (data?.readOnlyHistory) return;
     if (submitting.current) return;
     if (uploadBusy) {
-      message.warning("กรุณารอให้อัปโหลดไฟล์เสร็จก่อน");
+      message.warning(t("กรุณารอให้อัปโหลดไฟล์เสร็จก่อน"));
       return;
     }
     const pendingFiles = (data?.files || []).filter(
@@ -240,7 +274,7 @@ export default function Detail({
         (f: D) => f.content_type === "application/pdf" && Number(f.size_bytes) <= 15_000_000,
       )
     ) {
-      message.error("กรุณาแนบเอกสารคำขอ PDF ขนาดไม่เกิน 15 MB ในแบบฟอร์มนี้");
+      message.error(t("กรุณาแนบเอกสารคำขอ PDF ขนาดไม่เกิน 15 MB ในแบบฟอร์มนี้"));
       return;
     }
     if (
@@ -252,33 +286,45 @@ export default function Detail({
           ),
         ))
     ) {
-      message.error("กรุณาส่งภาพก่อนทำและหลังทำให้ครบ และส่งไฟล์ร่างที่ค้างก่อนยืนยันรายงาน");
+      message.error(t("กรุณาส่งภาพก่อนทำและหลังทำให้ครบ และส่งไฟล์ร่างที่ค้างก่อนยืนยันรายงาน"));
       return;
     }
     submitting.current = true;
     setBusy(true);
     try {
       if (["REJECT", "CLOSE", "APPROVE", "DENY"].includes(action)) {
-        const confirmed = await new Promise<boolean>((resolve) =>
-          modal.confirm({
-            title: "ตรวจสอบก่อนยืนยัน",
+        const confirmed = await new Promise<boolean>((resolve) => {
+          const copy = () => ({
+            title: t("ตรวจสอบก่อนยืนยัน"),
             content: (
               <div>
+                <DialogTools />
                 <p>
-                  เลขเรื่อง #{id.slice(0, 8).toUpperCase()} · ฉบับ {data!.complaint.version}
+                  {t("เลขเรื่อง #")} {id.slice(0, 8).toUpperCase()} · {t("ฉบับที่")}{" "}
+                  {data!.complaint.version}
                 </p>
-                <p>{actionNames[action]}</p>
-                <p>เหตุผล: {v.reason}</p>
+                <p>{actionButton(action)}</p>
+                <p>
+                  {t("เหตุผล:")} {v.reason}
+                </p>
+                {action === "DENY" && (
+                  <Alert type="warning" showIcon message={t(terminationNotice)} />
+                )}
               </div>
             ),
+            okText: t("ยืนยัน"),
+            cancelText: t("กลับไปแก้ไข"),
+          });
+          const confirmation = modal.confirm({
+            ...copy(),
             zIndex: 2000,
             maskClosable: false,
-            okText: "ยืนยัน",
-            cancelText: "กลับไปแก้ไข",
             onOk: () => resolve(true),
             onCancel: () => resolve(false),
-          }),
-        );
+          });
+          refreshConfirmation.current = () => confirmation.update(copy());
+        });
+        refreshConfirmation.current = undefined;
         if (!confirmed) return;
       }
       await api("/complaints/" + id + "/actions", {
@@ -295,7 +341,7 @@ export default function Detail({
         await removeDraft(draftKey);
         setDraft({ values: {}, files: [] });
       }
-      message.success("บันทึกแล้ว");
+      message.success(t("บันทึกแล้ว"));
       setAction("");
       if (action === "DECLINE") {
         back();
@@ -304,7 +350,7 @@ export default function Detail({
       await load();
       onChanged?.();
     } catch (e) {
-      message.error((e as Error).message);
+      message.error(t((e as Error).message));
       await load();
     } finally {
       submitting.current = false;
@@ -314,8 +360,8 @@ export default function Detail({
   if (error)
     return (
       <>
-        <Button onClick={back}>กลับรายการ</Button>
-        <Alert type="error" showIcon message={error} />
+        <Button onClick={back}>{t("กลับรายการ")}</Button>
+        <Alert type="error" showIcon message={t(error)} />
       </>
     );
   if (!data) return <Spin />;
@@ -330,7 +376,7 @@ export default function Detail({
     <List
       size="small"
       className="pending-evidence"
-      locale={{ emptyText: "ยังไม่ได้แนบไฟล์" }}
+      locale={{ emptyText: t("ยังไม่ได้แนบไฟล์") }}
       dataSource={pendingEvidence.filter((f: D) =>
         stage ? f.evidence_stage === stage : f.content_type === "application/pdf",
       )}
@@ -339,7 +385,7 @@ export default function Detail({
           <a href={"/api/files/" + file.id} target="_blank" rel="noreferrer">
             {file.original_name}
           </a>
-          <Tag color="green">แนบแล้ว</Tag>
+          <Tag color="green">{t("แนบแล้ว")}</Tag>
         </List.Item>
       )}
     />
@@ -401,33 +447,119 @@ export default function Detail({
       <div className="page-heading">
         <div>
           <Button type="text" icon={<ArrowLeftOutlined />} onClick={back}>
-            {embedded ? "กลับคิวงาน" : "กลับรายการ"}
+            {embedded ? t("กลับคิวงาน") : t("กลับรายการ")}
           </Button>
           <Title level={embedded ? 3 : 2}>{c.title || c.category_name}</Title>
           <Space wrap>
             <Text type="secondary">#{id.slice(0, 8).toUpperCase()}</Text>
-            {publicView && c.mock && <Tag>MOCK · ข้อมูลจำลอง</Tag>}
+            {publicView && c.mock && <Tag>{t("MOCK · ข้อมูลจำลอง")}</Tag>}
             <Tag color={["REJECTED", "TERMINATED"].includes(c.status) ? "red" : "cyan"}>
               {progressLabel(c)}
             </Tag>
           </Space>
         </div>
         <Button icon={<ReloadOutlined />} onClick={load}>
-          โหลดใหม่
+          {t("โหลดใหม่")}
         </Button>
       </div>
+      {c.status === "TERMINATED" && (
+        <Alert
+          className="operational-guidance"
+          type="warning"
+          showIcon
+          message={t(terminalSubtitle)}
+        />
+      )}
+      {!citizen &&
+        user.role === "FIELD" &&
+        data.actions?.some((item: D) => ["START", "REQUEST_RESOURCE"].includes(item.action)) && (
+          <Alert
+            className="operational-guidance"
+            type="info"
+            showIcon
+            message={t(
+              "ขั้นตอนปฏิบัติงาน: เมื่อสำรวจหน้างานจริงแล้ว หากวัสดุ/อุปกรณ์ปกติเพียงพอให้กด 'เริ่มปฏิบัติงานซ่อมแซม' หากเกินขีดความสามารถให้กด 'ส่งประเมินขอใช้ทรัพยากร/งบประมาณเพิ่ม'",
+            )}
+          />
+        )}
+      {!citizen &&
+        ["RESOURCE_DRAFT", "RESOURCE_CHECK", "RESOURCE_APPROVAL", "RESOURCE_REVISION"].includes(
+          c.status,
+        ) &&
+        latestResource?.status !== "APPROVED" && (
+          <Alert
+            className="operational-guidance"
+            type="warning"
+            showIcon
+            message={t("ระงับการใช้ทรัพยากรที่ขอชั่วคราว (รอผลการพิจารณาอนุมัติ)")}
+          />
+        )}
+      {user.role === "OFFICER" && c.status === "RESOURCE_CHECK" && (
+        <Alert
+          className="operational-guidance"
+          type="info"
+          message={t(
+            "ตรวจสอบความครบถ้วนทางสารบรรณและเลขที่เอกสารอ้างอิง (ก่อนเสนอผู้มีอำนาจพิจารณา)",
+          )}
+        />
+      )}
+      {user.role === "OFFICER" && ["OFFICER_REVIEW", "RESOLVED"].includes(c.status) && (
+        <Alert
+          className="operational-guidance"
+          type="info"
+          message={t(
+            "ตรวจสอบความสมบูรณ์ของภาพถ่าย Before/After เพื่อเผยแพร่ประชาสัมพันธ์และปิดทะเบียนคุมเรื่องร้องเรียน",
+          )}
+          description={t("รายงานนี้ผ่านการตรวจจากหัวหน้าผู้ลงพื้นที่แล้ว")}
+        />
+      )}
+      {user.role === "LEADER" && (
+        <Card className="assignment-summary" title={t("การมอบหมาย")}>
+          <Descriptions
+            column={1}
+            items={[
+              {
+                key: "appointment",
+                label: t("วันนัดหมายเดิม (อ่านอย่างเดียว)"),
+                children:
+                  (typeof c.assignment_details === "string"
+                    ? JSON.parse(c.assignment_details || "{}")
+                    : c.assignment_details
+                  )?.appointment || t("ยังไม่ระบุวันนัดหมาย"),
+              },
+              {
+                key: "urgency",
+                label: t("ความเร่งด่วน"),
+                children: t(
+                  ({ NORMAL: "ปกติ", PRIORITY: "เร่งด่วน" } as D)[
+                    (typeof c.assignment_details === "string"
+                      ? JSON.parse(c.assignment_details || "{}")
+                      : c.assignment_details
+                    )?.urgency
+                  ] || "ไม่ระบุ",
+                ),
+              },
+            ]}
+          />
+          {c.latitude != null && c.longitude != null && (
+            <LocationMap value={[Number(c.latitude), Number(c.longitude)]} />
+          )}
+        </Card>
+      )}
       {!citizen && c.status === "RESOURCE_APPROVAL" && latestResource?.status === "PENDING" && (
         <Alert
           type="info"
           showIcon
           style={{ marginBottom: 20 }}
-          message={"รออนุมัติโดย " + (latestResource.approver_name || "ผู้อนุมัติที่ได้รับมอบหมาย")}
+          message={
+            t("รออนุมัติโดย ") + (latestResource.approver_name || t("ผู้อนุมัติที่ได้รับมอบหมาย"))
+          }
           description={
             latestResource.approver_id === user.id
               ? user.role === "ADMIN"
-                ? "งานนี้ส่งถึงบัญชีของคุณ สลับเป็นบทบาทผู้อนุมัติเพื่อพิจารณา"
-                : "งานนี้ส่งถึงบัญชีของคุณ"
-              : "ผู้รับที่ระบุจะเห็นงานนี้ในคิวผู้อนุมัติของตน"
+                ? t("งานนี้ส่งถึงบัญชีของคุณ สลับเป็นบทบาทผู้อนุมัติเพื่อพิจารณา")
+                : t("งานนี้ส่งถึงบัญชีของคุณ")
+              : t("ผู้รับที่ระบุจะเห็นงานนี้ในคิวผู้อนุมัติของตน")
           }
         />
       )}
@@ -435,15 +567,16 @@ export default function Detail({
         <section className="split-case-summary">
           <div className="split-case-facts">
             <span>
-              <EnvironmentOutlined /> {c.address || "ไม่ระบุสถานที่"}
+              <EnvironmentOutlined /> {c.address || t("ไม่ระบุสถานที่")}
             </span>
             <span>
-              <CalendarOutlined /> กำหนดเสร็จ {date(c.due_at)}
+              <CalendarOutlined />
+              {t("กำหนดเสร็จ")} {date(c.due_at)}
             </span>
           </div>
-          <h3>รายละเอียด</h3>
+          <h3>{t("รายละเอียด")}</h3>
           <Paragraph style={{ whiteSpace: "pre-wrap" }}>{c.description}</Paragraph>
-          <h3>หลักฐานประกอบ</h3>
+          <h3>{t("หลักฐานประกอบ")}</h3>
           <EvidenceGallery
             media={(data.files || []).filter(
               (f: D) =>
@@ -456,7 +589,7 @@ export default function Detail({
         className={embedded ? "split-section" : "workflow-section"}
         open={embedded ? undefined : true}
       >
-        <summary>ขั้นตอนการดำเนินงาน</summary>
+        <summary>{t("ขั้นตอนการดำเนินงาน")}</summary>
         <Card className="workflow-progress" style={{ marginBottom: 20 }}>
           <Steps
             current={current}
@@ -469,12 +602,12 @@ export default function Detail({
             }
             responsive={citizen}
             items={[
-              "รับคำร้อง",
-              "จัดหน่วยงาน",
-              "มอบหมายทีม",
-              "ลงพื้นที่",
-              "ตรวจผลงาน",
-              "ปิดเรื่อง",
+              t("รับคำร้อง"),
+              t("จัดหน่วยงาน"),
+              t("มอบหมายทีม"),
+              t("ลงพื้นที่"),
+              t("ตรวจผลงาน"),
+              t("ปิดเรื่อง"),
             ].map((title, index) => {
               if (!endedWithoutCompletion || index === 5) return { title };
               const visited =
@@ -482,7 +615,7 @@ export default function Detail({
               return {
                 title,
                 status: visited ? ("finish" as const) : ("wait" as const),
-                description: visited ? undefined : "ไม่ได้ดำเนินการ",
+                description: visited ? undefined : t("ไม่ได้ดำเนินการ"),
               };
             })}
           />
@@ -495,13 +628,13 @@ export default function Detail({
           showIcon
           message={
             data.limitedHistory
-              ? "ประวัติการทำงานของคุณ แสดงเฉพาะข้อมูลที่เคยดำเนินการและไม่สามารถแก้ไขได้"
-              : "ประวัติงาน เปิดดูข้อมูลได้ ไม่สามารถดำเนินการจากหน้านี้"
+              ? t("ประวัติการทำงานของคุณ แสดงเฉพาะข้อมูลที่เคยดำเนินการและไม่สามารถแก้ไขได้")
+              : t("ประวัติงาน เปิดดูข้อมูลได้ ไม่สามารถดำเนินการจากหน้านี้")
           }
         />
       )}
       {data.readOnlyHistory && returnReasons.length > 0 && (
-        <Card title={<Title level={5}>เหตุผลส่งคืนงาน</Title>}>
+        <Card title={<Title level={5}>{t("เหตุผลส่งคืนงาน")}</Title>}>
           <List
             dataSource={returnReasons}
             renderItem={(reason) => <List.Item>{reason}</List.Item>}
@@ -517,30 +650,33 @@ export default function Detail({
             ) || undefined
           }
         >
-          <summary>คำขอทรัพยากรและเอกสารประกอบ ({data.resources?.length || 0})</summary>
+          <summary>
+            {t("คำขอทรัพยากรและเอกสารประกอบ (")}
+            {data.resources?.length || 0})
+          </summary>
           <ResourceReview resources={data.resources} files={data.files} />
         </details>
       )}
       {!citizen && data.transfers?.length > 0 && (
-        <Card title="การส่งต่อหน่วยงาน">
+        <Card title={t("การส่งต่อหน่วยงาน")}>
           <List
             dataSource={data.transfers}
-            renderItem={(t: D) => (
+            renderItem={(transfer: D) => (
               <List.Item>
                 <div>
                   <Text strong>
-                    {t.source_department_name} → {t.target_department_name}
+                    {transfer.source_department_name} → {transfer.target_department_name}
                   </Text>
-                  <Paragraph>{t.reason}</Paragraph>
+                  <Paragraph>{transfer.reason}</Paragraph>
                   <Text type="secondary">
-                    {t.state === "PENDING"
-                      ? "รอเจ้าหน้าที่ส่งต่อ"
-                      : t.state === "ACCEPTED"
-                        ? "ส่งต่อแล้ว"
-                        : "ส่งกลับแก้ไข"}{" "}
-                    · {date(t.created_at)}
+                    {transfer.state === "PENDING"
+                      ? t("รอเจ้าหน้าที่ส่งต่อ")
+                      : transfer.state === "ACCEPTED"
+                        ? t("ส่งต่อแล้ว")
+                        : t("ส่งกลับแก้ไข")}{" "}
+                    · {date(transfer.created_at)}
                   </Text>
-                  {t.review_reason && <Paragraph>{t.review_reason}</Paragraph>}
+                  {transfer.review_reason && <Paragraph>{transfer.review_reason}</Paragraph>}
                 </div>
               </List.Item>
             )}
@@ -556,7 +692,7 @@ export default function Detail({
           "RESOLVED",
           "TRANSFER_PENDING",
         ].includes(c.status) && (
-          <Card className="report-review-card" title="รายงานล่าสุดและหลักฐานประกอบ">
+          <Card className="report-review-card" title={t("รายงานล่าสุดและหลักฐานประกอบ")}>
             <Paragraph>{data.reports.at(-1).content}</Paragraph>
             <EvidenceGallery
               media={(data.files || []).filter(
@@ -572,7 +708,7 @@ export default function Detail({
                   file.report_id === data.reports.at(-1).id &&
                   file.content_type === "application/pdf",
               )}
-              emptyText="ไม่มีเอกสาร PDF เพิ่มเติมในรายงานนี้"
+              emptyText={t("ไม่มีเอกสาร PDF เพิ่มเติมในรายงานนี้")}
             />
           </Card>
         )}
@@ -580,11 +716,11 @@ export default function Detail({
         className={embedded ? "split-section split-extra-info" : "split-full-info"}
         open={embedded ? undefined : true}
       >
-        <summary>ข้อมูลคำร้อง เอกสาร และรายงานทั้งหมด</summary>
+        <summary>{t("ข้อมูลคำร้อง เอกสาร และรายงานทั้งหมด")}</summary>
         <Row gutter={[20, 20]}>
           <Col xs={24} xl={embedded || citizen ? 24 : 16}>
             {user.role !== "CITIZEN" && c.assignment_details && (
-              <Card title="คำแนะนำและความปลอดภัยก่อนรับงาน" style={{ marginBottom: 16 }}>
+              <Card title={t("คำแนะนำและความปลอดภัยก่อนรับงาน")} style={{ marginBottom: 16 }}>
                 <Descriptions
                   column={1}
                   items={Object.entries(
@@ -596,17 +732,17 @@ export default function Detail({
                     label:
                       (
                         {
-                          operationMethod: "วิธีดำเนินงาน",
-                          urgency: "ความเร่งด่วน",
-                          appointment: "วันนัดหมาย",
-                          workScope: "ขอบเขตงาน",
-                          precautions: "ข้อควรระวัง",
-                          coordinator: "ช่องทางประสานงาน",
+                          operationMethod: t("วิธีดำเนินงาน"),
+                          urgency: t("ความเร่งด่วน"),
+                          appointment: t("วันนัดหมาย"),
+                          workScope: t("ขอบเขตงาน"),
+                          precautions: t("ข้อควรระวัง"),
+                          coordinator: t("ช่องทางประสานงาน"),
                         } as D
                       )[key] || key,
                     children:
                       key === "urgency"
-                        ? ({ NORMAL: "ปกติ", PRIORITY: "เร่งด่วน" } as D)[String(value)] ||
+                        ? ({ NORMAL: t("ปกติ"), PRIORITY: t("เร่งด่วน") } as D)[String(value)] ||
                           String(value)
                         : String(value),
                   }))}
@@ -617,12 +753,12 @@ export default function Detail({
                     rel="noopener noreferrer"
                     href={`https://www.google.com/maps/dir/?api=1&destination=${c.latitude},${c.longitude}`}
                   >
-                    เปิดเส้นทางไปจุดเกิดเหตุ
+                    {t("เปิดเส้นทางไปจุดเกิดเหตุ")}
                   </a>
                 )}
               </Card>
             )}
-            <Card title="รายละเอียดคำร้อง">
+            <Card title={t("รายละเอียดคำร้อง")}>
               <Descriptions
                 column={1}
                 items={[
@@ -631,7 +767,7 @@ export default function Detail({
                     : [
                         {
                           key: "description",
-                          label: "ปัญหาที่แจ้ง",
+                          label: t("ปัญหาที่แจ้ง"),
                           children: (
                             <Paragraph style={{ whiteSpace: "pre-wrap" }}>
                               {c.description}
@@ -643,41 +779,41 @@ export default function Detail({
                     ? [
                         {
                           key: "contact_name",
-                          label: "ชื่อผู้ติดต่อ",
-                          children: c.contact_name || "ไม่ระบุ",
+                          label: t("ชื่อผู้ติดต่อ"),
+                          children: c.contact_name || t("ไม่ระบุ"),
                         },
                         {
                           key: "contact_phone",
-                          label: "เบอร์ติดต่อ",
-                          children: c.contact_phone || "ไม่ระบุ",
+                          label: t("เบอร์ติดต่อ"),
+                          children: c.contact_phone || t("ไม่ระบุ"),
                         },
                         {
                           key: "contact_email",
-                          label: "อีเมลติดต่อ",
-                          children: c.contact_email || "ไม่ระบุ",
+                          label: t("อีเมลติดต่อ"),
+                          children: c.contact_email || t("ไม่ระบุ"),
                         },
                       ]
                     : []),
                   {
                     key: "address",
-                    label: "สถานที่",
-                    children: publicView ? "ตำแหน่งโดยประมาณบนแผนที่" : c.address,
+                    label: t("สถานที่"),
+                    children: publicView ? t("ตำแหน่งโดยประมาณบนแผนที่") : c.address,
                   },
                   {
                     key: "created",
-                    label: "วันที่แจ้ง",
+                    label: t("วันที่แจ้ง"),
                     children: date(c.created_at),
                   },
-                  { key: "due", label: "กำหนดเสร็จ", children: date(c.due_at) },
+                  { key: "due", label: t("กำหนดเสร็จ"), children: date(c.due_at) },
                 ]}
               />
-              {c.latitude != null && (
+              {user.role !== "LEADER" && c.latitude != null && (
                 <LocationMap value={[Number(c.latitude), Number(c.longitude)]} />
               )}{" "}
               {c.answers && Object.keys(JSON.parse(c.answers)).length > 0 && (
                 <Descriptions
                   column={1}
-                  title="ข้อมูลเพิ่มเติม"
+                  title={t("ข้อมูลเพิ่มเติม")}
                   items={Object.entries(JSON.parse(c.answers)).map(([key, value]) => ({
                     key,
                     label: c.form_schema
@@ -694,15 +830,17 @@ export default function Detail({
                   items={[
                     {
                       key: "reports",
-                      label: "รายงานผล (" + (data.reports?.length || 0) + ")",
+                      label: t("รายงานผล (") + (data.reports?.length || 0) + ")",
                       children: (
                         <List
                           dataSource={data.reports}
-                          locale={{ emptyText: "ยังไม่มีรายงาน" }}
+                          locale={{ emptyText: t("ยังไม่มีรายงาน") }}
                           renderItem={(r: D) => (
                             <List.Item>
                               <div>
-                                <Text strong>ฉบับที่ {r.revision}</Text>
+                                <Text strong>
+                                  {t("ฉบับที่")} {r.revision}
+                                </Text>
                                 <Paragraph style={{ whiteSpace: "pre-wrap" }}>
                                   {r.content}
                                 </Paragraph>
@@ -715,33 +853,36 @@ export default function Detail({
                     },
                     {
                       key: "resources",
-                      label: "คำขอทรัพยากร",
+                      label: t("คำขอทรัพยากร"),
                       children: (
                         <>
                           <List
                             dataSource={data.resources}
-                            locale={{ emptyText: "ยังไม่มีคำขอทรัพยากร" }}
+                            locale={{ emptyText: t("ยังไม่มีคำขอทรัพยากร") }}
                             renderItem={(r: D) => (
                               <List.Item>
                                 <div>
                                   <Tag>
                                     {(
                                       {
-                                        DRAFT: "ร่างข้อเสนอ",
-                                        CHECK: "รอตรวจเอกสาร",
-                                        REVISION: "แก้ไขข้อเสนอ",
-                                        PENDING: "รออนุมัติ",
-                                        APPROVED: "อนุมัติแล้ว",
-                                        DENIED: "ไม่อนุมัติ",
+                                        DRAFT: t("ร่างข้อเสนอ"),
+                                        CHECK: t("รอตรวจเอกสาร"),
+                                        REVISION: t("แก้ไขข้อเสนอ"),
+                                        PENDING: t("รออนุมัติ"),
+                                        APPROVED: t("อนุมัติแล้ว"),
+                                        DENIED: t("ไม่อนุมัติ"),
                                       } as Record<string, string>
                                     )[r.status] || r.status}
                                   </Tag>
                                   {JSON.parse(r.revisions).map((v: D) => (
                                     <div key={v.id} className="revision">
                                       <Text strong>
-                                        ฉบับที่ {v.revision} •{" "}
-                                        {Number(v.amount).toLocaleString("th-TH")} บาท •{" "}
-                                        {v.duration_days} วัน
+                                        {t("ฉบับที่")} {v.revision} •{" "}
+                                        {Number(v.amount).toLocaleString(
+                                          language === "en" ? "en-GB" : "th-TH",
+                                        )}
+                                        {t("บาท •")} {v.duration_days}
+                                        {t("วัน")}
                                       </Text>
                                       <Paragraph style={{ whiteSpace: "pre-wrap" }}>
                                         {v.proposal}
@@ -755,11 +896,14 @@ export default function Detail({
                                             <List.Item>
                                               <span>{item.name}</span>
                                               <Text>
-                                                {Number(item.amount).toLocaleString("th-TH", {
-                                                  minimumFractionDigits: 2,
-                                                  maximumFractionDigits: 2,
-                                                })}{" "}
-                                                บาท
+                                                {Number(item.amount).toLocaleString(
+                                                  language === "en" ? "en-GB" : "th-TH",
+                                                  {
+                                                    minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2,
+                                                  },
+                                                )}{" "}
+                                                {t("บาท")}
                                               </Text>
                                             </List.Item>
                                           )}
@@ -769,7 +913,7 @@ export default function Detail({
                                         files={(data.files || []).filter(
                                           (file: D) => file.resource_revision_id === v.id,
                                         )}
-                                        emptyText="ไม่มีเอกสารที่ระบุฉบับนี้"
+                                        emptyText={t("ไม่มีเอกสารที่ระบุฉบับนี้")}
                                       />
                                     </div>
                                   ))}
@@ -778,7 +922,7 @@ export default function Detail({
                             )}
                           />
                           <List
-                            header="ลำดับการอนุมัติ"
+                            header={t("ลำดับการอนุมัติ")}
                             dataSource={data.approvals}
                             renderItem={(r: D) => (
                               <List.Item>
@@ -786,7 +930,11 @@ export default function Detail({
                                   <Text>
                                     {r.step}. {r.approver_name}
                                   </Text>
-                                  <Tag>{r.decision ? actionNames[r.decision] : "รอพิจารณา"}</Tag>
+                                  <Tag>
+                                    {r.decision
+                                      ? t(actionNames[r.decision] || r.decision)
+                                      : t("รอพิจารณา")}
+                                  </Tag>
                                   <Text>{r.reason}</Text>
                                 </Space>
                               </List.Item>
@@ -797,7 +945,7 @@ export default function Detail({
                     },
                     {
                       key: "work",
-                      label: "การมอบหมาย",
+                      label: t("การมอบหมาย"),
                       children: (
                         <List
                           dataSource={data.workOrders}
@@ -808,12 +956,12 @@ export default function Detail({
                                 <Text>
                                   {(
                                     {
-                                      ASSIGNED: "รอรับงาน",
-                                      ACCEPTED: "รับงานแล้ว",
-                                      IN_PROGRESS: "กำลังดำเนินการ",
-                                      DECLINED: "ปฏิเสธงาน",
-                                      CANCELLED: "ยกเลิกงาน",
-                                      COMPLETE: "เสร็จสิ้น",
+                                      ASSIGNED: t("รอรับงาน"),
+                                      ACCEPTED: t("รับงานแล้ว"),
+                                      IN_PROGRESS: t("กำลังดำเนินการ"),
+                                      DECLINED: t("ปฏิเสธงาน"),
+                                      CANCELLED: t("ยกเลิกงาน"),
+                                      COMPLETE: t("เสร็จสิ้น"),
                                     } as Record<string, string>
                                   )[r.status] || r.status}{" "}
                                   {r.reason && "• " + r.reason}
@@ -827,7 +975,7 @@ export default function Detail({
                     },
                     {
                       key: "reviews",
-                      label: "ผลการตรวจ",
+                      label: t("ผลการตรวจ"),
                       children: (
                         <List
                           dataSource={data.reviews}
@@ -835,7 +983,7 @@ export default function Detail({
                             <List.Item>
                               <div>
                                 <Text strong>
-                                  {actionNames[r.decision] || r.decision} • {r.actor_name}
+                                  {t(actionNames[r.decision] || r.decision)} • {r.actor_name}
                                 </Text>
                                 <Paragraph>{r.reason}</Paragraph>
                                 <Text type="secondary">{date(r.created_at)}</Text>
@@ -850,21 +998,21 @@ export default function Detail({
               </Card>
             )}
             <Card
-              title="ไฟล์หลักฐาน"
+              title={t("ไฟล์หลักฐาน")}
               style={{ marginTop: 20 }}
               extra={
                 uploadAllowed ? (
                   <Space wrap>
                     {user.role === "FIELD" && (
                       <Select
-                        aria-label="ชนิดหลักฐาน"
+                        aria-label={t("ชนิดหลักฐาน")}
                         value={evidenceStage}
                         disabled={uploadBusy}
                         onChange={setEvidenceStage}
                         options={[
-                          { value: "BEFORE", label: "ภาพก่อนทำ" },
-                          { value: "AFTER", label: "ภาพหลังทำ" },
-                          { value: "GENERAL", label: "วิดีโอ / เอกสารประกอบ" },
+                          { value: "BEFORE", label: t("ภาพก่อนทำ") },
+                          { value: "AFTER", label: t("ภาพหลังทำ") },
+                          { value: "GENERAL", label: t("วิดีโอ / เอกสารประกอบ") },
                         ]}
                       />
                     )}
@@ -881,7 +1029,7 @@ export default function Detail({
                 ) : undefined
               }
             >
-              {uploadAllowed && <Text type="secondary">{ATTACHMENT_HELP}</Text>}
+              {uploadAllowed && <Text type="secondary">{t(ATTACHMENT_HELP)}</Text>}
               {(citizen ||
                 (data.files || []).some(
                   (f: D) =>
@@ -915,11 +1063,11 @@ export default function Detail({
                             });
                             await load();
                           } catch (e) {
-                            message.error((e as Error).message);
+                            message.error(t((e as Error).message));
                           }
                         }}
                       >
-                        {f.public_approved ? "หยุดเผยแพร่" : "ไม่เผยแพร่แล้ว"}
+                        {f.public_approved ? t("หยุดเผยแพร่") : t("ไม่เผยแพร่แล้ว")}
                       </Button>
                     ) : (
                       <Button
@@ -929,7 +1077,7 @@ export default function Detail({
                           setConfirmedClean(false);
                         }}
                       >
-                        เผยแพร่สำเนา
+                        {t("เผยแพร่สำเนา")}
                       </Button>
                     )
                   ) : null
@@ -939,7 +1087,7 @@ export default function Detail({
           </Col>
           <Col xs={24} xl={embedded ? 24 : 8}>
             {!publicView && !data.readOnlyHistory && !embedded && data.actions?.length > 0 && (
-              <Card title="ดำเนินการ" style={{ marginBottom: 20 }}>
+              <Card title={t("ดำเนินการ")} style={{ marginBottom: 20 }}>
                 <Space direction="vertical" style={{ width: "100%" }}>
                   {data.actions.map((r: D) => (
                     <Button
@@ -960,7 +1108,7 @@ export default function Detail({
                       danger={["REJECT", "DENY", "DECLINE"].includes(r.action)}
                       onClick={() => choose(r.action)}
                     >
-                      {actionNames[r.action]}
+                      {actionButton(r.action)}
                     </Button>
                   ))}
                 </Space>
@@ -970,14 +1118,17 @@ export default function Detail({
         </Row>
       </details>
       <details className="split-section" open={embedded ? undefined : true}>
-        <summary>ประวัติการดำเนินงาน ({data.history.length})</summary>
-        <Card title="ประวัติการดำเนินการ">
+        <summary>
+          {t("ประวัติการดำเนินงาน (")}
+          {data.history.length})
+        </summary>
+        <Card title={t("ประวัติการดำเนินการ")}>
           <Timeline
             items={data.history.map((h: D) => ({
               color: ["DENY", "REJECT"].includes(h.action) ? "red" : govTokens["brand-primary"],
               children: (
                 <>
-                  <Text strong>{actionNames[h.action] || h.action}</Text>
+                  <Text strong>{t(actionNames[h.action] || h.action)}</Text>
                   <div>
                     <Text type="secondary">
                       {date(h.created_at)}
@@ -992,7 +1143,7 @@ export default function Detail({
         </Card>
       </details>
       {!publicView && !data.readOnlyHistory && embedded && data.actions?.length > 0 && (
-        <Card className="embedded-actions split-action-dock" title="ดำเนินการ">
+        <Card className="embedded-actions split-action-dock" title={t("ดำเนินการ")}>
           <Space wrap>
             {data.actions.map((r: D) => (
               <Button
@@ -1012,7 +1163,7 @@ export default function Detail({
                 danger={["REJECT", "DENY", "DECLINE"].includes(r.action)}
                 onClick={() => choose(r.action)}
               >
-                {actionNames[r.action]}
+                {actionButton(r.action)}
               </Button>
             ))}
           </Space>
@@ -1020,9 +1171,9 @@ export default function Detail({
       )}
       <Modal
         open={!data.readOnlyHistory && !!publishSource}
-        title="เผยแพร่สำเนาหลักฐานในชุมชน"
+        title={t("เผยแพร่สำเนาหลักฐานในชุมชน")}
         onCancel={() => setPublishSource(undefined)}
-        okText="ยืนยันเผยแพร่สำเนา"
+        okText={t("ยืนยันเผยแพร่สำเนา")}
         confirmLoading={publishing}
         okButtonProps={{ disabled: !publishFile || !confirmedClean }}
         onOk={async () => {
@@ -1036,20 +1187,25 @@ export default function Detail({
             await api(`/complaints/${id}/shared-media`, { method: "POST", body });
             setPublishSource(undefined);
             await load();
-            message.success("เผยแพร่สำเนาที่ตรวจแล้ว");
+            message.success(t("เผยแพร่สำเนาที่ตรวจแล้ว"));
           } catch (e) {
-            message.error((e as Error).message);
+            message.error(t((e as Error).message));
           } finally {
             setPublishing(false);
           }
         }}
       >
+        <DialogTools />
         <Alert
           type="info"
-          message="อัปโหลดสำเนาที่ปกปิดใบหน้า ทะเบียนรถ และข้อมูลส่วนตัวแล้ว ไฟล์ต้นฉบับยังเป็นส่วนตัว"
+          message={t(
+            "อัปโหลดสำเนาที่ปกปิดใบหน้า ทะเบียนรถ และข้อมูลส่วนตัวแล้ว ไฟล์ต้นฉบับยังเป็นส่วนตัว",
+          )}
           style={{ marginBottom: 16 }}
         />
-        <p>ต้นฉบับ: {publishSource?.original_name}</p>
+        <p>
+          {t("ต้นฉบับ:")} {publishSource?.original_name}
+        </p>
         <Upload
           accept=".jpg,.jpeg,.png,.mp4,.mov,.webm"
           maxCount={1}
@@ -1057,7 +1213,7 @@ export default function Detail({
           beforeUpload={(file) => {
             const error = attachmentError(file, 0);
             if (error) {
-              message.error(error);
+              message.error(t(error));
               return Upload.LIST_IGNORE;
             }
             setPublishFile(file);
@@ -1065,14 +1221,14 @@ export default function Detail({
           }}
           onRemove={() => setPublishFile(undefined)}
         >
-          <Button icon={<UploadOutlined />}>เลือกสำเนาที่ปกปิดข้อมูลแล้ว</Button>
+          <Button icon={<UploadOutlined />}>{t("เลือกสำเนาที่ปกปิดข้อมูลแล้ว")}</Button>
         </Upload>
         <Checkbox
           checked={confirmedClean}
           onChange={(e) => setConfirmedClean(e.target.checked)}
           style={{ marginTop: 16 }}
         >
-          ตรวจและปกปิดข้อมูลส่วนบุคคลแล้ว และอนุญาตให้แสดงสำเนานี้ในชุมชน
+          {t("ตรวจและปกปิดข้อมูลส่วนบุคคลแล้ว และอนุญาตให้แสดงสำเนานี้ในชุมชน")}
         </Checkbox>
       </Modal>
       <Modal
@@ -1082,13 +1238,14 @@ export default function Detail({
         maskClosable={false}
         closable={!busy && !uploadBusy}
         keyboard={!busy && !uploadBusy}
-        title={actionNames[action]}
+        title={actionButton(action)}
         onCancel={() => {
           if (!busy && !uploadBusy) setAction("");
         }}
         footer={null}
         destroyOnHidden
       >
+        <DialogTools />
         <Form
           form={form}
           layout="vertical"
@@ -1101,7 +1258,7 @@ export default function Detail({
                 await saveDraft(draftKey, saved);
                 setDraft(saved);
               } catch {
-                message.warning("บันทึกร่างไม่ได้ กรุณาเก็บข้อมูลไว้ก่อนปิดหน้า");
+                message.warning(t("บันทึกร่างไม่ได้ กรุณาเก็บข้อมูลไว้ก่อนปิดหน้า"));
               }
           }}
         >
@@ -1111,8 +1268,8 @@ export default function Detail({
               type={online ? "info" : "warning"}
               message={
                 online
-                  ? "ตรวจข้อมูลร่างและยืนยันส่งด้วยตนเอง ระบบไม่ส่งอัตโนมัติ"
-                  : "ออฟไลน์: เก็บข้อมูลเป็นร่างในอุปกรณ์ ยังไม่ได้ส่งรายงาน"
+                  ? t("ตรวจข้อมูลร่างและยืนยันส่งด้วยตนเอง ระบบไม่ส่งอัตโนมัติ")
+                  : t("ออฟไลน์: เก็บข้อมูลเป็นร่างในอุปกรณ์ ยังไม่ได้ส่งรายงาน")
               }
             />
           )}
@@ -1140,13 +1297,13 @@ export default function Detail({
                           await saveDraft(draftKey, next);
                           await load();
                         } catch (e) {
-                          message.error((e as Error).message);
+                          message.error(t((e as Error).message));
                         } finally {
                           setUploadBusy(false);
                         }
                       }}
                     >
-                      ส่งไฟล์อีกครั้ง
+                      {t("ส่งไฟล์อีกครั้ง")}
                     </Button>,
                   ]}
                 >
@@ -1157,19 +1314,38 @@ export default function Detail({
           )}
 
           {action === "DENY" && (
-            <Alert
-              style={{ marginBottom: 16 }}
-              type="error"
-              showIcon
-              message="การไม่อนุมัติจะยุติคำร้องทั้งเรื่องและยกเลิกงานที่ค้าง"
-            />
+            <div className="denial-presets">
+              <Alert
+                type="warning"
+                showIcon
+                message={t(
+                  "เหตุผลตัวอย่าง: โปรดตรวจทานข้อเท็จจริง อำนาจหน้าที่ และแนวทางต่อก่อนยืนยัน ข้อความนี้ไม่ใช่ข้อกฎหมายที่ใช้ได้ทุกกรณี",
+                )}
+              />
+              {denialPresets.map((preset) => (
+                <Button
+                  key={preset}
+                  block
+                  onClick={() => form.setFieldsValue({ reason: t(preset) })}
+                >
+                  {t(preset)}
+                </Button>
+              ))}
+              <Alert type="info" message={t(terminationNotice)} />
+              <Alert
+                style={{ marginBottom: 16 }}
+                type="error"
+                showIcon
+                message={t("การไม่อนุมัติจะยุติคำร้องทั้งเรื่องและยกเลิกงานที่ค้าง")}
+              />
+            </div>
           )}
           {["REQUEST_TRANSFER", "TRANSFER_DEPARTMENT"].includes(action) && (
             <>
               <Form.Item
                 name="targetDepartmentId"
-                label="หน่วยงานที่จะรับช่วงต่อ"
-                rules={[{ required: true, message: "กรุณาเลือกหน่วยงาน" }]}
+                label={t("หน่วยงานที่จะรับช่วงต่อ")}
+                rules={[{ required: true, message: t("กรุณาเลือกหน่วยงาน") }]}
               >
                 <Select
                   disabled={action === "TRANSFER_DEPARTMENT" && c.status === "TRANSFER_PENDING"}
@@ -1181,7 +1357,7 @@ export default function Detail({
                       try {
                         setPeople(await api("/people?role=LEADER&departmentId=" + department));
                       } catch (e) {
-                        message.error((e as Error).message);
+                        message.error(t((e as Error).message));
                       }
                   }}
                 />
@@ -1189,8 +1365,8 @@ export default function Detail({
               {action === "TRANSFER_DEPARTMENT" && (
                 <Form.Item
                   name="leaderId"
-                  label="หัวหน้าหน่วยงานที่รับช่วงต่อ"
-                  rules={[{ required: true, message: "กรุณาเลือกหัวหน้า" }]}
+                  label={t("หัวหน้าหน่วยงานที่รับช่วงต่อ")}
+                  rules={[{ required: true, message: t("กรุณาเลือกหัวหน้า") }]}
                 >
                   <Select options={people.map((p) => ({ value: p.id, label: p.display_name }))} />
                 </Form.Item>
@@ -1199,50 +1375,75 @@ export default function Detail({
           )}
           {action === "TRIAGE" && (
             <>
-              <Form.Item name="operationMethod" label="วิธีดำเนินงาน" rules={[{ required: true }]}>
+              <Form.Item
+                name="operationMethod"
+                label={t("วิธีดำเนินงาน")}
+                rules={[{ required: true }]}
+              >
                 <Input />
               </Form.Item>
-              <Form.Item name="urgency" label="ความเร่งด่วน" rules={[{ required: true }]}>
+              <Form.Item name="urgency" label={t("ความเร่งด่วน")} rules={[{ required: true }]}>
                 <Select
                   options={[
-                    { value: "NORMAL", label: "ปกติ" },
-                    { value: "PRIORITY", label: "เร่งด่วน" },
+                    { value: "NORMAL", label: t("ปกติ") },
+                    { value: "PRIORITY", label: t("เร่งด่วน") },
                   ]}
                 />
               </Form.Item>
-              <Form.Item name="appointment" label="วันนัดหมาย" rules={[{ required: true }]}>
+              <Form.Item name="appointment" label={t("วันนัดหมาย")} rules={[{ required: true }]}>
                 <Input type="date" />
               </Form.Item>
-              <Form.Item name="workScope" label="ขอบเขตงาน" rules={[{ required: true }]}>
+              <Form.Item name="workScope" label={t("ขอบเขตงาน")} rules={[{ required: true }]}>
                 <Input.TextArea />
               </Form.Item>
-              <Form.Item name="precautions" label="ข้อควรระวัง" rules={[{ required: true }]}>
+              <Form.Item name="precautions" label={t("ข้อควรระวัง")} rules={[{ required: true }]}>
                 <Input.TextArea />
               </Form.Item>
-              <Form.Item name="coordinator" label="ช่องทางประสานงาน" rules={[{ required: true }]}>
+              <Form.Item
+                name="coordinator"
+                label={t("ช่องทางประสานงาน")}
+                rules={[{ required: true }]}
+              >
                 <Input />
               </Form.Item>
             </>
           )}
           {action === "ASSIGN" && (
-            <Form.Item name="teamId" label="เลือกทีม (หรือเลือกผู้ลงพื้นที่รายบุคคลด้านล่าง)">
-              <Select
-                allowClear
-                options={teams.map((t) => ({
-                  value: t.id,
-                  label: t.name + " • " + t.representative_name,
-                }))}
-              />
-            </Form.Item>
+            <>
+              <Form.Item label={t("วันนัดหมายเดิม (อ่านอย่างเดียว)")}>
+                <Input
+                  aria-label={t("วันนัดหมายเดิม (อ่านอย่างเดียว)")}
+                  readOnly
+                  value={
+                    (typeof c.assignment_details === "string"
+                      ? JSON.parse(c.assignment_details || "{}")
+                      : c.assignment_details
+                    )?.appointment || t("ยังไม่ระบุวันนัดหมาย")
+                  }
+                />
+              </Form.Item>
+              <Form.Item
+                name="teamId"
+                label={t("เลือกทีม (หรือเลือกผู้ลงพื้นที่รายบุคคลด้านล่าง)")}
+              >
+                <Select
+                  allowClear
+                  options={teams.map((t) => ({
+                    value: t.id,
+                    label: t.name + " • " + t.representative_name,
+                  }))}
+                />
+              </Form.Item>
+            </>
           )}
           {["TRIAGE", "ASSIGN", "SEND_APPROVAL"].includes(action) && (
             <Form.Item
               label={
                 action === "TRIAGE"
-                  ? "หัวหน้าหน่วยงาน"
+                  ? t("หัวหน้าหน่วยงาน")
                   : action === "ASSIGN"
-                    ? "ผู้ลงพื้นที่"
-                    : "ผู้อนุมัติตามลำดับ (เลือก " + data.approvalStages + " คน)"
+                    ? t("ผู้ลงพื้นที่")
+                    : t("ผู้อนุมัติตามลำดับ (เลือก ") + data.approvalStages + t(" คน)")
               }
               name={
                 action === "TRIAGE"
@@ -1269,14 +1470,18 @@ export default function Detail({
             <>
               <div className="resource-request-header">
                 <Form.Item
-                  label="ชื่อคำขอทรัพยากร"
+                  label={t("ชื่อคำขอทรัพยากร")}
                   name="proposal"
                   rules={[{ required: true, whitespace: true, max: 20000 }]}
                 >
-                  <Input placeholder="เช่น วัสดุซ่อมทางเท้า" />
+                  <Input placeholder={t("เช่น วัสดุซ่อมทางเท้า")} />
                 </Form.Item>
-                <Form.Item label="หน่วยงานผู้ขอ">
-                  <Input value={resourceDepartment} readOnly />
+                <Form.Item label={t("หน่วยงานผู้ขอ")}>
+                  <Input
+                    value={resourceDepartment || t("หน่วยงานตามคำร้อง")}
+                    aria-label={t("หน่วยงานผู้ขอ")}
+                    readOnly
+                  />
                 </Form.Item>
               </div>
               <Form.List
@@ -1284,8 +1489,9 @@ export default function Detail({
                 rules={[
                   {
                     validator: async (_, items) => {
-                      if (!items?.length) throw new Error("เพิ่มรายการทรัพยากรอย่างน้อย 1 รายการ");
-                      if (items.length > 50) throw new Error("เพิ่มได้ไม่เกิน 50 รายการ");
+                      if (!items?.length)
+                        throw new Error(t("เพิ่มรายการทรัพยากรอย่างน้อย 1 รายการ"));
+                      if (items.length > 50) throw new Error(t("เพิ่มได้ไม่เกิน 50 รายการ"));
                       if (
                         items.reduce(
                           (sum: number, item: D) =>
@@ -1293,7 +1499,7 @@ export default function Detail({
                           0,
                         ) > 99999999999999
                       )
-                        throw new Error("งบประมาณรวมต้องไม่เกิน 999,999,999,999.99 บาท");
+                        throw new Error(t("งบประมาณรวมต้องไม่เกิน 999,999,999,999.99 บาท"));
                     },
                   },
                 ]}
@@ -1304,25 +1510,25 @@ export default function Detail({
                       {fields.map((field, index) => (
                         <div className="resource-item-row" key={field.key}>
                           <Form.Item
-                            label={"รายการที่ " + (index + 1)}
+                            label={t("รายการที่ ") + (index + 1)}
                             name={[field.name, "name"]}
                             rules={[{ required: true, whitespace: true, max: 200 }]}
                           >
                             <Input
-                              aria-label={"ชื่อรายการ " + (index + 1)}
-                              placeholder="ชื่อรายการ เช่น ทราย ปูนซีเมนต์"
+                              aria-label={t("ชื่อรายการ ") + (index + 1)}
+                              placeholder={t("ชื่อรายการ เช่น ทราย ปูนซีเมนต์")}
                               maxLength={200}
                             />
                           </Form.Item>
                           <Form.Item
-                            label="ราคา (บาท)"
+                            label={t("ราคา (บาท)")}
                             name={[field.name, "amount"]}
                             rules={[
                               { required: true, type: "number", min: 0, max: 999999999999.99 },
                             ]}
                           >
                             <InputNumber
-                              aria-label={"ราคารายการ " + (index + 1)}
+                              aria-label={t("ราคารายการ ") + (index + 1)}
                               min={0}
                               max={999999999999.99}
                               precision={2}
@@ -1349,10 +1555,10 @@ export default function Detail({
                               className="resource-remove"
                               icon={<DeleteOutlined />}
                               danger
-                              aria-label={"ลบรายการ " + (index + 1)}
+                              aria-label={t("ลบรายการ ") + (index + 1)}
                               onClick={() => remove(field.name)}
                             >
-                              ลบ
+                              {t("ลบ")}
                             </Button>
                           )}
                         </div>
@@ -1364,29 +1570,32 @@ export default function Detail({
                       disabled={fields.length >= 50}
                       onClick={() => add({ name: "", amount: null })}
                     >
-                      เพิ่มรายการ
+                      {t("เพิ่มรายการ")}
                     </Button>
                     <div className="resource-total" aria-live="polite">
-                      <Text>งบประมาณรวม {fields.length} รายการ</Text>
+                      <Text>
+                        {t("งบประมาณรวม")} {fields.length}
+                        {t("รายการ")}{" "}
+                      </Text>
                       <Text strong>
-                        {resourceTotal.toLocaleString("th-TH", {
+                        {resourceTotal.toLocaleString(language === "en" ? "en-GB" : "th-TH", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}{" "}
-                        บาท
+                        {t("บาท")}
                       </Text>
                     </div>
                   </>
                 )}
               </Form.List>
               <Form.Item
-                label="ระยะเวลาดำเนินการ (วัน)"
+                label={t("ระยะเวลาดำเนินการ (วัน)")}
                 name="durationDays"
                 rules={[{ required: true }]}
               >
                 <InputNumber min={1} max={3650} precision={0} />
               </Form.Item>
-              <Form.Item label="เอกสารคำขอ (PDF ไม่เกิน 15 MB)" required>
+              <Form.Item label={t("เอกสารคำขอ (PDF ไม่เกิน 15 MB)")} required>
                 <EvidenceUpload
                   complaintId={id}
                   pdf
@@ -1401,7 +1610,7 @@ export default function Detail({
           {action === "REPORT" && (
             <>
               <Form.Item
-                label="ข้อเท็จจริงและผลดำเนินการ"
+                label={t("ข้อเท็จจริงและผลดำเนินการ")}
                 name="content"
                 rules={[{ required: true, max: 20000 }]}
               >
@@ -1409,8 +1618,8 @@ export default function Detail({
               </Form.Item>
               <div className="field-evidence-steps">
                 {[
-                  { stage: "BEFORE", label: "1. ภาพก่อนทำ" },
-                  { stage: "AFTER", label: "2. ภาพหลังทำ" },
+                  { stage: "BEFORE", label: t("1. ภาพก่อนทำ") },
+                  { stage: "AFTER", label: t("2. ภาพหลังทำ") },
                 ].map((item) => (
                   <section key={item.stage}>
                     <h4>
@@ -1431,7 +1640,7 @@ export default function Detail({
                 ))}
               </div>
               <details className="additional-evidence">
-                <summary>วิดีโอหรือเอกสารประกอบเพิ่มเติม</summary>
+                <summary>{t("วิดีโอหรือเอกสารประกอบเพิ่มเติม")}</summary>
                 <EvidenceUpload
                   complaintId={id}
                   used={pendingBytes}
@@ -1442,22 +1651,31 @@ export default function Detail({
                 />
                 {evidenceList("GENERAL")}
               </details>
-              <Text type="secondary">ภาพก่อนและหลังต้องเป็น PNG/JPEG · {ATTACHMENT_HELP}</Text>
+              <Text type="secondary">
+                {t("ภาพก่อนและหลังต้องเป็น PNG/JPEG ·")}
+                {t(ATTACHMENT_HELP)}
+              </Text>
             </>
           )}
           {!["ACCEPT", "START", "PROPOSE", "REPORT"].includes(action) && (
             <Form.Item
-              label="เหตุผล / บันทึกการดำเนินการ"
+              label={
+                action === "RETURN_LEADER"
+                  ? t(
+                      "ระบุสิ่งที่ต้องปรับปรุงเพิ่มเติม (เช่น ภาพถ่ายไม่ชัดเจนสำหรับแจ้งประชาชน หรือข้อมูลสรุปไม่ครบถ้วน)",
+                    )
+                  : t("เหตุผล / บันทึกการดำเนินการ")
+              }
               name="reason"
               rules={[
                 {
                   required: requiredReasonActions.has(action),
                   whitespace: true,
                   max: 4000,
-                  message: "กรุณาระบุเหตุผลให้ครบถ้วน",
+                  message: t("กรุณาระบุเหตุผลให้ครบถ้วน"),
                 },
               ]}
-              extra={requiredReasonActions.has(action) ? undefined : "ไม่บังคับกรอก"}
+              extra={requiredReasonActions.has(action) ? undefined : t("ไม่บังคับกรอก")}
             >
               <Input.TextArea rows={3} />
             </Form.Item>
@@ -1470,7 +1688,7 @@ export default function Detail({
             disabled={uploadBusy || (action === "REPORT" && !online)}
             block
           >
-            ยืนยัน{actionNames[action]}
+            {t("ยืนยัน{{action}}", { action: actionButton(action) })}
           </Button>
         </Form>
       </Modal>

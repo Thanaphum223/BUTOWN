@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n/useI18n";
 import { useState } from "react";
 import { Alert, Button, Progress, Space, Typography, Upload } from "antd";
 import { CameraOutlined, UploadOutlined } from "@ant-design/icons";
@@ -26,6 +27,7 @@ export default function EvidenceUpload({
   onBusy,
   onFailed,
 }: Props) {
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [percent, setPercent] = useState(0);
   const [error, setError] = useState("");
@@ -58,7 +60,7 @@ export default function EvidenceUpload({
       body.append("evidenceStage", stage);
       await uploadFile(`/complaints/${complaintId}/files`, body, setPercent);
       await onUploaded();
-      setSuccess(`แนบไฟล์แล้ว: ${file.name}`);
+      setSuccess(file.name);
     } catch (e) {
       setError((e as Error).message);
       if (onFailed) await onFailed(file, stage);
@@ -80,7 +82,8 @@ export default function EvidenceUpload({
             beforeUpload={send}
           >
             <Button icon={<CameraOutlined />} loading={busy} disabled={busy || disabled}>
-              ถ่ายรูป{stage === "BEFORE" ? "ก่อนทำ" : "หลังทำ"}
+              {t("ถ่ายรูป")}
+              {stage === "BEFORE" ? t("ก่อนทำ") : t("หลังทำ")}
             </Button>
           </Upload>
         )}
@@ -91,7 +94,11 @@ export default function EvidenceUpload({
           beforeUpload={send}
         >
           <Button icon={<UploadOutlined />} loading={busy} disabled={busy || disabled}>
-            {pdf ? "เลือกเอกสาร PDF" : photos ? "เลือกรูปจากเครื่อง" : "แนบภาพ วิดีโอ หรือเอกสาร"}
+            {pdf
+              ? t("เลือกเอกสาร PDF")
+              : photos
+                ? t("เลือกรูปจากเครื่อง")
+                : t("แนบภาพ วิดีโอ หรือเอกสาร")}
           </Button>
         </Upload>
       </Space>
@@ -101,17 +108,17 @@ export default function EvidenceUpload({
           <Progress percent={percent} size="small" />
           <Typography.Text type="secondary">
             {percent === 100
-              ? "กำลังตรวจสอบและบันทึกไฟล์ กรุณารอสักครู่"
-              : "กำลังอัปโหลด กรุณาเปิดหน้านี้ไว้"}
+              ? t("กำลังตรวจสอบและบันทึกไฟล์ กรุณารอสักครู่")
+              : t("กำลังอัปโหลด กรุณาเปิดหน้านี้ไว้")}
           </Typography.Text>
         </div>
       )}
       {success && (
         <div role="status">
-          <Alert type="success" showIcon message={success} />
+          <Alert type="success" showIcon message={t("แนบไฟล์แล้ว: {{name}}", { name: success })} />
         </div>
       )}
-      {error && <Alert type="error" showIcon message={error} />}
+      {error && <Alert type="error" showIcon message={t(error)} />}
     </div>
   );
 }

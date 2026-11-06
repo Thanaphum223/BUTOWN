@@ -251,7 +251,7 @@ for (const width of [440, 1280]) {
 }
 
 for (const role of [
-  { value: "OFFICER", label: "เจ้าหน้าที่ตรวจสอบ" },
+  { value: "OFFICER", label: "เจ้าหน้าที่ส่วนกลาง (สำนักปลัด/ศูนย์รับเรื่องราวร้องทุกข์)" },
   { value: "APPROVER", label: "ผู้อนุมัติ" },
 ]) {
   test(`municipal ${role.value} assignment clears department and needs no department selector`, async ({
@@ -297,7 +297,10 @@ test("administrator switches to municipal reviewers without a department prompt"
       },
     });
   });
-  for (const label of ["เจ้าหน้าที่ตรวจสอบ", "ผู้อนุมัติ"]) {
+  for (const label of [
+    "เจ้าหน้าที่ส่วนกลาง (สำนักปลัด/ศูนย์รับเรื่องราวร้องทุกข์)",
+    "ผู้อนุมัติ",
+  ]) {
     await page
       .getByRole("combobox", { name: "สลับบทบาทผู้ดูแลระบบ", exact: true })
       .press("ArrowDown");

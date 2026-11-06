@@ -1,6 +1,8 @@
+import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
+import { useI18n } from "./i18n/useI18n";
 import { useRef, useState } from "react";
 import { Alert, Button, Form, Input } from "antd";
-import { post, refreshCsrf } from "./api";
+import { AuthUnavailableError, post, refreshCsrf } from "./api";
 import { useGovConfig } from "./govSso";
 export type GovAccountMode = "register" | "login";
 type Fields = { name?: string; email: string; password: string; confirmation?: string };
@@ -17,14 +19,18 @@ export default function GovAccountForm({
   onBusyChange: (busy: boolean) => void;
   onLogin: () => void;
 }) {
-  const { config, error: loadError } = useGovConfig();
+  const { t } = useI18n();
+  const { config, error: loadError, errorDetail: loadErrorDetail } = useGovConfig();
   const [form] = Form.useForm<Fields>();
+  useLocalizedFormErrors(form);
+  const [errorDetail, setErrorDetail] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
   function change(next: GovAccountMode) {
     form.resetFields();
     setError("");
+    setErrorDetail("");
     onModeChange(next);
   }
   function sameOrigin() {
@@ -38,6 +44,7 @@ export default function GovAccountForm({
     setBusy(true);
     onBusyChange(true);
     setError("");
+    setErrorDetail("");
     let sent = false;
     try {
       sameOrigin();
@@ -60,6 +67,7 @@ export default function GovAccountForm({
       await refreshCsrf();
       onLogin();
     } catch (e) {
+      setErrorDetail(e instanceof AuthUnavailableError ? e.detail : "");
       const message = (e as Error).message;
       setError(
         sent && mode === "register" && e instanceof TypeError
@@ -78,20 +86,33 @@ export default function GovAccountForm({
       <Alert
         type="warning"
         showIcon
-        message={
+        message={t(
           loadError ||
-          (config ? "ยังไม่ได้ตั้งค่า Gov Center SSO ครบถ้วน" : "กำลังโหลดข้อมูล Gov Center")
-        }
+            (config ? "ยังไม่ได้ตั้งค่า Gov Center SSO ครบถ้วน" : "กำลังโหลดข้อมูล Gov Center"),
+        )}
+        description={loadErrorDetail || undefined}
       />
     );
   if (new URL(config.callbackUrl).origin !== window.location.origin)
     return (
-      <Alert type="warning" showIcon message="กรุณาเข้า TownTrack ด้วยโดเมนที่ลงทะเบียน SSO ไว้" />
+      <Alert
+        type="warning"
+        showIcon
+        message={t("กรุณาเข้า TownTrack ด้วยโดเมนที่ลงทะเบียน SSO ไว้")}
+      />
     );
   const register = mode === "register";
   return (
     <>
-      {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          message={t(error)}
+          description={errorDetail || undefined}
+          style={{ marginBottom: 16 }}
+        />
+      )}
       <Form
         form={form}
         name="gov-account"
@@ -102,7 +123,7 @@ export default function GovAccountForm({
       >
         {register && (
           <Form.Item
-            label="ชื่อ-นามสกุล"
+            label={t("ชื่อ-นามสกุล")}
             name="name"
             rules={[
               {
@@ -110,52 +131,54 @@ export default function GovAccountForm({
                 whitespace: true,
                 min: 2,
                 max: 200,
-                message: "กรุณากรอกชื่อ 2–200 ตัวอักษร",
+                message: t("กรุณากรอกชื่อ 2–200 ตัวอักษร"),
               },
             ]}
           >
-            <Input autoComplete="name" maxLength={200} placeholder="ชื่อและนามสกุล" />
+            <Input autoComplete="name" maxLength={200} placeholder={t("ชื่อและนามสกุล")} />
           </Form.Item>
         )}
         <Form.Item
-          label="อีเมล"
+          label={t("อีเมล")}
           name="email"
-          rules={[{ required: true, type: "email", max: 320, message: "กรุณากรอกอีเมลให้ถูกต้อง" }]}
+          rules={[
+            { required: true, type: "email", max: 320, message: t("กรุณากรอกอีเมลให้ถูกต้อง") },
+          ]}
         >
           <Input autoComplete="email" type="email" maxLength={320} placeholder="name@example.com" />
         </Form.Item>
         <Form.Item
-          label="รหัสผ่าน"
+          label={t("รหัสผ่าน")}
           name="password"
-          extra={register ? "อย่างน้อย 12 ตัวอักษร" : undefined}
+          extra={register ? t("อย่างน้อย 12 ตัวอักษร") : undefined}
           rules={[
             {
               required: true,
               whitespace: true,
               min: register ? 12 : 1,
               max: 72,
-              message: register ? "กรุณากรอกรหัสผ่าน 12–72 ตัวอักษร" : "กรุณากรอกรหัสผ่าน",
+              message: register ? t("กรุณากรอกรหัสผ่าน 12–72 ตัวอักษร") : t("กรุณากรอกรหัสผ่าน"),
             },
           ]}
         >
           <Input.Password
             autoComplete={register ? "new-password" : "current-password"}
             maxLength={72}
-            placeholder="รหัสผ่าน"
+            placeholder={t("รหัสผ่าน")}
           />
         </Form.Item>
         {register && (
           <Form.Item
-            label="ยืนยันรหัสผ่าน"
+            label={t("ยืนยันรหัสผ่าน")}
             name="confirmation"
             dependencies={["password"]}
             rules={[
-              { required: true, message: "กรุณายืนยันรหัสผ่าน" },
+              { required: true, message: t("กรุณายืนยันรหัสผ่าน") },
               ({ getFieldValue }) => ({
                 validator(_, v) {
                   return !v || getFieldValue("password") === v
                     ? Promise.resolve()
-                    : Promise.reject(new Error("รหัสผ่านไม่ตรงกัน"));
+                    : Promise.reject(new Error(t("รหัสผ่านไม่ตรงกัน")));
                 },
               }),
             ]}
@@ -163,31 +186,31 @@ export default function GovAccountForm({
             <Input.Password
               autoComplete="new-password"
               maxLength={72}
-              placeholder="กรอกรหัสผ่านอีกครั้ง"
+              placeholder={t("กรอกรหัสผ่านอีกครั้ง")}
             />
           </Form.Item>
         )}
         <Button
           type="primary"
-          aria-label={register ? "สมัครและเข้าสู่ระบบ" : "เข้าสู่ระบบ"}
+          aria-label={register ? t("สมัครและเข้าสู่ระบบ") : t("เข้าสู่ระบบ")}
           htmlType="submit"
           block
           size="large"
           disabled={disabled}
           loading={busy}
         >
-          {register ? "สมัครและเข้าสู่ระบบ" : "เข้าสู่ระบบ"}
+          {register ? t("สมัครและเข้าสู่ระบบ") : t("เข้าสู่ระบบ")}
         </Button>
       </Form>
       <p className="auth-switch">
-        {register ? "มีบัญชีอยู่แล้ว?" : "ยังไม่มีบัญชี?"}{" "}
+        {register ? t("มีบัญชีอยู่แล้ว?") : t("ยังไม่มีบัญชี?")}{" "}
         <Button
           type="link"
-          aria-label={register ? "กลับไปหน้าเข้าสู่ระบบ" : "สมัครสมาชิก"}
+          aria-label={register ? t("กลับไปหน้าเข้าสู่ระบบ") : t("สมัครสมาชิก")}
           disabled={disabled}
           onClick={() => change(register ? "login" : "register")}
         >
-          {register ? "เข้าสู่ระบบ" : "สมัครสมาชิก"}
+          {register ? t("เข้าสู่ระบบ") : t("สมัครสมาชิก")}
         </Button>
       </p>
     </>

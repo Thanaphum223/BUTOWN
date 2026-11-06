@@ -1,9 +1,11 @@
+import { useI18n } from "./i18n/useI18n";
 import { useEffect, useState } from "react";
 import { Button, Form, Input, Typography } from "antd";
 import { LockOutlined } from "@ant-design/icons";
 import { api } from "./api";
 
 export default function ReporterEmail() {
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [revision, setRevision] = useState(0);
@@ -25,20 +27,20 @@ export default function ReporterEmail() {
   }, [revision]);
   return (
     <Form.Item
-      label="อีเมล"
+      label={t("อีเมล")}
       htmlFor="report-contact-email"
       extra={
         state === "error" ? (
           <>
-            <Typography.Text type="danger">โหลดอีเมลไม่สำเร็จ</Typography.Text>{" "}
+            <Typography.Text type="danger">{t("โหลดอีเมลไม่สำเร็จ")}</Typography.Text>{" "}
             <Button type="link" onClick={() => setRevision((v) => v + 1)}>
-              ลองโหลดอีเมลอีกครั้ง
+              {t("ลองโหลดอีเมลอีกครั้ง")}
             </Button>
           </>
         ) : state === "loading" ? (
-          "กำลังโหลดอีเมลจากบัญชี Gov Center…"
+          t("กำลังโหลดอีเมลจากบัญชี Gov Center…")
         ) : !email ? (
-          "บัญชี Gov Center ยังไม่ได้ระบุอีเมล"
+          t("บัญชี Gov Center ยังไม่ได้ระบุอีเมล")
         ) : undefined
       }
     >
@@ -50,7 +52,7 @@ export default function ReporterEmail() {
         readOnly
         aria-readonly="true"
         aria-busy={state === "loading"}
-        suffix={<LockOutlined aria-label="แก้ไขอีเมลไม่ได้" />}
+        suffix={<LockOutlined aria-label={t("แก้ไขอีเมลไม่ได้")} />}
       />
     </Form.Item>
   );

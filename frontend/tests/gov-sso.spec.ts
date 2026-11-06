@@ -198,7 +198,7 @@ for (const configFailure of ["unconfigured", "unavailable", "wrong-origin"]) {
       await expect(
         page.getByText(
           configFailure === "unavailable"
-            ? "โหลดข้อมูล Gov Center ไม่สำเร็จ กรุณาลองใหม่"
+            ? "ระบบยืนยันตัวตนส่วนกลางไม่พร้อมให้บริการ (503) กรุณาลองเข้าสู่ระบบอีกครั้ง"
             : "ยังไม่ได้ตั้งค่า Gov Center SSO ครบถ้วน",
         ),
       ).toBeVisible();

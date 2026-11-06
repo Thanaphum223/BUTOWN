@@ -1,3 +1,4 @@
+import { translate } from "./i18n/core";
 const examples: Record<string, string> = {
   ถนนและทางเท้า: "ถนนเป็นหลุมกว้างประมาณ 50 ซม. หน้าปากซอย ทำให้รถผ่านลำบาก",
   "ท่อระบายน้ำ / น้ำท่วมขัง": "ท่อระบายน้ำอุดตัน หลังฝนตกมีน้ำขังสูงประมาณ 20 ซม. รถเล็กผ่านลำบาก",
@@ -38,11 +39,18 @@ const examples: Record<string, string> = {
     "ยื่นคำขอรับบริการไว้เมื่อวันที่ระบุ แต่ยังไม่ได้รับแจ้งความคืบหน้า ขอให้ตรวจสอบ",
 };
 
-export function reportDescriptionExample(categoryName?: string): string {
+export function reportDescriptionExample(
+  categoryName?: string,
+  t: typeof translate = translate,
+): string {
   const name = categoryName?.trim();
-  if (!name) return "ระบุปัญหาที่พบ ช่วงเวลาที่เกิดเหตุ และผลกระทบต่อผู้ใช้พื้นที่";
+  if (!name) return t("ระบุปัญหาที่พบ ช่วงเวลาที่เกิดเหตุ และผลกระทบต่อผู้ใช้พื้นที่");
   const example = Object.hasOwn(examples, name) ? examples[name] : undefined;
   return example
-    ? `เช่น ${example}`
-    : `อธิบายปัญหา${name === "อื่น ๆ (ในอำนาจหน้าที่เทศบาล)" ? "ที่พบ" : `เกี่ยวกับ${name}`} พร้อมช่วงเวลาที่เกิดเหตุและผลกระทบ`;
+    ? t("เช่น {{example}}", { example: t(example) })
+    : name === "อื่น ๆ (ในอำนาจหน้าที่เทศบาล)"
+      ? t("อธิบายปัญหาที่พบ พร้อมช่วงเวลาที่เกิดเหตุและผลกระทบ")
+      : t("อธิบายปัญหาเกี่ยวกับ{{category}} พร้อมช่วงเวลาที่เกิดเหตุและผลกระทบ", {
+          category: name,
+        });
 }

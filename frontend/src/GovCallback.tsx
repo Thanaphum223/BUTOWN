@@ -1,11 +1,15 @@
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useI18n } from "./i18n/useI18n";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Card, Spin, Typography } from "antd";
-import { post, refreshCsrf } from "./api";
+import { AuthUnavailableError, post, refreshCsrf } from "./api";
 import { govClient, useGovConfig } from "./govSso";
 import type { GovCallbackReturn } from "./govCallbackReturn";
 export default function GovCallback({ returned }: { returned: GovCallbackReturn }) {
-  const { config, error: loadError } = useGovConfig();
+  const { t } = useI18n();
+  const { config, error: loadError, errorDetail: loadErrorDetail } = useGovConfig();
   const started = useRef(false);
+  const [errorDetail, setErrorDetail] = useState("");
   const [error, setError] = useState("");
   useEffect(() => {
     if (!config || started.current) return;
@@ -31,6 +35,7 @@ export default function GovCallback({ returned }: { returned: GovCallbackReturn 
         // would keep this callback component mounted instead of loading the app.
         window.location.replace("/");
       } catch (e) {
+        setErrorDetail(e instanceof AuthUnavailableError ? e.detail : "");
         setError((e as Error).message);
       }
     })();
@@ -38,21 +43,27 @@ export default function GovCallback({ returned }: { returned: GovCallbackReturn 
   return (
     <main className="content" style={{ maxWidth: 520, margin: "10vh auto" }}>
       <Card>
-        <Typography.Title level={3}>ยืนยันตัวตนกับ Gov Center</Typography.Title>
+        <LanguageSwitcher />
+        <Typography.Title level={3}>{t("ยืนยันตัวตนกับ Gov Center")}</Typography.Title>
         {error || loadError ? (
           <>
-            <Alert type="error" showIcon message={error || loadError} />
+            <Alert
+              type="error"
+              showIcon
+              message={t(error || loadError)}
+              description={(error ? errorDetail : loadErrorDetail) || undefined}
+            />
             <Button
               block
               type="primary"
               style={{ marginTop: 16 }}
               onClick={() => window.location.replace("/")}
             >
-              เริ่มเข้าสู่ระบบใหม่
+              {t("เริ่มเข้าสู่ระบบใหม่")}
             </Button>
           </>
         ) : (
-          <Spin tip="กำลังยืนยันตัวตน">
+          <Spin tip={t("กำลังยืนยันตัวตน")}>
             <div style={{ minHeight: 96 }} />
           </Spin>
         )}

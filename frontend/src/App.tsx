@@ -1,3 +1,10 @@
+import DialogTools from "./DialogTools";
+import GovAuthBadge from "./GovAuthBadge";
+import UatAuthToolbar from "./UatAuthToolbar";
+import { setUatAccount } from "./uatAuth";
+import { AuthUnavailableError } from "./api";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useI18n } from "./i18n/useI18n";
 import { MenuOutlined } from "@ant-design/icons";
 import GovAuthPage from "./GovAuthPage";
 import GovProfile from "./GovProfile";
@@ -69,6 +76,7 @@ import LocationMap from "./LocationMap";
 const { Title, Text, Paragraph } = Typography;
 type RowData = Record<string, any>;
 function StateTag({ value }: { value: string }) {
+  const { t } = useI18n();
   return (
     <Tag
       color={
@@ -81,7 +89,7 @@ function StateTag({ value }: { value: string }) {
               : "processing"
       }
     >
-      {statusNames[value] || value}
+      {t(statusNames[value] || value)}
     </Tag>
   );
 }
@@ -105,14 +113,16 @@ function useData<T>(url: string, refresh = 0) {
   return { data, error };
 }
 function ErrorBox({ error }: { error: string }) {
+  const { t } = useI18n();
   return error ? (
-    <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />
+    <Alert type="error" showIcon message={t(error)} style={{ marginBottom: 16 }} />
   ) : null;
 }
 export default function App({ govReturn }: { govReturn: GovCallbackReturn | null }) {
   return govReturn ? <GovCallback returned={govReturn} /> : <TownTrackApp />;
 }
 function TownTrackApp() {
+  const { t } = useI18n();
   const screens = Grid.useBreakpoint();
   const [mobileMenu, setMobileMenu] = useState(false);
   const [showRoleControls, setShowRoleControls] = useState(false);
@@ -128,10 +138,22 @@ function TownTrackApp() {
     [refresh, setRefresh] = useState(0);
   const [selectedPublic, setSelectedPublic] = useState(false);
   const { message } = AntApp.useApp();
+  const [authError, setAuthError] = useState("");
+  const [authErrorDetail, setAuthErrorDetail] = useState("");
   const load = () =>
     api<RowData>("/auth/me")
-      .then(setUser)
-      .catch(() => setUser(null));
+      .then((next) => {
+        setAuthError("");
+        setAuthErrorDetail("");
+        setUatAccount(next as { id: string; role: string });
+        setUser(next);
+      })
+      .catch((error) => {
+        setAuthError(error instanceof AuthUnavailableError ? error.message : "");
+        setAuthErrorDetail(error instanceof AuthUnavailableError ? error.detail : "");
+        setUatAccount(null);
+        setUser(null);
+      });
   useEffect(() => {
     void load();
   }, []);
@@ -144,7 +166,7 @@ function TownTrackApp() {
         })
         .catch(() => {
           setDepartmentError(true);
-          message.error("โหลดหน่วยงานไม่สำเร็จ กรุณารีเฟรชหน้า");
+          message.error(t("โหลดหน่วยงานไม่สำเร็จ กรุณารีเฟรชหน้า"));
         });
   }, [user]);
   const switchAdminRole = async (role: string, departmentId = user?.department_id) => {
@@ -157,13 +179,14 @@ function TownTrackApp() {
           departmentId: ["LEADER", "FIELD"].includes(role) ? departmentId : null,
         }),
       });
+      setUatAccount(next as { id: string; role: string });
       setUser(next);
       setPendingAdminRole(null);
       setView("dashboard");
       setSelected("");
       setRefresh((x) => x + 1);
     } catch (e) {
-      message.error((e as Error).message);
+      message.error(t((e as Error).message));
     } finally {
       setSwitchingRole(false);
     }
@@ -182,6 +205,8 @@ function TownTrackApp() {
   if (!user)
     return (
       <GovAuthPage
+        authError={authError}
+        authErrorDetail={authErrorDetail}
         onLogin={() => {
           void load();
           setView("dashboard");
@@ -189,42 +214,45 @@ function TownTrackApp() {
       />
     );
   const items = [
-    { key: "dashboard", icon: <DashboardOutlined />, label: "ภาพรวม" },
+    { key: "dashboard", icon: <DashboardOutlined />, label: t("ภาพรวม") },
     {
       key: "cases",
       icon: <FileTextOutlined />,
-      label: user.role === "CITIZEN" ? "ติดตามสถานะ" : "คิวงาน",
+      label: user.role === "CITIZEN" ? t("ติดตามสถานะ") : t("คิวงาน"),
     },
     ...(user.role !== "CITIZEN"
-      ? [{ key: "history", icon: <HistoryOutlined />, label: "ประวัติงาน" }]
+      ? [{ key: "history", icon: <HistoryOutlined />, label: t("ประวัติงาน") }]
       : []),
     ...(user.role === "CITIZEN"
       ? [
-          { key: "new", icon: <PlusOutlined />, label: "แจ้งปัญหา" },
+          { key: "new", icon: <PlusOutlined />, label: t("แจ้งปัญหา") },
           {
             key: "following",
             icon: <EnvironmentOutlined />,
-            label: "เรื่องที่ติดตาม",
+            label: t("เรื่องที่ติดตาม"),
           },
         ]
       : []),
     ...(user.role === "LEADER"
-      ? [{ key: "teams", icon: <TeamOutlined />, label: "ทีมลงพื้นที่" }]
+      ? [{ key: "teams", icon: <TeamOutlined />, label: t("ทีมลงพื้นที่") }]
       : []),
-    { key: "notifications", icon: <BellOutlined />, label: "การแจ้งเตือน" },
+    { key: "notifications", icon: <BellOutlined />, label: t("การแจ้งเตือน") },
     ...(user.role === "ADMIN"
-      ? [{ key: "admin", icon: <SettingOutlined />, label: "จัดการระบบ" }]
+      ? [{ key: "admin", icon: <SettingOutlined />, label: t("จัดการระบบ") }]
       : []),
-    { key: "password", icon: <LockOutlined />, label: "เปลี่ยนรหัสผ่าน" },
+    { key: "password", icon: <LockOutlined />, label: t("เปลี่ยนรหัสผ่าน") },
   ];
   return (
     <PrivacyGate key={user.id} user={user}>
+      {user.role !== "CITIZEN" && <UatAuthToolbar busy={switchingRole} />}
       <Modal
-        title={"เลือกหน่วยงานสำหรับ" + (pendingAdminRole ? roleNames[pendingAdminRole] : "บทบาท")}
+        title={t("เลือกหน่วยงานสำหรับ{{role}}", {
+          role: pendingAdminRole ? t(roleNames[pendingAdminRole]) : t("บทบาท"),
+        })}
         open={pendingAdminRole !== null}
         onCancel={() => setPendingAdminRole(null)}
-        okText="เริ่มใช้บทบาทนี้"
-        cancelText="ยกเลิก"
+        okText={t("เริ่มใช้บทบาทนี้")}
+        cancelText={t("ยกเลิก")}
         confirmLoading={switchingRole}
         okButtonProps={{ disabled: !pendingDepartment || departmentError }}
         onOk={() =>
@@ -233,20 +261,23 @@ function TownTrackApp() {
           void switchAdminRole(pendingAdminRole, pendingDepartment)
         }
       >
+        <DialogTools />
         <p>
-          เลือกหน่วยงานเพื่อแสดงงานและสิทธิ์ที่ตรงกับบทบาท คุณสามารถสลับกลับผู้ดูแลระบบได้ทุกเมื่อ
+          {t(
+            "เลือกหน่วยงานเพื่อแสดงงานและสิทธิ์ที่ตรงกับบทบาท คุณสามารถสลับกลับผู้ดูแลระบบได้ทุกเมื่อ",
+          )}
         </p>
         {departmentError ? (
-          <Alert type="error" message="โหลดหน่วยงานไม่สำเร็จ กรุณารีเฟรชหน้า" />
+          <Alert type="error" message={t("โหลดหน่วยงานไม่สำเร็จ กรุณารีเฟรชหน้า")} />
         ) : (
           <Select
-            aria-label="เลือกหน่วยงานเพื่อเริ่มบทบาท"
+            aria-label={t("เลือกหน่วยงานเพื่อเริ่มบทบาท")}
             style={{ width: "100%" }}
-            placeholder="เลือกหน่วยงาน"
+            placeholder={t("เลือกหน่วยงาน")}
             value={pendingDepartment}
             onChange={setPendingDepartment}
             options={adminDepartments.map((d) => ({ value: d.id, label: d.name }))}
-            notFoundContent="ยังไม่มีหน่วยงาน กรุณาเพิ่มในเมนูจัดการระบบ"
+            notFoundContent={t("ยังไม่มีหน่วยงาน กรุณาเพิ่มในเมนูจัดการระบบ")}
           />
         )}
       </Modal>
@@ -270,7 +301,7 @@ function TownTrackApp() {
             <div className="brand">
               <EnvironmentOutlined /> TownTrack
             </div>
-            <div className="nav-label">บริการเทศบาล</div>
+            <div className="nav-label">{t("บริการเทศบาล")}</div>
             <Menu
               mode="inline"
               selectedKeys={[view === "detail" ? "cases" : view]}
@@ -281,17 +312,18 @@ function TownTrackApp() {
               }}
             />
             <div className="sidebar-bottom">
-              <Tag color="green">{roleNames[user.role]}</Tag>
+              <Tag color="green">{t(roleNames[user.role])}</Tag>
               <p>
-                ประสานงานอย่างเป็นระบบ
+                {t("ประสานงานอย่างเป็นระบบ")}
                 <br />
-                ติดตามผลอย่างโปร่งใส
+                {t("ติดตามผลอย่างโปร่งใส")}
               </p>
             </div>
           </Layout.Sider>
         )}
         <Drawer
-          title="เมนู TownTrack"
+          title={t("เมนู TownTrack")}
+          extra={<DialogTools />}
           placement="left"
           width="min(320px, 90vw)"
           open={mobileMenu}
@@ -313,7 +345,7 @@ function TownTrackApp() {
             {user.role !== "CITIZEN" && !screens.lg && (
               <Button
                 icon={<MenuOutlined />}
-                aria-label="เปิดเมนูหลัก"
+                aria-label={t("เปิดเมนูหลัก")}
                 onClick={() => setMobileMenu(true)}
               />
             )}
@@ -321,22 +353,23 @@ function TownTrackApp() {
               {user.role === "CITIZEN" ? (
                 <Avatar className="citizen-profile-avatar">{user.display_name?.[0]}</Avatar>
               ) : (
-                <span className="municipal-mark">ท</span>
+                <span className="municipal-mark">{t("ท")}</span>
               )}
               <div>
                 <strong title={user.role === "CITIZEN" ? user.display_name : undefined}>
                   {user.role === "CITIZEN"
-                    ? `สวัสดี, ${user.display_name}`
-                    : "ศูนย์รับเรื่องเทศบาล"}
+                    ? t("สวัสดี, {{name}}", { name: user.display_name })
+                    : t("ศูนย์รับเรื่องเทศบาล")}
                 </strong>
                 <small>
                   {user.role === "CITIZEN"
-                    ? "บริการประชาชน · TownTrack"
-                    : "งานบริการประชาชน · " + roleNames[user.role]}
+                    ? t("บริการประชาชน · TownTrack")
+                    : t("งานบริการประชาชน · {{role}}", { role: t(roleNames[user.role]) })}
                 </small>
               </div>
             </div>
             <Space className="account-controls" wrap>
+              <LanguageSwitcher />
               {(user.account_role === "ADMIN" || user.role === "ADMIN") && (
                 <>
                   {!screens.lg && (
@@ -344,7 +377,7 @@ function TownTrackApp() {
                       aria-expanded={showRoleControls}
                       onClick={() => setShowRoleControls((v) => !v)}
                     >
-                      สลับบทบาท
+                      {t("สลับบทบาท")}
                     </Button>
                   )}
                   <div
@@ -354,8 +387,8 @@ function TownTrackApp() {
                   >
                     {["LEADER", "FIELD"].includes(user.role) && (
                       <Select
-                        aria-label="หน่วยงานสำหรับบทบาท"
-                        placeholder="เลือกหน่วยงาน"
+                        aria-label={t("หน่วยงานสำหรับบทบาท")}
+                        placeholder={t("เลือกหน่วยงาน")}
                         style={{ minWidth: 150 }}
                         value={user.department_id || undefined}
                         disabled={switchingRole}
@@ -364,14 +397,16 @@ function TownTrackApp() {
                       />
                     )}
                     <Select
-                      aria-label="สลับบทบาทผู้ดูแลระบบ"
+                      aria-label={t("สลับบทบาทผู้ดูแลระบบ")}
+                      className="admin-role-select"
+                      popupClassName="admin-role-options"
                       style={{ minWidth: 150 }}
                       value={user.role}
                       loading={switchingRole}
                       disabled={switchingRole}
                       options={Object.entries(roleNames).map(([value, label]) => ({
                         value,
-                        label,
+                        label: t(label),
                       }))}
                       onChange={(role) => {
                         if (["LEADER", "FIELD"].includes(role) && !user.department_id) {
@@ -388,31 +423,33 @@ function TownTrackApp() {
               {user.role === "CITIZEN" && (
                 <Button
                   className="font-size-toggle"
-                  aria-label={fontLarge ? "ย่อขนาดตัวอักษร" : "ขยายขนาดตัวอักษร"}
+                  aria-label={fontLarge ? t("ย่อขนาดตัวอักษร") : t("ขยายขนาดตัวอักษร")}
                   aria-pressed={fontLarge}
                   onClick={() => setFontLarge((v) => !v)}
                 >
-                  <span aria-hidden="true">{fontLarge ? "ก−" : "ก+"}</span>
-                  <span className="font-toggle-label">{fontLarge ? "ย่อ" : "ขยาย"}</span>
+                  <span aria-hidden="true">{fontLarge ? t("ก−") : t("ก+")}</span>
+                  <span className="font-toggle-label">{fontLarge ? t("ย่อ") : t("ขยาย")}</span>
                 </Button>
               )}
               <GovProfile />
               <Avatar className="account-avatar">{user.display_name?.[0]}</Avatar>
               <span className="account-name">{user.display_name}</span>
               <Button
-                aria-label="ออกจากระบบ"
+                aria-label={t("ออกจากระบบ")}
                 icon={<LogoutOutlined />}
                 onClick={async () => {
                   try {
                     await api("/auth/logout", { method: "POST" });
+                    setUatAccount(null);
                     setUser(null);
                   } catch (e) {
-                    message.error((e as Error).message);
+                    message.error(t((e as Error).message));
                   }
                 }}
               />
             </Space>
           </Layout.Header>
+          <GovAuthBadge signedIn />
           <Layout.Content className="content">
             {view === "dashboard" && user.role === "CITIZEN" ? (
               <CitizenHome onFollowing={() => setView("following")} />
@@ -462,25 +499,30 @@ function TownTrackApp() {
             ) : view === "admin" ? (
               <Admin />
             ) : (
-              <Password onDone={() => setUser(null)} />
+              <Password
+                onDone={() => {
+                  setUatAccount(null);
+                  setUser(null);
+                }}
+              />
             )}
           </Layout.Content>
           <Layout.Footer className="footer">
-            TownTrack • ระบบรับเรื่องและบริหารงานลงพื้นที่
+            {t("TownTrack • ระบบรับเรื่องและบริหารงานลงพื้นที่")}
           </Layout.Footer>
         </Layout>
         {user.role === "CITIZEN" && (
-          <nav className="citizen-bottom-nav" aria-label="เมนูประชาชน">
+          <nav className="citizen-bottom-nav" aria-label={t("เมนูประชาชน")}>
             {[
-              { key: "dashboard", icon: <HomeOutlined />, label: "หน้าหลัก" },
-              { key: "new", icon: <PlusOutlined />, label: "แจ้งปัญหา" },
-              { key: "cases", icon: <FileTextOutlined />, label: "ติดตามสถานะ" },
+              { key: "dashboard", icon: <HomeOutlined />, label: t("หน้าหลัก") },
+              { key: "new", icon: <PlusOutlined />, label: t("แจ้งปัญหา") },
+              { key: "cases", icon: <FileTextOutlined />, label: t("ติดตามสถานะ") },
               {
                 key: "notifications",
                 icon: <BellOutlined />,
-                label: "แจ้งเตือน",
+                label: t("แจ้งเตือน"),
               },
-              { key: "emergency", icon: <AlertOutlined />, label: "เหตุฉุกเฉิน" },
+              { key: "emergency", icon: <AlertOutlined />, label: t("เหตุฉุกเฉิน") },
             ].map((item) => (
               <a
                 key={item.key}
@@ -521,6 +563,7 @@ function CaseList({
   onNew: () => void;
   reload: () => void;
 }) {
+  const { t } = useI18n();
   const [page, setPage] = useState(1),
     [size, setSize] = useState(10);
   const [search, setSearch] = useState(""),
@@ -551,20 +594,20 @@ function CaseList({
       <div className="page-heading">
         <div>
           <Text className="eyebrow">TOWNTRACK / WORKSPACE</Text>
-          <Title level={2}>{dashboard ? "ภาพรวมการดำเนินงาน" : "งานและคำร้อง"}</Title>
+          <Title level={2}>{dashboard ? t("ภาพรวมการดำเนินงาน") : t("งานและคำร้อง")}</Title>
           <Text type="secondary">
             {user.role === "CITIZEN"
-              ? "ติดตามปัญหาที่คุณแจ้งและดูความคืบหน้า"
-              : "ติดตามคำร้องและงานที่อยู่ในขอบเขตความรับผิดชอบ"}
+              ? t("ติดตามปัญหาที่คุณแจ้งและดูความคืบหน้า")
+              : t("ติดตามคำร้องและงานที่อยู่ในขอบเขตความรับผิดชอบ")}
           </Text>
         </div>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={reload}>
-            โหลดใหม่
+            {t("โหลดใหม่")}
           </Button>
           {user.role === "CITIZEN" && (
             <Button type="primary" icon={<PlusOutlined />} onClick={onNew}>
-              แจ้งปัญหา
+              {t("แจ้งปัญหา")}
             </Button>
           )}
         </Space>
@@ -573,12 +616,12 @@ function CaseList({
       {dashboard && (
         <Row gutter={[16, 16]} className="stats">
           {[
-            ["คำร้องทั้งหมด", data?.stats.total || 0],
-            ["กำลังดำเนินการ", data?.stats.in_progress || 0],
-            ["ปิดเรื่องสำเร็จ", data?.stats.closed || 0],
-            ["เกินกำหนด", data?.stats.overdue || 0],
+            [t("คำร้องทั้งหมด"), data?.stats.total || 0],
+            [t("กำลังดำเนินการ"), data?.stats.in_progress || 0],
+            [t("ปิดเรื่องสำเร็จ"), data?.stats.closed || 0],
+            [t("เกินกำหนด"), data?.stats.overdue || 0],
           ].map(([label, n], i) => (
-            <Col xs={12} xl={6} key={label}>
+            <Col xs={12} xl={6} key={i}>
               <Card>
                 <div className={"stat-icon stat-" + i}>
                   <FileTextOutlined />
@@ -589,17 +632,22 @@ function CaseList({
           ))}
         </Row>
       )}
-      <Card title="รายการคำร้อง" extra={<Text type="secondary">พบ {data?.total || 0} รายการ</Text>}>
+      <Card
+        title={t("รายการคำร้อง")}
+        extra={
+          <Text type="secondary">{t("พบ {{count}} รายการ", { count: data?.total || 0 })}</Text>
+        }
+      >
         <Space wrap className="filters">
           <Input.Search
-            placeholder="ค้นหาหัวข้อหรือเลขคำร้อง"
+            placeholder={t("ค้นหาหัวข้อหรือเลขคำร้อง")}
             allowClear
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ width: 280 }}
           />
           <Select
-            placeholder="ทุกสถานะ"
+            placeholder={t("ทุกสถานะ")}
             allowClear
             style={{ width: 230 }}
             value={status}
@@ -609,7 +657,7 @@ function CaseList({
             }}
             options={Object.entries(statusNames).map(([value, label]) => ({
               value,
-              label,
+              label: t(label),
             }))}
           />
         </Space>
@@ -630,7 +678,7 @@ function CaseList({
           }}
           columns={[
             {
-              title: "คำร้อง",
+              title: t("คำร้อง"),
               dataIndex: "title",
               render: (v, r) => (
                 <>
@@ -645,15 +693,15 @@ function CaseList({
                 </>
               ),
             },
-            { title: "ประเภท", dataIndex: "category_name" },
+            { title: t("ประเภท"), dataIndex: "category_name" },
             {
-              title: "สถานะ",
+              title: t("สถานะ"),
               dataIndex: "status",
               render: (v) => <StateTag value={v} />,
             },
-            { title: "วันที่แจ้ง", dataIndex: "created_at", render: date },
+            { title: t("วันที่แจ้ง"), dataIndex: "created_at", render: date },
             {
-              title: "กำหนดเสร็จ",
+              title: t("กำหนดเสร็จ"),
               dataIndex: "due_at",
               render: (v, r) => (
                 <Text
@@ -667,7 +715,7 @@ function CaseList({
             },
             {
               title: "",
-              render: (_, r) => <Button onClick={() => open(r.id)}>ดูรายละเอียด</Button>,
+              render: (_, r) => <Button onClick={() => open(r.id)}>{t("ดูรายละเอียด")}</Button>,
             },
           ]}
         />
@@ -676,6 +724,7 @@ function CaseList({
   );
 }
 function Following({ open }: { open: (id: string) => void }) {
+  const { t } = useI18n();
   const [detailId, setDetailId] = useState<string>();
   const [refresh, setRefresh] = useState(0);
   const { data, error } = useData<RowData[]>("/following", refresh);
@@ -683,22 +732,22 @@ function Following({ open }: { open: (id: string) => void }) {
   return (
     <>
       <CommunityDetail id={detailId} onClose={() => setDetailId(undefined)} />
-      <Title level={2}>เรื่องที่ติดตาม</Title>
+      <Title level={2}>{t("เรื่องที่ติดตาม")}</Title>
       <ErrorBox error={error} />
       <Card>
         <Alert
           style={{ marginBottom: 16 }}
           type="info"
-          message="แสดงเฉพาะประเภทปัญหาและสถานะของเรื่องที่ติดตาม เพื่อรักษาข้อมูลผู้แจ้ง"
+          message={t("แสดงเฉพาะประเภทปัญหาและสถานะของเรื่องที่ติดตาม เพื่อรักษาข้อมูลผู้แจ้ง")}
         />
         <List
           dataSource={data}
-          locale={{ emptyText: "ยังไม่มีเรื่องที่ติดตาม" }}
+          locale={{ emptyText: t("ยังไม่มีเรื่องที่ติดตาม") }}
           renderItem={(r) => (
             <List.Item
               actions={[
                 <Button key="detail" onClick={() => setDetailId(r.id)}>
-                  ดูรายละเอียด
+                  {t("ดูรายละเอียด")}
                 </Button>,
                 <Button
                   key="unfollow"
@@ -709,11 +758,11 @@ function Following({ open }: { open: (id: string) => void }) {
                       });
                       setRefresh((x) => x + 1);
                     } catch (e) {
-                      message.error((e as Error).message);
+                      message.error(t((e as Error).message));
                     }
                   }}
                 >
-                  เลิกติดตาม
+                  {t("เลิกติดตาม")}
                 </Button>,
               ]}
             >
@@ -734,6 +783,7 @@ function Following({ open }: { open: (id: string) => void }) {
   );
 }
 function Notifications({ open, citizen }: { open: (id: string) => void; citizen: boolean }) {
+  const { t } = useI18n();
   const [communityId, setCommunityId] = useState<string>();
   const [refresh, setRefresh] = useState(0);
   const { data, error } = useData<RowData[]>("/notifications", refresh);
@@ -741,25 +791,25 @@ function Notifications({ open, citizen }: { open: (id: string) => void; citizen:
   return (
     <>
       <div className="page-heading">
-        <Title level={2}>การแจ้งเตือน</Title>
+        <Title level={2}>{t("การแจ้งเตือน")}</Title>
         <Button
           onClick={async () => {
             try {
               await post("/notifications/read", {});
               setRefresh((x) => x + 1);
             } catch (e) {
-              message.error((e as Error).message);
+              message.error(t((e as Error).message));
             }
           }}
         >
-          อ่านทั้งหมดแล้ว
+          {t("อ่านทั้งหมดแล้ว")}
         </Button>
       </div>
       <ErrorBox error={error} />
       <Card>
         <List
           dataSource={data}
-          locale={{ emptyText: "ยังไม่มีการแจ้งเตือน" }}
+          locale={{ emptyText: t("ยังไม่มีการแจ้งเตือน") }}
           renderItem={(r) => (
             <List.Item
               className="notification-item"
@@ -772,7 +822,7 @@ function Notifications({ open, citizen }: { open: (id: string) => void; citizen:
                           citizen ? setCommunityId(r.complaint_id) : open(r.complaint_id)
                         }
                       >
-                        ดูคำร้อง
+                        {t("ดูคำร้อง")}
                       </Button>,
                     ]
                   : undefined
@@ -784,9 +834,8 @@ function Notifications({ open, citizen }: { open: (id: string) => void; citizen:
                     <Avatar icon={<BellOutlined />} />
                   </Badge>
                 }
-                title={String(r.message).replace(
-                  /\b[A-Z][A-Z_]+\b/g,
-                  (code) => statusNames[code] || actionNames[code] || code,
+                title={String(r.message).replace(/\b[A-Z][A-Z_]+\b/g, (code) =>
+                  t(statusNames[code] || actionNames[code] || code),
                 )}
                 description={
                   date(r.created_at) + (r.complaint_id ? " • #" + r.complaint_id.slice(0, 8) : "")
@@ -801,35 +850,43 @@ function Notifications({ open, citizen }: { open: (id: string) => void; citizen:
   );
 }
 function Password({ onDone }: { onDone: () => void }) {
+  const { language, t } = useI18n();
+  const [form] = Form.useForm();
+  useEffect(() => {
+    const invalid = form.getFieldsError().filter((field) => field.errors.length);
+    if (invalid.length)
+      void form.validateFields(invalid.map((field) => field.name)).catch(() => {});
+  }, [form, language]);
   const { message } = AntApp.useApp();
   return (
     <>
-      <Title level={2}>เปลี่ยนรหัสผ่าน</Title>
+      <Title level={2}>{t("เปลี่ยนรหัสผ่าน")}</Title>
       <Card style={{ maxWidth: 520 }}>
         <Form
+          form={form}
           layout="vertical"
           onFinish={async (v) => {
             try {
               await post("/auth/password", v);
-              message.success("เปลี่ยนรหัสผ่านแล้ว กรุณาเข้าสู่ระบบใหม่");
+              message.success(t("เปลี่ยนรหัสผ่านแล้ว กรุณาเข้าสู่ระบบใหม่"));
               onDone();
             } catch (e) {
-              message.error((e as Error).message);
+              message.error(t((e as Error).message));
             }
           }}
         >
-          <Form.Item name="currentPassword" label="รหัสผ่านเดิม" rules={[{ required: true }]}>
+          <Form.Item name="currentPassword" label={t("รหัสผ่านเดิม")} rules={[{ required: true }]}>
             <Input.Password autoComplete="current-password" />
           </Form.Item>
           <Form.Item
             name="newPassword"
-            label="รหัสผ่านใหม่ (อย่างน้อย 12 ตัวอักษร)"
+            label={t("รหัสผ่านใหม่ (อย่างน้อย 12 ตัวอักษร)")}
             rules={[{ required: true, min: 12, max: 72 }]}
           >
             <Input.Password autoComplete="new-password" />
           </Form.Item>
           <Button type="primary" htmlType="submit">
-            บันทึกรหัสผ่านใหม่
+            {t("บันทึกรหัสผ่านใหม่")}
           </Button>
         </Form>
       </Card>

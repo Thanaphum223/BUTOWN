@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n/useI18n";
 import { createContext, useContext, useState } from "react";
 type P = [number, number];
 type Geo = {
@@ -38,6 +39,7 @@ function locate() {
   return pending;
 }
 export function GeoProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const [point, setPoint] = useState<P | undefined>(cached),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -56,6 +58,10 @@ export function GeoProvider({ children }: { children: React.ReactNode }) {
       setBusy(false);
     }
   }
-  return <Context.Provider value={{ point, busy, error, request }}>{children}</Context.Provider>;
+  return (
+    <Context.Provider value={{ point, busy, error: t(error), request }}>
+      {children}
+    </Context.Provider>
+  );
 }
 export const useGeo = () => useContext(Context);

@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n/useI18n";
 import { useEffect, useState } from "react";
 import {
   App,
@@ -22,6 +23,7 @@ export default function CitizenTracking({
   initialTab?: string;
   open: (id: string, publicView?: boolean) => void;
 }) {
+  const { t } = useI18n();
   const [tab, setTab] = useState(initialTab),
     [page, setPage] = useState(1),
     [revision, setRevision] = useState(0);
@@ -51,9 +53,9 @@ export default function CitizenTracking({
       await api(`/complaints/${id}/follow`, { method: "DELETE" });
       setPage(1);
       setRevision((v) => v + 1);
-      message.success("ยกเลิกการติดตามแล้ว");
+      message.success(t("ยกเลิกการติดตามแล้ว"));
     } catch (e) {
-      message.error((e as Error).message);
+      message.error(t((e as Error).message));
     } finally {
       setRemoving(undefined);
     }
@@ -62,13 +64,13 @@ export default function CitizenTracking({
     <section className="citizen-tracking">
       <div className="page-heading tracking-heading">
         <div>
-          <Typography.Title level={2}>ติดตามสถานะ</Typography.Title>
+          <Typography.Title level={2}>{t("ติดตามสถานะ")}</Typography.Title>
           <Typography.Text type="secondary">
-            ความคืบหน้าของเรื่องที่แจ้งและเรื่องที่ติดตาม
+            {t("ความคืบหน้าของเรื่องที่แจ้งและเรื่องที่ติดตาม")}
           </Typography.Text>
         </div>
         <Button icon={<ReloadOutlined />} loading={busy} onClick={() => setRevision((v) => v + 1)}>
-          โหลดใหม่
+          {t("โหลดใหม่")}
         </Button>
       </div>
       <Tabs
@@ -78,16 +80,16 @@ export default function CitizenTracking({
           setPage(1);
         }}
         items={[
-          { key: "mine", label: "เรื่องที่ฉันแจ้ง" },
-          { key: "following", label: "เรื่องที่ติดตาม" },
+          { key: "mine", label: t("เรื่องที่ฉันแจ้ง") },
+          { key: "following", label: t("เรื่องที่ติดตาม") },
         ]}
       />
       {error && (
         <Alert
           type="error"
           showIcon
-          message={error}
-          action={<Button onClick={() => setRevision((v) => v + 1)}>ลองใหม่</Button>}
+          message={t(error)}
+          action={<Button onClick={() => setRevision((v) => v + 1)}>{t("ลองใหม่")}</Button>}
         />
       )}
       <List
@@ -99,10 +101,10 @@ export default function CitizenTracking({
             <Empty
               description={
                 busy
-                  ? "กำลังโหลด…"
+                  ? t("กำลังโหลด…")
                   : tab === "mine"
-                    ? "ยังไม่มีเรื่องที่แจ้ง"
-                    : "ยังไม่มีเรื่องที่ติดตาม"
+                    ? t("ยังไม่มีเรื่องที่แจ้ง")
+                    : t("ยังไม่มีเรื่องที่ติดตาม")
               }
             />
           ),
@@ -129,28 +131,32 @@ export default function CitizenTracking({
               <Typography.Title level={4}>{item.category_name}</Typography.Title>
               <div className="tracking-dates">
                 <span>
-                  <CalendarOutlined aria-hidden /> แจ้งเมื่อ {date(item.created_at)}
+                  <CalendarOutlined aria-hidden /> {t("แจ้งเมื่อ")}
+                  {date(item.created_at)}
                 </span>
-                <span>อัปเดตล่าสุด {date(item.updated_at)}</span>
+                <span>
+                  {t("อัปเดตล่าสุด")}
+                  {date(item.updated_at)}
+                </span>
               </div>
               <Space className="tracking-card-actions" wrap>
                 <Button
-                  aria-label="ดูรายละเอียด"
+                  aria-label={t("ดูรายละเอียด")}
                   type="primary"
                   icon={<EyeOutlined />}
                   onClick={() => open(item.id, tab === "following")}
                 >
-                  ดูรายละเอียด
+                  {t("ดูรายละเอียด")}
                 </Button>
                 {tab === "following" && (
                   <Button
-                    aria-label="ยกเลิกการติดตาม"
+                    aria-label={t("ยกเลิกการติดตาม")}
                     icon={<BellOutlined />}
                     loading={removing === item.id}
                     disabled={!!removing && removing !== item.id}
                     onClick={() => void unfollow(item.id)}
                   >
-                    ยกเลิกการติดตาม
+                    {t("ยกเลิกการติดตาม")}
                   </Button>
                 )}
               </Space>
@@ -163,7 +169,7 @@ export default function CitizenTracking({
         pageSize={5}
         total={Number(data?.total || 0)}
         showSizeChanger={false}
-        showTotal={(total) => `ทั้งหมด ${total} เรื่อง`}
+        showTotal={(total) => t("ทั้งหมด {{count}} เรื่อง", { count: total })}
         onChange={setPage}
         hideOnSinglePage
       />

@@ -1,6 +1,8 @@
+import { useI18n } from "./i18n/useI18n";
 import { Alert } from "antd";
 type D = Record<string, any>;
 export default function CitizenOutcome({ status, history }: { status: string; history: D[] }) {
+  const { t } = useI18n();
   if (!["CLOSED", "REJECTED", "TERMINATED"].includes(status)) return null;
   const action = status === "CLOSED" ? "CLOSE" : status === "REJECTED" ? "REJECT" : "DENY";
   const decision = [...history]
@@ -19,14 +21,14 @@ export default function CitizenOutcome({ status, history }: { status: string; hi
       type={status === "CLOSED" ? "success" : "error"}
       message={
         status === "CLOSED"
-          ? "ผลการดำเนินงาน"
+          ? t("ผลการดำเนินงาน")
           : status === "REJECTED"
-            ? "เหตุผลที่ไม่รับเรื่อง"
-            : "เหตุผลที่ไม่อนุมัติและยุติเรื่อง"
+            ? t("เหตุผลที่ไม่รับเรื่อง")
+            : t("เหตุผลที่ไม่อนุมัติและยุติเรื่อง")
       }
       description={
         <div className="citizen-outcome-reason">
-          {decision?.reason || "ไม่มีเหตุผลบันทึกไว้ในระบบ"}
+          {decision?.reason || t("ไม่มีเหตุผลบันทึกไว้ในระบบ")}
         </div>
       }
     />

@@ -1,9 +1,22 @@
+import GovAuthBadge from "./GovAuthBadge";
+import UatAuthToolbar from "./UatAuthToolbar";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useI18n } from "./i18n/useI18n";
 import { useState } from "react";
-import { Card, ConfigProvider, Divider, Typography } from "antd";
+import { Alert, Card, ConfigProvider, Divider, Typography } from "antd";
 import GovAccountForm, { type GovAccountMode } from "./GovAccountForm";
 import GovLogin from "./GovLogin";
 
-export default function GovAuthPage({ onLogin }: { onLogin: () => void }) {
+export default function GovAuthPage({
+  onLogin,
+  authError = "",
+  authErrorDetail = "",
+}: {
+  onLogin: () => void;
+  authError?: string;
+  authErrorDetail?: string;
+}) {
+  const { t } = useI18n();
   const [mode, setMode] = useState<GovAccountMode>("login");
   const [busy, setBusy] = useState(false);
   const register = mode === "register";
@@ -17,19 +30,30 @@ export default function GovAuthPage({ onLogin }: { onLogin: () => void }) {
         },
       }}
     >
+      <UatAuthToolbar busy={busy} />
       <main className="auth-page">
         <Card className="auth-card">
+          {authError && (
+            <Alert
+              type="error"
+              showIcon
+              message={t(authError)}
+              description={authErrorDetail || undefined}
+            />
+          )}
+          <GovAuthBadge />
           <header className="auth-heading">
+            <LanguageSwitcher />
             <Typography.Title level={1}>
-              {register ? "สมัครสมาชิก" : "เข้าสู่ระบบ"}
+              {register ? t("สมัครสมาชิก") : t("เข้าสู่ระบบ")}
             </Typography.Title>
-            <Typography.Paragraph>บัญชี Gov Center · TownTrack</Typography.Paragraph>
+            <Typography.Paragraph>{t("บัญชี Gov Center · TownTrack")}</Typography.Paragraph>
           </header>
           {!register && (
             <>
               <GovLogin compact disabled={busy} onBusyChange={setBusy} />
               <Divider plain className="auth-divider">
-                หรือ
+                {t("หรือ")}
               </Divider>
             </>
           )}

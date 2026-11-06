@@ -1,3 +1,5 @@
+import DialogTools from "./DialogTools";
+import { useI18n } from "./i18n/useI18n";
 import { useEffect, useRef, useState } from "react";
 import { Alert, App, Button, Modal, Space, Typography, type GetRef } from "antd";
 import { api } from "./api";
@@ -18,6 +20,7 @@ export default function AccountDeletion({
   const [error, setError] = useState("");
   const submitting = useRef(false);
   const cancelButton = useRef<GetRef<typeof Button>>(null);
+  const { t } = useI18n();
   const { message } = App.useApp();
   useEffect(() => setError(""), [account?.id]);
   async function remove() {
@@ -29,7 +32,7 @@ export default function AccountDeletion({
       await api(`/admin/users/${account.id}`, { method: "DELETE" });
       await onDeleted();
       onClose();
-      message.success("ลบบัญชีออกจาก TownTrack แล้ว");
+      message.success(t("ลบบัญชีออกจาก TownTrack แล้ว"));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -40,7 +43,7 @@ export default function AccountDeletion({
   return (
     <Modal
       open={!!account}
-      title="ลบบัญชีผู้ใช้"
+      title={t("ลบบัญชีผู้ใช้")}
       footer={null}
       onCancel={() => {
         if (!submitting.current) onClose();
@@ -53,38 +56,42 @@ export default function AccountDeletion({
       }}
       destroyOnHidden
     >
-      <Typography.Paragraph>ต้องการลบบัญชีนี้ออกจาก TownTrack หรือไม่?</Typography.Paragraph>
+      <DialogTools />
+      <Typography.Paragraph>{t("ต้องการลบบัญชีนี้ออกจาก TownTrack หรือไม่?")}</Typography.Paragraph>
       <Typography.Paragraph>
         <strong>{account?.display_name}</strong>
         <br />
         <Typography.Text type="secondary" style={{ overflowWrap: "anywhere" }}>
-          ชื่อผู้ใช้: {account?.username}
+          {t("ชื่อผู้ใช้:")}
+          {account?.username}
         </Typography.Text>
       </Typography.Paragraph>
       <Alert
         type="warning"
         showIcon
         style={{ marginBottom: 16 }}
-        message="บัญชีเดิมจะเข้าใช้งาน TownTrack ไม่ได้"
-        description="บัญชี Gov Center ยังคงอยู่ หากกลับมาใช้งานจะได้บัญชีใหม่ ไม่ผูกกับประวัติส่วนตัวเดิม คำร้อง ไฟล์แนบ และประวัติงานจะเก็บไว้ในระบบ"
+        message={t("บัญชีเดิมจะเข้าใช้งาน TownTrack ไม่ได้")}
+        description={t(
+          "บัญชี Gov Center ยังคงอยู่ หากกลับมาใช้งานจะได้บัญชีใหม่ ไม่ผูกกับประวัติส่วนตัวเดิม คำร้อง ไฟล์แนบ และประวัติงานจะเก็บไว้ในระบบ",
+        )}
       />
       <Typography.Paragraph type="secondary">
-        งานที่ยังไม่เสร็จจะไม่ถูกย้ายให้ผู้อื่นโดยอัตโนมัติ
+        {t("งานที่ยังไม่เสร็จจะไม่ถูกย้ายให้ผู้อื่นโดยอัตโนมัติ")}
       </Typography.Paragraph>
-      {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
+      {error && <Alert type="error" showIcon message={t(error)} style={{ marginBottom: 16 }} />}
       <Space style={{ display: "flex", justifyContent: "flex-end" }}>
         <Button ref={cancelButton} disabled={busy} onClick={onClose}>
-          ยกเลิก
+          {t("ยกเลิก")}
         </Button>
         <Button
-          aria-label="ยืนยันลบบัญชี"
+          aria-label={t("ยืนยันลบบัญชี")}
           type="primary"
           danger
           loading={busy}
           disabled={busy || account?.id === currentUserId}
           onClick={() => void remove()}
         >
-          ยืนยันลบบัญชี
+          {t("ยืนยันลบบัญชี")}
         </Button>
       </Space>
     </Modal>

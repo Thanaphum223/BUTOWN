@@ -1,3 +1,5 @@
+import DialogTools from "./DialogTools";
+import { useI18n } from "./i18n/useI18n";
 import { useState } from "react";
 import {
   Alert,
@@ -13,7 +15,7 @@ import {
   Typography,
 } from "antd";
 import { UserOutlined } from "@ant-design/icons";
-import { api } from "./api";
+import { api, date } from "./api";
 import GovLogin from "./GovLogin";
 
 type GovProfileData = {
@@ -29,6 +31,7 @@ type GovProfileData = {
 };
 
 export default function GovProfile() {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false),
     [busy, setBusy] = useState(false);
   const [data, setData] = useState<GovProfileData>(),
@@ -48,19 +51,25 @@ export default function GovProfile() {
   }
   return (
     <>
-      <Tooltip title="ข้อมูล Gov Center">
+      <Tooltip title={t("ข้อมูล Gov Center")}>
         <Button
-          aria-label="ข้อมูล Gov Center"
+          aria-label={t("ข้อมูล Gov Center")}
           icon={<UserOutlined />}
           onClick={() => void load()}
         />
       </Tooltip>
-      <Drawer title="ข้อมูล Gov Center" width={480} open={open} onClose={() => setOpen(false)}>
-        {busy && <Spin aria-label="กำลังโหลดข้อมูลบัญชี" />}
+      <Drawer
+        title={t("ข้อมูล Gov Center")}
+        extra={<DialogTools />}
+        width={480}
+        open={open}
+        onClose={() => setOpen(false)}
+      >
+        {busy && <Spin aria-label={t("กำลังโหลดข้อมูลบัญชี")} />}
         {error && (
           <Space direction="vertical">
-            <Alert type="error" showIcon message={error} />
-            <Button onClick={() => void load()}>ลองอีกครั้ง</Button>
+            <Alert type="error" showIcon message={t(error)} />
+            <Button onClick={() => void load()}>{t("ลองอีกครั้ง")}</Button>
           </Space>
         )}
         {data && !data.linked && (
@@ -68,8 +77,10 @@ export default function GovProfile() {
             <Alert
               type="info"
               showIcon
-              message="ยังไม่ได้เชื่อมบัญชี Gov Center"
-              description="เชื่อมกับบัญชีปัจจุบันเพื่อใช้ข้อมูลผู้ใช้จาก Gov Center โดยคงสิทธิ์ของบัญชี TownTrack เดิม"
+              message={t("ยังไม่ได้เชื่อมบัญชี Gov Center")}
+              description={t(
+                "เชื่อมกับบัญชีปัจจุบันเพื่อใช้ข้อมูลผู้ใช้จาก Gov Center โดยคงสิทธิ์ของบัญชี TownTrack เดิม",
+              )}
             />
             <GovLogin link />
           </Space>
@@ -78,49 +89,50 @@ export default function GovProfile() {
           <Space direction="vertical" size="large" style={{ width: "100%" }}>
             <Descriptions
               column={1}
-              title="ข้อมูลผู้ใช้"
+              title={t("ข้อมูลผู้ใช้")}
               items={[
                 {
                   key: "name",
-                  label: "ชื่อจาก Gov Center",
-                  children: data.profile?.name || "ไม่ระบุ",
+                  label: t("ชื่อจาก Gov Center"),
+                  children: data.profile?.name || t("ไม่ระบุ"),
                 },
-                { key: "email", label: "อีเมล", children: data.profile?.email || "ไม่ระบุ" },
+                { key: "email", label: t("อีเมล"), children: data.profile?.email || t("ไม่ระบุ") },
                 {
                   key: "synced",
-                  label: "อัปเดตล่าสุด",
-                  children: data.profile?.last_sso_at
-                    ? new Date(data.profile.last_sso_at).toLocaleString("th-TH", {
-                        timeZone: "Asia/Bangkok",
-                      })
-                    : "—",
+                  label: t("อัปเดตล่าสุด"),
+                  children: data.profile?.last_sso_at ? date(data.profile.last_sso_at) : "—",
                 },
               ]}
             />
             <div>
-              <Typography.Title level={5}>บ้านที่เชื่อมกับบัญชี</Typography.Title>
+              <Typography.Title level={5}>{t("บ้านที่เชื่อมกับบัญชี")}</Typography.Title>
               {!data.residences.length && (
                 <Empty
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="ไม่มีข้อมูลบ้านที่เชื่อมไว้ หรือบริการยังไม่ได้รับสิทธิ์อ่านข้อมูลบ้าน"
+                  description={t(
+                    "ไม่มีข้อมูลบ้านที่เชื่อมไว้ หรือบริการยังไม่ได้รับสิทธิ์อ่านข้อมูลบ้าน",
+                  )}
                 />
               )}
               <Space direction="vertical" style={{ width: "100%" }}>
                 {data.residences.map((home) => (
                   <Card key={home.residenceId} size="small">
-                    <Typography.Paragraph>{home.address || "ไม่ระบุที่อยู่"}</Typography.Paragraph>
+                    <Typography.Paragraph>
+                      {home.address || t("ไม่ระบุที่อยู่")}
+                    </Typography.Paragraph>
                     <Tag color={home.canUseForOfficialTransaction ? "green" : "orange"}>
                       {home.canUseForOfficialTransaction
-                        ? "ยืนยันข้อมูลแล้ว"
-                        : "ยังไม่ผ่านการยืนยันครบถ้วน"}
+                        ? t("ยืนยันข้อมูลแล้ว")
+                        : t("ยังไม่ผ่านการยืนยันครบถ้วน")}
                     </Tag>
                   </Card>
                 ))}
               </Space>
             </div>
             <Typography.Text type="secondary">
-              ข้อมูลอัปเดตเมื่อเข้าสู่ระบบผ่าน Gov Center ครั้งล่าสุด สิทธิ์ทำงานกำหนดโดยผู้ดูแล
-              TownTrack
+              {t(
+                "ข้อมูลอัปเดตเมื่อเข้าสู่ระบบผ่าน Gov Center ครั้งล่าสุด สิทธิ์ทำงานกำหนดโดยผู้ดูแล TownTrack",
+              )}
             </Typography.Text>
           </Space>
         )}

@@ -1,3 +1,6 @@
+import DialogTools from "./DialogTools";
+import { useI18n } from "./i18n/useI18n";
+import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
 import { useEffect, useRef, useState } from "react";
 import {
   App,
@@ -37,7 +40,9 @@ export default function Admin() {
   }>();
   const loadRequest = useRef<AbortController | undefined>(undefined);
   const [form] = Form.useForm();
+  const { t } = useI18n();
   const { message } = App.useApp();
+  useLocalizedFormErrors(form);
   const selectedUser = Form.useWatch("userId", form);
   const selectedRole = Form.useWatch("role", form);
   async function load() {
@@ -76,7 +81,7 @@ export default function Admin() {
         try {
           v.fields = typeof v.fields === "string" ? JSON.parse(v.fields || "[]") : v.fields || [];
         } catch {
-          throw new Error("รูปแบบ JSON ของช่องข้อมูลไม่ถูกต้อง");
+          throw new Error(t("รูปแบบ JSON ของช่องข้อมูลไม่ถูกต้อง"));
         }
       }
       if (kind === "roles")
@@ -85,11 +90,11 @@ export default function Admin() {
           departmentId: v.departmentId || null,
         });
       else await post("/admin/" + kind, v);
-      message.success("บันทึกแล้ว");
+      message.success(t("บันทึกแล้ว"));
       setKind("");
       await load();
     } catch (e) {
-      message.error((e as Error).message);
+      message.error(t((e as Error).message));
     } finally {
       setBusy(false);
     }
@@ -100,7 +105,7 @@ export default function Admin() {
     setKind(k);
     if (k === "roles") void load();
   };
-  if (!data) return error ? <Alert type="error" message={error} /> : <Card loading />;
+  if (!data) return error ? <Alert type="error" message={t(error)} /> : <Card loading />;
   const departments = data.departments.map((x: D) => ({
     value: x.id,
     label: x.name,
@@ -110,7 +115,7 @@ export default function Admin() {
       <div className="page-heading">
         <div>
           <Text className="eyebrow">ADMINISTRATION</Text>
-          <Title level={2}>จัดการระบบ</Title>
+          <Title level={2}>{t("จัดการระบบ")}</Title>
           <Text type="secondary">{data.municipality.name}</Text>
         </div>
         <Button
@@ -120,51 +125,54 @@ export default function Admin() {
             setKind("municipality");
           }}
         >
-          แก้ชื่อเทศบาล
+          {t("แก้ชื่อเทศบาล")}
         </Button>
       </div>
       <Alert
         style={{ marginBottom: 20 }}
         type="info"
         showIcon
-        message="Workflow ที่เผยแพร่แล้วจะไม่ถูกแก้ทับ เปลี่ยนค่าโดยสร้างเวอร์ชันใหม่ แล้วเลือกใช้ในประเภทปัญหา คำร้องเดิมยังใช้เวอร์ชันเดิม"
+        message={t(
+          "Workflow ที่เผยแพร่แล้วจะไม่ถูกแก้ทับ เปลี่ยนค่าโดยสร้างเวอร์ชันใหม่ แล้วเลือกใช้ในประเภทปัญหา คำร้องเดิมยังใช้เวอร์ชันเดิม",
+        )}
       />
       <Card>
-        {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 12 }} />}
+        {error && <Alert type="error" showIcon message={t(error)} style={{ marginBottom: 12 }} />}
         <Tabs
           items={[
             {
               key: "users",
-              label: "บัญชีผู้ใช้",
+              label: t("บัญชีผู้ใช้"),
               children: (
                 <>
                   <Text type="secondary">
-                    เลือกบัญชีที่สมัครประชาชนไว้แล้ว เพื่อกำหนดบทบาทบุคลากรและหน่วยงาน
-                    โดยใช้รหัสผ่านเดิม
+                    {t(
+                      "เลือกบัญชีที่สมัครประชาชนไว้แล้ว เพื่อกำหนดบทบาทบุคลากรและหน่วยงาน โดยใช้รหัสผ่านเดิม",
+                    )}
                   </Text>
                   <Space
                     wrap
                     style={{ width: "100%", justifyContent: "space-between", marginTop: 12 }}
                   >
                     <Input.Search
-                      aria-label="ค้นหาบัญชีผู้ใช้"
-                      placeholder="ค้นหาชื่อผู้ใช้หรือชื่อที่แสดง"
+                      aria-label={t("ค้นหาบัญชีผู้ใช้")}
+                      placeholder={t("ค้นหาชื่อผู้ใช้หรือชื่อที่แสดง")}
                       allowClear
                       value={userQuery}
                       onChange={(e) => setUserQuery(e.target.value)}
                     />
                     <Select
-                      aria-label="กรองประเภทบัญชี"
-                      placeholder="ทุกบทบาท"
+                      aria-label={t("กรองประเภทบัญชี")}
+                      placeholder={t("ทุกบทบาท")}
                       allowClear
                       style={{ minWidth: 160 }}
                       value={userRoleFilter}
                       onChange={setUserRoleFilter}
                       options={[
-                        { value: "CITIZEN", label: "บัญชีประชาชน" },
+                        { value: "CITIZEN", label: t("บัญชีประชาชน") },
                         ...Object.entries(roleNames)
                           .filter(([role]) => role !== "CITIZEN")
-                          .map(([value, label]) => ({ value, label })),
+                          .map(([value, label]) => ({ value, label: t(label) })),
                       ]}
                     />
                     <Button
@@ -172,10 +180,10 @@ export default function Admin() {
                       loading={refreshing}
                       onClick={() => void load()}
                     >
-                      โหลดรายชื่อใหม่
+                      {t("โหลดรายชื่อใหม่")}
                     </Button>
                     <Button type="primary" onClick={() => create("roles")}>
-                      กำหนดบทบาทให้บัญชีที่มีอยู่
+                      {t("กำหนดบทบาทให้บัญชีที่มีอยู่")}
                     </Button>
                   </Space>
                   <Table<D>
@@ -190,21 +198,21 @@ export default function Admin() {
                     )}
                     scroll={{ x: 700 }}
                     columns={[
-                      { title: "ชื่อผู้ใช้", dataIndex: "username" },
-                      { title: "ชื่อ", dataIndex: "display_name" },
+                      { title: t("ชื่อผู้ใช้"), dataIndex: "username" },
+                      { title: t("ชื่อ"), dataIndex: "display_name" },
                       {
-                        title: "บทบาท",
+                        title: t("บทบาท"),
                         dataIndex: "role",
-                        render: (v) => roleNames[v],
+                        render: (v) => t(roleNames[v]),
                       },
                       {
-                        title: "หน่วยงาน",
+                        title: t("หน่วยงาน"),
                         dataIndex: "department_id",
                         render: (id: string) =>
                           data.departments.find((d: D) => d.id === id)?.name || "—",
                       },
                       {
-                        title: "จัดการ",
+                        title: t("จัดการ"),
                         key: "editRole",
                         render: (_, r) => (
                           <Space wrap>
@@ -219,7 +227,7 @@ export default function Admin() {
                                 setKind("roles");
                               }}
                             >
-                              กำหนดบทบาท
+                              {t("กำหนดบทบาท")}
                             </Button>
                             <Button
                               danger
@@ -233,13 +241,13 @@ export default function Admin() {
                                 })
                               }
                             >
-                              ลบบัญชี
+                              {t("ลบบัญชี")}
                             </Button>
                           </Space>
                         ),
                       },
                       {
-                        title: "เปิดใช้งาน",
+                        title: t("เปิดใช้งาน"),
                         dataIndex: "enabled",
                         render: (v, r) => (
                           <Switch
@@ -249,7 +257,7 @@ export default function Admin() {
                                 await post("/admin/users/" + r.id + "/enabled", { enabled });
                                 await load();
                               } catch (e) {
-                                message.error((e as Error).message);
+                                message.error(t((e as Error).message));
                               }
                             }}
                           />
@@ -262,16 +270,16 @@ export default function Admin() {
             },
             {
               key: "gov-roles",
-              label: "บทบาท Gov Center",
+              label: t("บทบาท Gov Center"),
               children: <GovRoleSettings departments={data.departments} />,
             },
             {
               key: "departments",
-              label: "หน่วยงาน",
+              label: t("หน่วยงาน"),
               children: (
                 <>
                   <Button type="primary" onClick={() => create("departments")}>
-                    เพิ่มหน่วยงาน
+                    {t("เพิ่มหน่วยงาน")}
                   </Button>
                   <DepartmentPeople
                     departments={data.departments}
@@ -284,23 +292,23 @@ export default function Admin() {
             },
             {
               key: "categories",
-              label: "ประเภทปัญหา / แบบฟอร์ม / SLA",
+              label: t("ประเภทปัญหา / แบบฟอร์ม / SLA"),
               children: (
                 <>
                   <Button type="primary" onClick={() => create("categories")}>
-                    เพิ่มประเภทปัญหา
+                    {t("เพิ่มประเภทปัญหา")}
                   </Button>
                   <Table<D>
                     rowKey="id"
                     dataSource={data.categories}
                     scroll={{ x: 650 }}
                     columns={[
-                      { title: "ประเภท", dataIndex: "name" },
-                      { title: "SLA (ชั่วโมง)", dataIndex: "sla_hours" },
+                      { title: t("ประเภท"), dataIndex: "name" },
+                      { title: t("SLA (ชั่วโมง)"), dataIndex: "sla_hours" },
                       {
-                        title: "เปิดใช้งาน",
+                        title: t("เปิดใช้งาน"),
                         dataIndex: "active",
-                        render: (v) => (v ? "เปิด" : "ปิด"),
+                        render: (v) => (v ? t("เปิด") : t("ปิด")),
                       },
                       {
                         title: "",
@@ -320,7 +328,7 @@ export default function Admin() {
                               setKind("categories");
                             }}
                           >
-                            แก้ไข
+                            {t("แก้ไข")}
                           </Button>
                         ),
                       },
@@ -335,21 +343,25 @@ export default function Admin() {
               children: (
                 <>
                   <Button type="primary" onClick={() => create("workflows")}>
-                    เผยแพร่เวอร์ชันใหม่
+                    {t("เผยแพร่เวอร์ชันใหม่")}
                   </Button>
                   <Table<D>
                     rowKey="id"
                     dataSource={data.workflows}
                     columns={[
-                      { title: "เวอร์ชัน", dataIndex: "version" },
-                      { title: "ชื่อ", dataIndex: "name" },
+                      { title: t("เวอร์ชัน"), dataIndex: "version" },
+                      { title: t("ชื่อ"), dataIndex: "name" },
                       {
-                        title: "ลำดับอนุมัติทรัพยากร",
+                        title: t("ลำดับอนุมัติทรัพยากร"),
                         dataIndex: "approval_stages",
                       },
                     ]}
                   />
-                  <Alert message="เส้นทางงานยึด Flow ที่ตกลงไว้ ขณะนี้ตั้งจำนวนผู้อนุมัติทรัพยากรได้ 1–5 ลำดับ" />
+                  <Alert
+                    message={t(
+                      "เส้นทางงานยึด Flow ที่ตกลงไว้ ขณะนี้ตั้งจำนวนผู้อนุมัติทรัพยากรได้ 1–5 ลำดับ",
+                    )}
+                  />
                 </>
               ),
             },
@@ -364,11 +376,12 @@ export default function Admin() {
       />
       <Modal
         open={!!kind}
-        title={kind === "roles" ? "กำหนดบทบาทให้บัญชีที่มีอยู่" : "ตั้งค่าระบบ"}
+        title={kind === "roles" ? t("กำหนดบทบาทให้บัญชีที่มีอยู่") : t("ตั้งค่าระบบ")}
         onCancel={() => setKind("")}
         footer={null}
         destroyOnHidden
       >
+        <DialogTools />
         <Form form={form} layout="vertical" onFinish={save}>
           <Form.Item name="id" hidden>
             <Input />
@@ -377,8 +390,8 @@ export default function Admin() {
             <>
               <Form.Item
                 name="userId"
-                label="ค้นหาบัญชีที่สมัครไว้แล้ว"
-                rules={[{ required: true, message: "กรุณาเลือกบัญชีผู้ใช้" }]}
+                label={t("ค้นหาบัญชีที่สมัครไว้แล้ว")}
+                rules={[{ required: true, message: t("กรุณาเลือกบัญชีผู้ใช้") }]}
               >
                 <Select
                   showSearch
@@ -387,9 +400,9 @@ export default function Admin() {
                     if (open) void load();
                   }}
                   optionFilterProp="label"
-                  placeholder="พิมพ์ชื่อผู้ใช้หรือชื่อที่แสดงของบัญชีประชาชน"
+                  placeholder={t("พิมพ์ชื่อผู้ใช้หรือชื่อที่แสดงของบัญชีประชาชน")}
                   notFoundContent={
-                    refreshing ? "กำลังโหลดรายชื่อ…" : "ไม่พบบัญชีที่สมัครไว้ในเทศบาลนี้"
+                    refreshing ? t("กำลังโหลดรายชื่อ…") : t("ไม่พบบัญชีที่สมัครไว้ในเทศบาลนี้")
                   }
                   options={data.users.map((u: D) => ({
                     value: u.id,
@@ -410,19 +423,26 @@ export default function Admin() {
                   type="info"
                   showIcon
                   message={
-                    "บทบาทปัจจุบัน: " +
-                    roleNames[data.users.find((u: D) => u.id === selectedUser)?.role]
+                    t("บทบาทปัจจุบัน: ") +
+                    t(roleNames[data.users.find((u: D) => u.id === selectedUser)?.role])
                   }
-                  description="บัญชีและรหัสผ่านเดิมยังใช้ได้ หลังบันทึกให้ผู้ใช้ออกจากระบบแล้วเข้าสู่ระบบใหม่"
+                  description={t(
+                    "บัญชีและรหัสผ่านเดิมยังใช้ได้ หลังบันทึกให้ผู้ใช้ออกจากระบบแล้วเข้าสู่ระบบใหม่",
+                  )}
                 />
               )}
               <Form.Item
                 name="role"
-                label="บทบาทที่ต้องการ"
-                rules={[{ required: true, message: "กรุณาเลือกบทบาท" }]}
+                label={t("บทบาทที่ต้องการ")}
+                rules={[{ required: true, message: t("กรุณาเลือกบทบาท") }]}
               >
                 <Select
-                  options={Object.entries(roleNames).map(([value, label]) => ({ value, label }))}
+                  className="admin-role-select"
+                  classNames={{ popup: { root: "admin-role-options" } }}
+                  options={Object.entries(roleNames).map(([value, label]) => ({
+                    value,
+                    label: t(label),
+                  }))}
                   onChange={(role) => {
                     if (!["LEADER", "FIELD"].includes(role))
                       form.setFieldValue("departmentId", undefined);
@@ -431,19 +451,19 @@ export default function Admin() {
               </Form.Item>
               <Form.Item
                 name="departmentId"
-                label="กอง / หน่วยงาน"
+                label={t("กอง / หน่วยงาน")}
                 hidden={!["LEADER", "FIELD"].includes(selectedRole)}
                 rules={[
                   {
                     required: ["LEADER", "FIELD"].includes(selectedRole),
-                    message: "กรุณาเลือกหน่วยงาน",
+                    message: t("กรุณาเลือกหน่วยงาน"),
                   },
                 ]}
               >
                 <Select
                   disabled={!["LEADER", "FIELD"].includes(selectedRole)}
                   allowClear
-                  placeholder="เลือกหน่วยงาน"
+                  placeholder={t("เลือกหน่วยงาน")}
                   options={departments}
                 />
               </Form.Item>
@@ -451,7 +471,7 @@ export default function Admin() {
                 <Alert
                   type="info"
                   showIcon
-                  message="บทบาทนี้ดูแลงานระดับเทศบาล ไม่สังกัดกอง"
+                  message={t("บทบาทนี้ดูแลงานระดับเทศบาล ไม่สังกัดกอง")}
                   style={{ marginBottom: 16 }}
                 />
               )}
@@ -460,46 +480,48 @@ export default function Admin() {
             <>
               <Form.Item
                 name="username"
-                label="ชื่อผู้ใช้"
+                label={t("ชื่อผู้ใช้")}
                 rules={[{ required: true, pattern: /^[a-zA-Z0-9._-]{4,60}$/ }]}
               >
                 <Input />
               </Form.Item>
               <Form.Item
                 name="displayName"
-                label="ชื่อที่แสดง"
+                label={t("ชื่อที่แสดง")}
                 rules={[{ required: true, max: 200 }]}
               >
                 <Input />
               </Form.Item>
               <Form.Item
                 name="password"
-                label="รหัสผ่านเริ่มต้น (อย่างน้อย 12 ตัวอักษร)"
+                label={t("รหัสผ่านเริ่มต้น (อย่างน้อย 12 ตัวอักษร)")}
                 rules={[{ required: true, min: 12, max: 72 }]}
               >
                 <Input.Password autoComplete="new-password" />
               </Form.Item>
-              <Form.Item name="role" label="บทบาท" rules={[{ required: true }]}>
+              <Form.Item name="role" label={t("บทบาท")} rules={[{ required: true }]}>
                 <Select
+                  className="admin-role-select"
+                  classNames={{ popup: { root: "admin-role-options" } }}
                   options={Object.entries(roleNames).map(([value, label]) => ({
                     value,
-                    label,
+                    label: t(label),
                   }))}
                 />
               </Form.Item>
-              <Form.Item name="departmentId" label="หน่วยงาน (จำเป็นสำหรับบุคลากร)">
+              <Form.Item name="departmentId" label={t("หน่วยงาน (จำเป็นสำหรับบุคลากร)")}>
                 <Select allowClear options={departments} />
               </Form.Item>
             </>
           ) : (
-            <Form.Item name="name" label="ชื่อ" rules={[{ required: true, max: 200 }]}>
+            <Form.Item name="name" label={t("ชื่อ")} rules={[{ required: true, max: 200 }]}>
               <Input />
             </Form.Item>
           )}
           {kind === "workflows" && (
             <Form.Item
               name="approvalStages"
-              label="จำนวนลำดับอนุมัติทรัพยากร"
+              label={t("จำนวนลำดับอนุมัติทรัพยากร")}
               rules={[{ required: true }]}
             >
               <InputNumber min={1} max={5} precision={0} />
@@ -507,7 +529,11 @@ export default function Admin() {
           )}
           {kind === "categories" && (
             <>
-              <Form.Item name="departmentId" label="หน่วยงานรับผิดชอบ" rules={[{ required: true }]}>
+              <Form.Item
+                name="departmentId"
+                label={t("หน่วยงานรับผิดชอบ")}
+                rules={[{ required: true }]}
+              >
                 <Select options={departments} />
               </Form.Item>
               <Form.Item name="workflowId" label="Workflow" rules={[{ required: true }]}>
@@ -515,20 +541,20 @@ export default function Admin() {
                   options={data.workflows.map((w: D) => ({
                     value: w.id,
                     label:
-                      "รุ่น " +
+                      t("รุ่น ") +
                       w.version +
                       " • " +
                       w.name +
                       " • " +
                       w.approval_stages +
-                      " ลำดับอนุมัติ",
+                      t(" ลำดับอนุมัติ"),
                   }))}
                 />
               </Form.Item>
-              <Form.Item name="slaHours" label="SLA (ชั่วโมง)" rules={[{ required: true }]}>
+              <Form.Item name="slaHours" label={t("SLA (ชั่วโมง)")} rules={[{ required: true }]}>
                 <InputNumber min={1} max={87600} precision={0} />
               </Form.Item>
-              <Typography.Title level={5}>ช่องข้อมูลเพิ่มเติม</Typography.Title>
+              <Typography.Title level={5}>{t("ช่องข้อมูลเพิ่มเติม")}</Typography.Title>
               <Form.List name="fields">
                 {(fields, { add, remove }) => (
                   <>
@@ -539,7 +565,7 @@ export default function Admin() {
                         </Form.Item>
                         <Form.Item
                           name={[field.name, "label"]}
-                          label="ชื่อช่องข้อมูล"
+                          label={t("ชื่อช่องข้อมูล")}
                           rules={[{ required: true, max: 200 }]}
                         >
                           <Input />
@@ -547,13 +573,13 @@ export default function Admin() {
                         <Space>
                           <Form.Item
                             name={[field.name, "required"]}
-                            label="บังคับกรอก"
+                            label={t("บังคับกรอก")}
                             valuePropName="checked"
                           >
                             <Switch />
                           </Form.Item>
                           <Button danger onClick={() => remove(field.name)}>
-                            ลบช่องนี้
+                            {t("ลบช่องนี้")}
                           </Button>
                         </Space>
                       </Card>
@@ -568,14 +594,14 @@ export default function Admin() {
                         })
                       }
                     >
-                      เพิ่มช่องข้อมูล
+                      {t("เพิ่มช่องข้อมูล")}
                     </Button>
                   </>
                 )}
               </Form.List>
               <Form.Item
                 name="active"
-                label="เปิดรับคำร้อง"
+                label={t("เปิดรับคำร้อง")}
                 valuePropName="checked"
                 initialValue={true}
               >
@@ -584,7 +610,7 @@ export default function Admin() {
             </>
           )}
           <Button type="primary" htmlType="submit" loading={busy} block>
-            บันทึก
+            {t("บันทึก")}
           </Button>
         </Form>
       </Modal>

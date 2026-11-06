@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n/useI18n";
 import { useEffect, useState } from "react";
 import { Alert, Button, Card, Empty, Space, Spin, Tag, Typography } from "antd";
 import { AlertOutlined, EnvironmentOutlined, PhoneOutlined } from "@ant-design/icons";
@@ -68,6 +69,7 @@ type Place = {
   website: string;
 };
 export default function EmergencyContacts() {
+  const { t } = useI18n();
   const geo = useGeo();
   const [point, setPoint] = useState<[number, number] | undefined>(geo.point);
   const [type, setType] = useState("hospital");
@@ -123,64 +125,70 @@ export default function EmergencyContacts() {
 
   return (
     <div className="emergency-page">
-      <Text className="eyebrow">หมายเลขช่วยเหลือ · TOWNTRACK</Text>
+      <Text className="eyebrow">{t("หมายเลขช่วยเหลือ · TOWNTRACK")}</Text>
       <Title level={2}>
-        <AlertOutlined /> เหตุฉุกเฉิน
+        <AlertOutlined /> {t("เหตุฉุกเฉิน")}
       </Title>
-      <Title level={3}>สายด่วนฉุกเฉิน</Title>
+      <Title level={3}>{t("สายด่วนฉุกเฉิน")}</Title>
       <div className="emergency-hotlines">
         {hotlines.map((line) => (
           <Card key={line.number} size="small">
             <a
               className="emergency-call"
               href={`tel:${line.number}`}
-              aria-label={`โทร ${line.number} ${line.title}`}
+              aria-label={t("โทร {{number}} {{title}}", {
+                number: line.number,
+                title: t(line.title),
+              })}
             >
               <PhoneOutlined />
               <strong>{line.number}</strong>
             </a>
-            <Title level={5}>{line.title}</Title>
-            <Text type="secondary">{line.detail}</Text>
+            <Title level={5}>{t(line.title)}</Title>
+            <Text type="secondary">{t(line.detail)}</Text>
             <div>
               <a href={line.source} target="_blank" rel="noopener noreferrer">
-                ข้อมูลจากหน่วยงานรัฐ
+                {t("ข้อมูลจากหน่วยงานรัฐ")}
               </a>
             </div>
           </Card>
         ))}
       </div>
       <details className="emergency-utilities">
-        <summary>ไฟฟ้าและประปา</summary>
+        <summary>{t("ไฟฟ้าและประปา")}</summary>
         <div className="emergency-hotlines">
           {utilities.map((line) => (
             <Card size="small" key={line.number}>
               <a
                 href={`tel:${line.number}`}
                 className="emergency-call"
-                aria-label={`โทร ${line.number} ${line.title}`}
+                aria-label={t("โทร {{number}} {{title}}", {
+                  number: line.number,
+                  title: t(line.title),
+                })}
               >
                 <PhoneOutlined />
                 <strong>{line.number}</strong>
               </a>
-              <Title level={5}>{line.title}</Title>
-              <Text type="secondary">{line.detail}</Text>
+              <Title level={5}>{t(line.title)}</Title>
+              <Text type="secondary">{t(line.detail)}</Text>
             </Card>
           ))}
         </div>
         <a href={sources.government} target="_blank" rel="noopener noreferrer">
-          แหล่งข้อมูลหมายเลขสาธารณูปโภค
+          {t("แหล่งข้อมูลหมายเลขสาธารณูปโภค")}
         </a>
       </details>
-      <section aria-label="สถานที่สำคัญใกล้ฉัน" className="emergency-nearby">
+      <section aria-label={t("สถานที่สำคัญใกล้ฉัน")} className="emergency-nearby">
         <Title level={3}>
-          <EnvironmentOutlined /> สถานที่สำคัญใกล้ฉัน
+          <EnvironmentOutlined /> {t("สถานที่สำคัญใกล้ฉัน")}
         </Title>
-        <p>ภายใน 50 กม. จากจุดที่เลือก เรียงตามระยะทางเส้นตรงจากใกล้ไปไกล</p>
+        <p>{t("ภายใน 50 กม. จากจุดที่เลือก เรียงตามระยะทางเส้นตรงจากใกล้ไปไกล")}</p>
         {geo.error && (
-          <Alert type="info" showIcon message={geo.error} style={{ marginBottom: 12 }} />
+          <Alert type="info" showIcon message={t(geo.error)} style={{ marginBottom: 12 }} />
         )}
         <details className="emergency-manual-point">
-          <summary>เลือกจุดค้นหาบนแผนที่เอง</summary>
+          <summary>{t("เลือกจุดค้นหาบนแผนที่เอง")}</summary>
           <LocationMap value={point || geo.point} onChange={setPoint} />
         </details>
         <Space wrap className="emergency-types">
@@ -191,38 +199,41 @@ export default function EmergencyContacts() {
               aria-pressed={type === item.value}
               onClick={() => setType(item.value)}
             >
-              {item.label}
+              {t(item.label)}
             </Button>
           ))}
         </Space>
         <div role="status" aria-live="polite">
           {busy && (
             <p>
-              <Spin size="small" /> กำลังค้นหาสถานที่ใกล้เคียง…
+              <Spin size="small" /> {t("กำลังค้นหาสถานที่ใกล้เคียง…")}
             </p>
           )}
           {error && (
             <Alert
               type="warning"
               showIcon
-              message={error}
-              action={<Button onClick={() => setRefresh((v) => v + 1)}>ลองอีกครั้ง</Button>}
+              message={t(error)}
+              action={<Button onClick={() => setRefresh((v) => v + 1)}>{t("ลองอีกครั้ง")}</Button>}
             />
           )}
           {!point && (
             <p>
               {geo.busy ? (
                 <>
-                  <Spin size="small" /> กำลังระบุตำแหน่งเพื่อค้นหาสถานที่ใกล้เคียง…
+                  <Spin size="small" /> {t("กำลังระบุตำแหน่งเพื่อค้นหาสถานที่ใกล้เคียง…")}
                 </>
               ) : (
-                "เลือกจุดบนแผนที่เพื่อค้นหาสถานที่และเบอร์ตรงอัตโนมัติ"
+                t("เลือกจุดบนแผนที่เพื่อค้นหาสถานที่และเบอร์ตรงอัตโนมัติ")
               )}
             </p>
           )}
           {searched && !places.length && (
             <Empty
-              description={`ไม่พบข้อมูลในรัศมี ${radiusKm} กม. เลือกจุดค้นหาใหม่ หรือใช้สายด่วนด้านบน`}
+              description={t(
+                "ไม่พบข้อมูลในรัศมี {{radius}} กม. เลือกจุดค้นหาใหม่ หรือใช้สายด่วนด้านบน",
+                { radius: radiusKm },
+              )}
             />
           )}
         </div>
@@ -232,7 +243,11 @@ export default function EmergencyContacts() {
               key={place.id}
               size="small"
               title={place.name}
-              extra={<Tag>{(place.distanceMeters / 1000).toFixed(1)} กม.</Tag>}
+              extra={
+                <Tag>
+                  {(place.distanceMeters / 1000).toFixed(1)} {t("กม.")}
+                </Tag>
+              }
             >
               <p>{place.address}</p>
               {place.phones.length ? (
@@ -242,14 +257,14 @@ export default function EmergencyContacts() {
                       key={phone}
                       href={`tel:${phone}`}
                       icon={<PhoneOutlined />}
-                      aria-label={`โทรตรง ${place.name} ${phone}`}
+                      aria-label={t("โทรตรง {{place}} {{phone}}", { place: place.name, phone })}
                     >
                       {phone}
                     </Button>
                   ))}
                 </Space>
               ) : (
-                <Text type="secondary">ยังไม่มีเบอร์ตรงในแหล่งข้อมูล</Text>
+                <Text type="secondary">{t("ยังไม่มีเบอร์ตรงในแหล่งข้อมูล")}</Text>
               )}
               <Space wrap style={{ display: "flex", marginTop: 12 }}>
                 <a
@@ -257,28 +272,30 @@ export default function EmergencyContacts() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  ดูบนแผนที่
+                  {t("ดูบนแผนที่")}
                 </a>
                 <a href={place.phoneSourceUrl} target="_blank" rel="noopener noreferrer">
-                  แหล่งข้อมูลติดต่อ
+                  {t("แหล่งข้อมูลติดต่อ")}
                 </a>
                 {place.website && (
                   <a href={place.website} target="_blank" rel="noopener noreferrer">
-                    เว็บไซต์สถานที่
+                    {t("เว็บไซต์สถานที่")}
                   </a>
                 )}
               </Space>
               {place.phoneCheckedAt && (
                 <Text type="secondary">
-                  ตรวจข้อมูลเบอร์จากเว็บไซต์หน่วยงาน: {place.phoneCheckedAt}
+                  {t("ตรวจข้อมูลเบอร์จากเว็บไซต์หน่วยงาน:")}
+                  {place.phoneCheckedAt}
                 </Text>
               )}
             </Card>
           ))}
         </div>
         <p className="emergency-attribution">
-          ข้อมูลสถานที่ © OpenStreetMap contributors ·
-          เบอร์ตรงบางแห่งอาจไม่มีข้อมูลหรือมีการเปลี่ยนแปลง
+          {t(
+            "ข้อมูลสถานที่ © OpenStreetMap contributors · เบอร์ตรงบางแห่งอาจไม่มีข้อมูลหรือมีการเปลี่ยนแปลง",
+          )}
         </p>
       </section>
     </div>

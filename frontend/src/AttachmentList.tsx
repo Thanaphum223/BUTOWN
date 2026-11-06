@@ -1,3 +1,6 @@
+import DialogTools from "./DialogTools";
+import { useI18n } from "./i18n/useI18n";
+import { translate as t } from "./i18n/core";
 import { Component, lazy, Suspense, useState, type ReactNode } from "react";
 import { Alert, Button, Empty, Modal, Space, Spin, Typography } from "antd";
 import {
@@ -10,7 +13,7 @@ const PdfPreview = lazy(() => import("./PdfPreview"));
 type D = Record<string, any>;
 type FileEndpoint = "files" | "media";
 class PdfLoadBoundary extends Component<
-  { file: D; endpoint: FileEndpoint; onClose: () => void; children: ReactNode },
+  { file: D; endpoint: FileEndpoint; onClose: () => void; children: ReactNode; language: string },
   { failed: boolean }
 > {
   state = { failed: false };
@@ -21,20 +24,21 @@ class PdfLoadBoundary extends Component<
     return this.state.failed ? (
       <Modal
         open
-        title="เปิดเอกสาร"
+        title={t("เปิดเอกสาร")}
         onCancel={this.props.onClose}
         footer={
           <Button
             href={`/api/${this.props.endpoint}/${this.props.file.id}`}
             icon={<DownloadOutlined />}
           >
-            ดาวน์โหลดเอกสารต้นฉบับ
+            {t("ดาวน์โหลดเอกสารต้นฉบับ")}
           </Button>
         }
       >
+        <DialogTools />
         <Alert
           type="error"
-          message="เปิดโปรแกรมอ่านเอกสารไม่ได้ กรุณาดาวน์โหลดต้นฉบับเพื่ออ่านด้วยแอป PDF"
+          message={t("เปิดโปรแกรมอ่านเอกสารไม่ได้ กรุณาดาวน์โหลดต้นฉบับเพื่ออ่านด้วยแอป PDF")}
         />
       </Modal>
     ) : (
@@ -53,11 +57,12 @@ export default function AttachmentList({
   emptyText?: string;
   extraActions?: (file: D) => ReactNode;
 }) {
+  const { language, t } = useI18n();
   const [preview, setPreview] = useState<D>();
   return (
     <>
       {!files.length ? (
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyText} />
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t(emptyText)} />
       ) : (
         <div className="attachment-list">
           {files.map((file) => {
@@ -72,9 +77,12 @@ export default function AttachmentList({
                     <Typography.Text strong>{file.original_name}</Typography.Text>
                     <br />
                     <Typography.Text type="secondary">
-                      {(Number(file.size_bytes) / 1_000_000).toLocaleString("th-TH", {
-                        maximumFractionDigits: 2,
-                      })}{" "}
+                      {(Number(file.size_bytes) / 1_000_000).toLocaleString(
+                        language === "en" ? "en-GB" : "th-TH",
+                        {
+                          maximumFractionDigits: 2,
+                        },
+                      )}{" "}
                       MB
                     </Typography.Text>
                   </div>
@@ -82,11 +90,11 @@ export default function AttachmentList({
                 <Space wrap>
                   {pdf && (
                     <Button icon={<EyeOutlined />} onClick={() => setPreview(file)}>
-                      ดูเอกสาร
+                      {t("ดูเอกสาร")}
                     </Button>
                   )}
                   <Button icon={<DownloadOutlined />} href={`/api/${endpoint}/${file.id}`}>
-                    ดาวน์โหลด
+                    {t("ดาวน์โหลด")}
                   </Button>
                   {extraActions?.(file)}
                 </Space>
@@ -99,6 +107,7 @@ export default function AttachmentList({
         <PdfLoadBoundary
           key={`${endpoint}:${preview.id}`}
           file={preview}
+          language={language}
           endpoint={endpoint}
           onClose={() => setPreview(undefined)}
         >
@@ -106,10 +115,11 @@ export default function AttachmentList({
             fallback={
               <Modal
                 open
-                title="กำลังเปิดเอกสาร"
+                title={t("กำลังเปิดเอกสาร")}
                 onCancel={() => setPreview(undefined)}
                 footer={null}
               >
+                <DialogTools />
                 <Spin />
               </Modal>
             }

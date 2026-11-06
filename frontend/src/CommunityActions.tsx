@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n/useI18n";
 import { Button } from "antd";
 import { BellOutlined, CheckOutlined, EyeOutlined, LikeOutlined } from "@ant-design/icons";
 
@@ -27,10 +28,11 @@ export default function CommunityActions({
   onVote,
   onFollow,
 }: Props) {
+  const { t } = useI18n();
   return (
     <div className="community-issue-actions">
-      <Button aria-label="ดูรายละเอียด" icon={<EyeOutlined />} onClick={onDetails}>
-        ดูรายละเอียด
+      <Button aria-label={t("ดูรายละเอียด")} icon={<EyeOutlined />} onClick={onDetails}>
+        {t("ดูรายละเอียด")}
       </Button>
       <Button
         disabled={disabled}
@@ -38,10 +40,10 @@ export default function CommunityActions({
         type={item.following ? "primary" : "default"}
         loading={following}
         aria-pressed={!!item.following}
-        aria-label={item.following ? "ติดตามแล้ว" : "ติดตาม"}
+        aria-label={item.following ? t("ติดตามแล้ว") : t("ติดตาม")}
         onClick={onFollow}
       >
-        {item.following ? "ติดตามแล้ว" : "ติดตาม"}
+        {item.following ? t("ติดตามแล้ว") : t("ติดตาม")}
       </Button>
       <Button
         disabled={disabled}
@@ -49,10 +51,10 @@ export default function CommunityActions({
         loading={voting}
         type={item.voted ? "primary" : "default"}
         aria-pressed={!!item.voted}
-        aria-label={`${item.voted ? "ยกเลิกโหวต" : "โหวต"} ${item.category_name} #${item.id.slice(0, 8)}`}
+        aria-label={`${item.voted ? t("ยกเลิกโหวต") : t("โหวต")} ${item.category_name} #${item.id.slice(0, 8)}`}
         onClick={onVote}
       >
-        {item.votes ?? 0} โหวต
+        {item.votes ?? 0} {t("โหวต")}
       </Button>
     </div>
   );

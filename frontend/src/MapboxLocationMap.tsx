@@ -1,13 +1,16 @@
+import { useI18n } from "./i18n/useI18n";
 import { govTokens } from "./govTheme";
 import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { Alert, Button, Table } from "antd";
+import { statusNames } from "./api";
 import type { LocationMapProps } from "./LocationMap";
 export default function MapboxLocationMap({
   token,
   ...props
 }: LocationMapProps & { token: string }) {
+  const { language, t } = useI18n();
   const el = useRef<HTMLDivElement>(null),
     map = useRef<mapboxgl.Map | undefined>(undefined);
   const marker = useRef<mapboxgl.Marker | undefined>(undefined);
@@ -69,12 +72,25 @@ export default function MapboxLocationMap({
     };
   }, [token, retry]);
   useEffect(() => {
+    const container = map.current?.getContainer();
+    for (const [selector, label] of [
+      [".mapboxgl-ctrl-zoom-in", t("ซูมเข้า")],
+      [".mapboxgl-ctrl-zoom-out", t("ซูมออก")],
+      [".mapboxgl-ctrl-compass", t("หมุนแผนที่ไปทิศเหนือ")],
+      [".mapboxgl-ctrl-attrib-button", t("ข้อมูลผู้จัดทำแผนที่")],
+    ]) {
+      const control = container?.querySelector(selector);
+      control?.setAttribute("title", label);
+      control?.setAttribute("aria-label", label);
+    }
+  }, [language, ready, retry]);
+  useEffect(() => {
     const m = map.current;
     if (!m || !ready) return;
     const features = (props.points || []).map((p) => ({
       type: "Feature" as const,
       geometry: { type: "Point" as const, coordinates: [p.longitude, p.latitude] },
-      properties: { id: p.id, name: p.categoryName || "ปัญหาที่แจ้ง", status: p.status },
+      properties: { id: p.id, name: p.categoryName || t("ปัญหาที่แจ้ง"), status: p.status },
     }));
     if (m.getSource("issues"))
       (m.getSource("issues") as mapboxgl.GeoJSONSource).setData({
@@ -201,13 +217,13 @@ export default function MapboxLocationMap({
       features.forEach((f) => bounds.extend(f.geometry.coordinates as [number, number]));
       m.fitBounds(bounds, { padding: 30, maxZoom: 15, duration: 0 });
     }
-  }, [ready, props.value?.[0], props.value?.[1], props.points, props.radiusMeters]);
+  }, [ready, props.value?.[0], props.value?.[1], props.points, props.radiusMeters, language]);
   return (
     <>
       <div
         className="location-map"
         role="region"
-        aria-label="แผนที่ตำแหน่งปัญหา"
+        aria-label={t("แผนที่ตำแหน่งปัญหา")}
         ref={el}
         style={{ height: 280, display: failed ? "none" : undefined }}
       />
@@ -215,8 +231,10 @@ export default function MapboxLocationMap({
         <>
           <Alert
             type="warning"
-            message="แผนที่ไม่พร้อมใช้งาน แสดงข้อมูลจากฐานข้อมูลเป็นรายการแทน"
-            action={<Button onClick={() => setRetry((v) => v + 1)}>ลองโหลดแผนที่ใหม่</Button>}
+            message={t("แผนที่ไม่พร้อมใช้งาน แสดงข้อมูลจากฐานข้อมูลเป็นรายการแทน")}
+            action={
+              <Button onClick={() => setRetry((v) => v + 1)}>{t("ลองโหลดแผนที่ใหม่")}</Button>
+            }
           />
           <Table
             size="small"
@@ -224,8 +242,12 @@ export default function MapboxLocationMap({
             dataSource={props.points || []}
             pagination={{ pageSize: 5 }}
             columns={[
-              { title: "ประเภทปัญหา", dataIndex: "categoryName" },
-              { title: "สถานะ", dataIndex: "status" },
+              { title: t("ประเภทปัญหา"), dataIndex: "categoryName" },
+              {
+                title: t("สถานะ"),
+                dataIndex: "status",
+                render: (status: string) => t(statusNames[status] || status),
+              },
             ]}
           />
         </>

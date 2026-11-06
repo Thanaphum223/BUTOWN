@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n/useI18n";
 import { Image, Typography, Tag } from "antd";
 import AttachmentList from "./AttachmentList";
 type Media = {
@@ -9,8 +10,9 @@ type Media = {
   has_thumbnail?: boolean;
 };
 export default function EvidenceGallery({ media = [] }: { media: Media[] }) {
+  const { t } = useI18n();
   if (!media.length)
-    return <Typography.Paragraph type="secondary">ยังไม่มีไฟล์ให้แสดง</Typography.Paragraph>;
+    return <Typography.Paragraph type="secondary">{t("ยังไม่มีไฟล์ให้แสดง")}</Typography.Paragraph>;
   const documents = media.filter((file) => file.content_type === "application/pdf");
   const visual = media.filter(
     (file) => file.content_type.startsWith("image/") || file.content_type.startsWith("video/"),
@@ -31,12 +33,12 @@ export default function EvidenceGallery({ media = [] }: { media: Media[] }) {
               ) : (
                 <video controls playsInline preload="none" aria-label={file.original_name}>
                   <source src={`/api/media/${file.id}`} type={file.content_type} />
-                  เบราว์เซอร์นี้ไม่รองรับวิดีโอชนิดนี้
+                  {t("เบราว์เซอร์นี้ไม่รองรับวิดีโอชนิดนี้")}
                 </video>
               )}
               <figcaption>
                 {file.evidence_stage && file.evidence_stage !== "GENERAL" && (
-                  <Tag>{file.evidence_stage === "BEFORE" ? "ก่อนแก้ไข" : "หลังแก้ไข"}</Tag>
+                  <Tag>{file.evidence_stage === "BEFORE" ? t("ก่อนแก้ไข") : t("หลังแก้ไข")}</Tag>
                 )}
                 <span>{file.original_name}</span>
               </figcaption>

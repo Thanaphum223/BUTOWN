@@ -3264,3 +3264,255 @@ button.queue-item .queue-item-top .ant-tag {
     justify-content: center;
   }
 }
+
+.language-switcher {
+  max-width: 100%;
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 1px solid var(--gov-border, #b7c9bf);
+  border-radius: 6px;
+  color: var(--gov-text, #163b2b);
+  background: #fff;
+  font: inherit;
+  line-height: 1.4;
+}
+.language-switcher:focus-visible {
+  outline: 3px solid #16734b;
+  outline-offset: 2px;
+}
+.auth-heading > .language-switcher {
+  display: block;
+  margin-left: auto;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 600px) {
+  .citizen-shell .topbar {
+    flex-wrap: wrap;
+  }
+  .citizen-shell .header-identity {
+    flex-basis: 100%;
+  }
+  .citizen-shell .account-controls {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* Operational forms and field cards: long bilingual instructions wrap at mobile widths. */
+.operational-guidance,
+.assignment-summary {
+  margin-bottom: 16px;
+}
+.field-task-card {
+  margin-bottom: 12px;
+  min-width: 0;
+}
+.field-task-card.selected {
+  border-color: var(--brand-primary, #176747);
+}
+.field-task-card p {
+  overflow-wrap: anywhere;
+}
+.field-task-card .location-map {
+  margin-top: 12px;
+}
+.denial-presets {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.denial-presets .ant-btn,
+.workflow-modal .ant-btn,
+.split-action-dock .ant-btn,
+.embedded-actions .ant-btn {
+  height: auto;
+  min-height: 44px;
+  white-space: normal;
+}
+.denial-presets .ant-btn > span,
+.workflow-modal .ant-btn > span,
+.split-action-dock .ant-btn > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.denial-presets .ant-btn {
+  text-align: start;
+  justify-content: flex-start;
+  padding: 8px 12px;
+}
+.staff-workspace .queue-quick-status .ant-btn {
+  height: auto;
+  min-height: 32px;
+  white-space: normal;
+}
+.terminal-subtitle {
+  display: block;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.workflow-modal .ant-modal-content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 48px);
+}
+.workflow-modal .ant-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+.workflow-modal .ant-form > .ant-btn:last-child {
+  position: static;
+  box-shadow: none;
+}
+
+/* Administration role names must remain readable in both languages on phones. */
+.admin-role-select.ant-select-single {
+  height: auto;
+  min-height: 48px;
+}
+.admin-role-select.ant-select-single .ant-select-selector {
+  height: auto;
+  min-height: 48px;
+}
+.admin-role-select.ant-select-single .ant-select-selection-item {
+  padding-block: 10px;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.admin-role-options .ant-select-item-option-content {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.gov-auth-badge {
+  color: #225b45;
+  background: #edf7f0;
+  padding: 10px 18px;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.gov-auth-badge strong,
+.gov-auth-badge small {
+  display: block;
+}
+.auth-card .gov-auth-badge {
+  margin-bottom: 16px;
+  border-radius: 8px;
+}
+.uat-auth-host:popover-open {
+  position: fixed;
+  inset: auto 12px 12px auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  width: min(460px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+}
+.uat-auth-tools {
+  background: #fff9e8;
+  color: #554218;
+  border: 1px solid #b69a4a;
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 3px 16px #0002;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.uat-auth-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.uat-auth-control strong {
+  white-space: nowrap;
+}
+.uat-auth-control label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.uat-auth-control .ant-switch {
+  flex-shrink: 0;
+}
+.uat-auth-tools.is-blocked {
+  padding: 18px;
+}
+.uat-auth-tools .ant-alert {
+  margin-top: 14px;
+}
+.uat-auth-tools small {
+  display: block;
+  margin-top: 6px;
+}
+/* Leave room to scroll bottom form controls above the always reachable UAT control. */
+body:has(.uat-auth-host:popover-open) {
+  padding-bottom: 110px;
+}
+body:has(.uat-auth-host:popover-open) .ant-modal-wrap {
+  padding-bottom: 110px;
+}
+
+[data-uat-suspended] {
+  display: none !important;
+}
+
+body:has(.uat-auth-host:popover-open) .staff-shell .split-action-dock {
+  bottom: 110px;
+}
+@media (max-width: 991px) {
+  body:has(.uat-auth-host:popover-open) .staff-shell .workspace-detail:has(.split-action-dock) {
+    padding-bottom: 260px;
+  }
+}
+
+.dialog-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/* Both flex items and their role labels must fit the header, including long
+   municipal role names. A document-overflow check cannot detect a negative left edge. */
+.staff-shell .topbar {
+  flex-wrap: wrap;
+}
+.staff-shell .header-identity {
+  flex: 1 1 240px;
+  min-width: 0;
+  max-width: 100%;
+}
+.staff-shell .header-identity > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.staff-shell .account-controls {
+  flex: 1 1 360px;
+  min-width: 0;
+  max-width: 100%;
+}
+.staff-shell .account-controls > .ant-space-item {
+  min-width: 0;
+  max-width: 100%;
+}
+.staff-shell .account-controls > .ant-space-item:has(.admin-role-controls) {
+  flex: 1 1 260px;
+}
+.staff-shell .admin-role-controls {
+  width: 100%;
+  min-width: 0;
+}
+.staff-shell .admin-role-controls .ant-select {
+  flex: 1 1 160px;
+  min-width: 0 !important;
+  max-width: 100%;
+  width: 100%;
+}

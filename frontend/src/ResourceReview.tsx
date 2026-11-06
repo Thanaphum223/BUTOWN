@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n/useI18n";
 import { Card, List, Tag, Typography, Empty } from "antd";
 import AttachmentList from "./AttachmentList";
 import { date } from "./api";
@@ -9,6 +10,7 @@ export default function ResourceReview({
   resources?: D[];
   files?: D[];
 }) {
+  const { t, language } = useI18n();
   const submitted = resources
     .map((resource): D => ({ ...resource, revisions: JSON.parse(resource.revisions || "[]") }))
     .filter((resource) => resource.revisions.length);
@@ -17,7 +19,9 @@ export default function ResourceReview({
     return (
       <Empty
         image={Empty.PRESENTED_IMAGE_SIMPLE}
-        description="ยังไม่มีข้อเสนอทรัพยากร หัวหน้าสามารถจัดทำและแนบเอกสารจากปุ่มส่งข้อเสนอทรัพยากร"
+        description={t(
+          "ยังไม่มีข้อเสนอทรัพยากร หัวหน้าสามารถจัดทำและแนบเอกสารจากปุ่มส่งข้อเสนอทรัพยากร",
+        )}
       />
     );
   const revision = latest.revisions.at(-1);
@@ -28,17 +32,28 @@ export default function ResourceReview({
   return (
     <Card
       className="resource-review-card"
-      title="คำขอทรัพยากรและเอกสารประกอบ"
-      extra={<Tag color="green">ฉบับที่ {revision.revision}</Tag>}
+      title={t("คำขอทรัพยากรและเอกสารประกอบ")}
+      extra={
+        <Tag color="green">
+          {t("ฉบับที่")} {revision.revision}
+        </Tag>
+      }
     >
       <Typography.Title level={4}>{revision.proposal}</Typography.Title>
       <div className="resource-review-summary">
         <Typography.Text strong>
-          งบประมาณ {Number(revision.amount).toLocaleString("th-TH", { minimumFractionDigits: 2 })}{" "}
-          บาท
+          {t("งบประมาณ")}{" "}
+          {Number(revision.amount).toLocaleString(language === "en" ? "en-GB" : "th-TH", {
+            minimumFractionDigits: 2,
+          })}{" "}
+          {t("บาท")}{" "}
         </Typography.Text>
-        <Typography.Text>ระยะเวลา {revision.duration_days} วัน</Typography.Text>
-        <Typography.Text type="secondary">ส่งเมื่อ {date(revision.created_at)}</Typography.Text>
+        <Typography.Text>
+          {t("ระยะเวลา")} {revision.duration_days} {t("วัน")}{" "}
+        </Typography.Text>
+        <Typography.Text type="secondary">
+          {t("ส่งเมื่อ")} {date(revision.created_at)}
+        </Typography.Text>
       </div>
       {Array.isArray(revision.line_items) && revision.line_items.length > 0 && (
         <List
@@ -48,26 +63,33 @@ export default function ResourceReview({
             <List.Item>
               <span>{item.name}</span>
               <Typography.Text>
-                {Number(item.amount).toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท
+                {Number(item.amount).toLocaleString(language === "en" ? "en-GB" : "th-TH", {
+                  minimumFractionDigits: 2,
+                })}{" "}
+                {t("บาท")}{" "}
               </Typography.Text>
             </List.Item>
           )}
         />
       )}
-      <Typography.Title level={5}>เอกสารฉบับที่ {revision.revision}</Typography.Title>
+      <Typography.Title level={5}>
+        {t("เอกสารฉบับที่")} {revision.revision}
+      </Typography.Title>
       <AttachmentList
         files={current}
-        emptyText="ไม่พบเอกสารที่ผูกกับฉบับนี้ กรุณาตรวจไฟล์เดิมด้านล่างหรือส่งกลับหัวหน้าให้แนบใหม่"
+        emptyText={t(
+          "ไม่พบเอกสารที่ผูกกับฉบับนี้ กรุณาตรวจไฟล์เดิมด้านล่างหรือส่งกลับหัวหน้าให้แนบใหม่",
+        )}
       />
       {legacy.length > 0 && (
         <details className="legacy-resource-files" open>
-          <summary>ไฟล์คำขอเดิมที่ไม่ระบุฉบับ</summary>
+          <summary>{t("ไฟล์คำขอเดิมที่ไม่ระบุฉบับ")}</summary>
           <AttachmentList files={legacy} />
         </details>
       )}
       {latest.revisions.length > 1 && (
         <Typography.Paragraph type="secondary">
-          ดูเอกสารฉบับก่อนหน้าได้ในแท็บคำขอทรัพยากรด้านล่าง
+          {t("ดูเอกสารฉบับก่อนหน้าได้ในแท็บคำขอทรัพยากรด้านล่าง")}
         </Typography.Paragraph>
       )}
     </Card>

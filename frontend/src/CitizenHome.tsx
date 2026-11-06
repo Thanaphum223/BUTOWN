@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n/useI18n";
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -31,6 +32,7 @@ import LocationMap from "./LocationMap";
 type D = Record<string, any>;
 const { Title, Text } = Typography;
 export default function CitizenHome({ onFollowing }: { onFollowing: () => void }) {
+  const { language, t } = useI18n();
   const geo = useGeo();
   const [area, setArea] = useState<"nearby" | "municipality">("municipality");
   const municipal = area === "municipality";
@@ -148,13 +150,13 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
           <button
             className="issue-media-cover"
             onClick={() => setDetailId(item.id)}
-            aria-label={`ดูหลักฐาน ${item.category_name}`}
+            aria-label={t("ดูหลักฐาน {{category}}", { category: item.category_name })}
           >
             {item.cover.content_type.startsWith("image/") && item.cover.has_thumbnail ? (
               <img
                 loading="lazy"
                 src={`/api/media/${item.cover.id}?thumbnail=true`}
-                alt={`หลักฐาน ${item.category_name}`}
+                alt={t("หลักฐาน {{category}}", { category: item.category_name })}
               />
             ) : (
               <div className="issue-media-placeholder">
@@ -167,20 +169,22 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
                 )}
                 <span>
                   {item.cover.content_type.startsWith("video/")
-                    ? "เปิดดูวิดีโอหลักฐาน"
+                    ? t("เปิดดูวิดีโอหลักฐาน")
                     : item.cover.content_type === "application/pdf"
-                      ? "เปิดดูเอกสาร PDF"
-                      : "เปิดดูรูปหลักฐาน"}
+                      ? t("เปิดดูเอกสาร PDF")
+                      : t("เปิดดูรูปหลักฐาน")}
                 </span>
               </div>
             )}
-            <span className="issue-media-count">{item.media_count} ไฟล์หลักฐาน</span>
+            <span className="issue-media-count">
+              {item.media_count} {t("ไฟล์หลักฐาน")}
+            </span>
           </button>
         ) : (
           <div className="issue-media-cover issue-media-empty">
             <div className="issue-media-placeholder">
               <PictureOutlined aria-hidden />
-              <span>ไม่มีไฟล์แนบ</span>
+              <span>{t("ไม่มีไฟล์แนบ")}</span>
             </div>
           </div>
         )
@@ -195,10 +199,10 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
       <Title level={4}>{item.category_name}</Title>
       <Text type="secondary">
         #{item.id.slice(0, 8).toUpperCase()} ·{" "}
-        {new Date(item.created_at).toLocaleDateString("th-TH")}
+        {new Date(item.created_at).toLocaleDateString(language === "en" ? "en-GB" : "th-TH")}
       </Text>
       <div className="issue-card-footer">
-        {item.mock ? <Tag>MOCK · ข้อมูลจำลอง</Tag> : <span />}
+        {item.mock ? <Tag>{t("MOCK · ข้อมูลจำลอง")}</Tag> : <span />}
       </div>
       {issueActions(item)}
     </Card>
@@ -208,20 +212,22 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
       <CommunityDetail id={detailId} onClose={() => setDetailId(undefined)} />
       <div className="page-heading community-heading">
         <div>
-          <Text className="eyebrow">ชุมชน · TOWNTRACK</Text>
-          <Title level={2}>{municipal ? "เรื่องแจ้งในเทศบาล" : "เรื่องแจ้งใกล้จุดที่เลือก"}</Title>
+          <Text className="eyebrow">{t("ชุมชน · TOWNTRACK")}</Text>
+          <Title level={2}>
+            {municipal ? t("เรื่องแจ้งในเทศบาล") : t("เรื่องแจ้งใกล้จุดที่เลือก")}
+          </Title>
         </div>
       </div>
       <div className="community-area-control">
         <Radio.Group
-          aria-label="พื้นที่ค้นหาปัญหา"
+          aria-label={t("พื้นที่ค้นหาปัญหา")}
           optionType="button"
           buttonStyle="solid"
           value={area}
           onChange={(e) => changeArea(e.target.value)}
           options={[
-            { value: "municipality", label: "ทั้งเทศบาล" },
-            { value: "nearby", label: "ใกล้จุดที่เลือก (5 กม.)" },
+            { value: "municipality", label: t("ทั้งเทศบาล") },
+            { value: "nearby", label: t("ใกล้จุดที่เลือก (5 กม.)") },
           ]}
         />
       </div>
@@ -229,7 +235,7 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
         {[
           [
             FileTextOutlined,
-            municipal ? "เรื่องทั้งหมด" : "เรื่องใกล้จุดที่เลือก",
+            municipal ? t("เรื่องทั้งหมด") : t("เรื่องใกล้จุดที่เลือก"),
             result?.stats?.total ?? "—",
           ],
           [LikeOutlined, "เสียงสนับสนุน", result?.stats?.votes ?? "—"],
@@ -245,12 +251,12 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
         ].map(([Icon, label, value]) => {
           const Symbol = Icon as typeof FileTextOutlined;
           return (
-            <div key={String(label)}>
+            <div key={t(String(label))}>
               <span className="metric-symbol">
                 <Symbol />
               </span>
               <strong>{String(value)}</strong>
-              <span>{String(label)}</span>
+              <span>{t(String(label))}</span>
             </div>
           );
         })}
@@ -260,7 +266,9 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
           type="info"
           showIcon
           message={
-            geo.busy ? "กำลังระบุตำแหน่ง…" : geo.error || "เลือกจุดบนแผนที่เพื่อดูปัญหาในระยะ 5 กม."
+            geo.busy
+              ? t("กำลังระบุตำแหน่ง…")
+              : (geo.error && t(geo.error)) || t("เลือกจุดบนแผนที่เพื่อดูปัญหาในระยะ 5 กม.")
           }
         />
       )}
@@ -269,16 +277,16 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
           className="community-empty-area"
           type="info"
           showIcon
-          message="ไม่พบเรื่องในรัศมี 5 กม. จากจุดที่เลือก"
+          message={t("ไม่พบเรื่องในรัศมี 5 กม. จากจุดที่เลือก")}
           description={
             Number(result.municipalityTotal) > 0
-              ? `มีอีก ${result.municipalityTotal} เรื่องในเทศบาล`
-              : "ลองเปลี่ยนจุดบนแผนที่หรือเลือกประเภทปัญหาอื่น"
+              ? t("มีอีก {{count}} เรื่องในเทศบาล", { count: result.municipalityTotal })
+              : t("ลองเปลี่ยนจุดบนแผนที่หรือเลือกประเภทปัญหาอื่น")
           }
           action={
             Number(result.municipalityTotal) > 0 ? (
               <Button onClick={() => changeArea("municipality")}>
-                ดูทั้งเทศบาล ({result.municipalityTotal} เรื่อง)
+                {t("ดูทั้งเทศบาล ({{count}} เรื่อง)", { count: result.municipalityTotal })}
               </Button>
             ) : undefined
           }
@@ -288,20 +296,20 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
         <Alert
           type="warning"
           showIcon
-          message={error}
-          action={<Button onClick={() => setRevision((v) => v + 1)}>ลองใหม่</Button>}
+          message={t(error)}
+          action={<Button onClick={() => setRevision((v) => v + 1)}>{t("ลองใหม่")}</Button>}
           style={{ margin: "16px 0" }}
         />
       )}
       <div className="community-toolbar">
         <Space wrap>
-          <Text strong>ประเภทปัญหา</Text>
+          <Text strong>{t("ประเภทปัญหา")}</Text>
           <Select
-            aria-label="ประเภทปัญหาที่ค้นหา"
+            aria-label={t("ประเภทปัญหาที่ค้นหา")}
             value={category || ""}
             style={{ minWidth: 240 }}
             options={[
-              { value: "", label: "ทุกประเภทปัญหา" },
+              { value: "", label: t("ทุกประเภทปัญหา") },
               ...(catalog?.categories || []).map((c: D) => ({ value: c.id, label: c.name })),
             ]}
             onChange={(value) => {
@@ -311,13 +319,13 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
             }}
           />
         </Space>
-        <Button onClick={onFollowing}>เรื่องที่ติดตาม</Button>
+        <Button onClick={onFollowing}>{t("เรื่องที่ติดตาม")}</Button>
       </div>
       <div className="community-explorer">
         <Card
           className="community-map-panel"
-          title="ปัญหาบนแผนที่"
-          extra={<Tag color="green">{municipal ? "ทั้งเทศบาล" : "รัศมี 5 กม."}</Tag>}
+          title={t("ปัญหาบนแผนที่")}
+          extra={<Tag color="green">{municipal ? t("ทั้งเทศบาล") : t("รัศมี 5 กม.")}</Tag>}
         >
           <LocationMap
             value={municipal ? undefined : point}
@@ -338,15 +346,15 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
               }))}
           />
           <Text type="secondary">
-            {municipal ? "ตำแหน่งโดยประมาณของรายการในหน้านี้" : "ตำแหน่งโดยประมาณ"}
+            {municipal ? t("ตำแหน่งโดยประมาณของรายการในหน้านี้") : t("ตำแหน่งโดยประมาณ")}
           </Text>
         </Card>
         <section className="community-results">
           <div className="ranking-heading">
             <div>
-              <Text className="eyebrow">เสียงจากชุมชน</Text>
+              <Text className="eyebrow">{t("เสียงจากชุมชน")}</Text>
               <Title level={4}>
-                <TrophyOutlined /> 5 ปัญหาที่มีโหวตสูงสุด
+                <TrophyOutlined /> {t("5 ปัญหาที่มีโหวตสูงสุด")}
               </Title>
             </div>
             <Tag>TOP 5</Tag>
@@ -356,8 +364,8 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
             dataSource={result?.top || []}
             locale={{
               emptyText: municipal
-                ? "ยังไม่มีปัญหาที่ได้รับโหวตในเทศบาล"
-                : "ยังไม่มีปัญหาที่ได้รับโหวตในระยะ 5 กม.",
+                ? t("ยังไม่มีปัญหาที่ได้รับโหวตในเทศบาล")
+                : t("ยังไม่มีปัญหาที่ได้รับโหวตในระยะ 5 กม."),
             }}
             renderItem={(item: D, index: number) => (
               <List.Item className="ranking-row">
@@ -381,8 +389,12 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
       </div>
       <section className="community-all-results">
         <div className="row-title">
-          <Title level={4}>{municipal ? "เรื่องแจ้งทั้งหมด" : "เรื่องแจ้งรอบจุดที่เลือก"}</Title>
-          <Tag color="green">{result?.total ?? "—"} เรื่อง</Tag>
+          <Title level={4}>
+            {municipal ? t("เรื่องแจ้งทั้งหมด") : t("เรื่องแจ้งรอบจุดที่เลือก")}
+          </Title>
+          <Tag color="green">
+            {result?.total ?? "—"} {t("เรื่อง")}
+          </Tag>
         </div>
         <List
           loading={busy}
@@ -392,8 +404,8 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
               <Empty
                 description={
                   municipal
-                    ? "ยังไม่มีเรื่องในเทศบาลสำหรับประเภทปัญหาที่เลือก"
-                    : "ยังไม่มีปัญหาในระยะนี้ ลองเปลี่ยนพื้นที่ค้นหาด้านบน"
+                    ? t("ยังไม่มีเรื่องในเทศบาลสำหรับประเภทปัญหาที่เลือก")
+                    : t("ยังไม่มีปัญหาในระยะนี้ ลองเปลี่ยนพื้นที่ค้นหาด้านบน")
                 }
               />
             ),

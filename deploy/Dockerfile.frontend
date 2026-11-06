@@ -3,6 +3,8 @@ WORKDIR /app
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
+ARG VITE_ENABLE_UAT_TOOLS=false
+ENV VITE_ENABLE_UAT_TOOLS=$VITE_ENABLE_UAT_TOOLS
 RUN npm run build
 FROM nginx:stable-alpine
 COPY --chmod=755 deploy/40-trusted-proxy.sh /docker-entrypoint.d/40-trusted-proxy.sh

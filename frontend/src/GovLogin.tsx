@@ -1,7 +1,8 @@
+import { useI18n } from "./i18n/useI18n";
 import { useRef, useState } from "react";
 import { Alert, Button, Space } from "antd";
 import { SafetyCertificateOutlined } from "@ant-design/icons";
-import { post, refreshCsrf } from "./api";
+import { AuthUnavailableError, post, refreshCsrf } from "./api";
 import { govLineLogin, useGovConfig } from "./govSso";
 export default function GovLogin({
   link = false,
@@ -14,7 +15,9 @@ export default function GovLogin({
   disabled?: boolean;
   onBusyChange?: (busy: boolean) => void;
 }) {
-  const { config, error: loadError } = useGovConfig();
+  const { t } = useI18n();
+  const { config, error: loadError, errorDetail: loadErrorDetail } = useGovConfig();
+  const [errorDetail, setErrorDetail] = useState("");
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const starting = useRef(false);
@@ -23,7 +26,8 @@ export default function GovLogin({
       <Alert
         type="warning"
         showIcon
-        message={loadError || "ยังไม่ได้ตั้งค่า Gov Center SSO ครบถ้วน"}
+        message={t(loadError || "ยังไม่ได้ตั้งค่า Gov Center SSO ครบถ้วน")}
+        description={loadErrorDetail || undefined}
       />
     ) : null;
   async function start() {
@@ -32,12 +36,14 @@ export default function GovLogin({
     setBusy(true);
     onBusyChange?.(true);
     setError("");
+    setErrorDetail("");
     try {
       await refreshCsrf();
       const { url, state } = govLineLogin(config!);
       await post("/auth/gov/start", { state, purpose: link ? "LINK" : "LOGIN" });
       window.location.assign(url);
     } catch (e) {
+      setErrorDetail(e instanceof AuthUnavailableError ? e.detail : "");
       setError((e as Error).message);
       starting.current = false;
       setBusy(false);
@@ -47,7 +53,7 @@ export default function GovLogin({
   return (
     <Space direction="vertical" style={{ width: link ? "auto" : "100%", marginTop: 0 }}>
       <Button
-        aria-label={link ? "เชื่อมบัญชี Gov Center" : "เข้าสู่ระบบด้วย LINE"}
+        aria-label={link ? t("เชื่อมบัญชี Gov Center") : t("เข้าสู่ระบบด้วย LINE")}
         block={!link}
         disabled={disabled || busy}
         className={link ? undefined : "gov-line-login"}
@@ -79,9 +85,11 @@ export default function GovLogin({
         loading={busy}
         onClick={() => void start()}
       >
-        {link ? "เชื่อมบัญชี Gov Center" : "เข้าสู่ระบบด้วย LINE"}
+        {link ? t("เชื่อมบัญชี Gov Center") : t("เข้าสู่ระบบด้วย LINE")}
       </Button>
-      {error && <Alert type="error" showIcon message={error} />}
+      {error && (
+        <Alert type="error" showIcon message={t(error)} description={errorDetail || undefined} />
+      )}
     </Space>
   );
 }

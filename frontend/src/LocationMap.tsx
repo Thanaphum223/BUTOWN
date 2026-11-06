@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n/useI18n";
 import { govTokens } from "./govTheme";
 import { Alert, Spin } from "antd";
 import { api } from "./api";
@@ -25,6 +26,7 @@ export function LeafletLocationMap({
   radiusMeters,
   fitPoints,
 }: LocationMapProps) {
+  const { language, t } = useI18n();
   const el = useRef<HTMLDivElement>(null),
     map = useRef<L.Map | null>(null),
     radius = useRef<L.Circle | null>(null),
@@ -62,6 +64,17 @@ export function LeafletLocationMap({
       map.current = null;
     };
   }, []);
+  useEffect(() => {
+    const container = map.current?.getContainer();
+    for (const [selector, label] of [
+      [".leaflet-control-zoom-in", t("ซูมเข้า")],
+      [".leaflet-control-zoom-out", t("ซูมออก")],
+    ]) {
+      const control = container?.querySelector(selector);
+      control?.setAttribute("title", label);
+      control?.setAttribute("aria-label", label);
+    }
+  }, [language]);
   useEffect(() => {
     if (!map.current) return;
     marker.current?.remove();
@@ -120,7 +133,7 @@ export function LeafletLocationMap({
           : item.status === "NEW"
             ? "#b76a0a"
             : "#2874a6";
-      icon.setAttribute("aria-label", name || "ปัญหาที่แจ้ง");
+      icon.setAttribute("aria-label", name || t("ปัญหาที่แจ้ง"));
       const dot = item.categoryName
         ? L.marker([Number(item.latitude), Number(item.longitude)], {
             icon: L.divIcon({
@@ -153,11 +166,11 @@ export function LeafletLocationMap({
     return () => {
       layer.remove();
     };
-  }, [points, fitPoints]);
+  }, [points, fitPoints, language]);
   return (
     <div
       role="region"
-      aria-label="แผนที่ตำแหน่งปัญหา"
+      aria-label={t("แผนที่ตำแหน่งปัญหา")}
       ref={el}
       className="location-map"
       style={{ height: 280, borderRadius: 12, margin: "12px 0" }}
@@ -168,6 +181,7 @@ export function LeafletLocationMap({
 const MapboxMap = lazy(() => import("./MapboxLocationMap"));
 let configuration: Promise<{ provider: string; publicToken: string }> | undefined;
 export default function LocationMap(props: LocationMapProps) {
+  const { t } = useI18n();
   const [config, setConfig] = useState<{ provider: string; publicToken: string }>();
   const [error, setError] = useState(false);
   useEffect(() => {
@@ -185,7 +199,8 @@ export default function LocationMap(props: LocationMapProps) {
       active = false;
     };
   }, []);
-  if (error) return <Alert type="warning" message="โหลดการตั้งค่าแผนที่ไม่สำเร็จ กรุณาลองใหม่" />;
+  if (error)
+    return <Alert type="warning" message={t("โหลดการตั้งค่าแผนที่ไม่สำเร็จ กรุณาลองใหม่")} />;
   if (!config) return <Spin />;
   return config.provider === "mapbox" ? (
     <Suspense fallback={<Spin />}>
