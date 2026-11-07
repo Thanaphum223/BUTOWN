@@ -26,20 +26,21 @@ async function authBoundary(page: Page, signedIn = false) {
 }
 
 for (const mode of ["login", "register"] as const) {
-  test(`${mode} draft survives language changes and language persists after reload`, async ({
+  test(`${mode} draft uses the stored language and language persists after reload`, async ({
     page,
   }) => {
     await authBoundary(page);
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "เข้าสู่ระบบ", exact: true })).toBeVisible();
+    await page.evaluate(() => localStorage.setItem("towntrack.language", "en"));
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
     if (mode === "register") {
-      await page.getByRole("button", { name: "สมัครสมาชิก", exact: true }).click();
-      await page.getByLabel("ชื่อ-นามสกุล", { exact: true }).fill("ชื่อร่างที่ผู้ใช้กรอก");
-      await page.getByLabel("ยืนยันรหัสผ่าน", { exact: true }).fill("Draft-password-123");
+      await page.getByRole("button", { name: "Create account", exact: true }).click();
+      await page.getByLabel("Full name", { exact: true }).fill("ชื่อร่างที่ผู้ใช้กรอก");
+      await page.getByLabel("Confirm password", { exact: true }).fill("Draft-password-123");
     }
-    await page.getByLabel("อีเมล", { exact: true }).fill("draft@example.test");
-    await page.getByLabel("รหัสผ่าน", { exact: true }).fill("Draft-password-123");
-    await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
+    await page.getByLabel("Email", { exact: true }).fill("draft@example.test");
+    await page.getByLabel("Password", { exact: true }).fill("Draft-password-123");
     await expect(
       page.getByRole("heading", {
         name: mode === "register" ? "Create account" : "Sign in",
@@ -60,15 +61,12 @@ for (const mode of ["login", "register"] as const) {
     expect(await page.evaluate(() => localStorage.getItem("towntrack.language"))).toBe("en");
     await page.reload();
     await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
-    await expect(page.getByRole("combobox", { name: "Language / ภาษา", exact: true })).toHaveValue(
-      "en",
-    );
-    await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("th");
-    await expect(page.getByRole("heading", { name: "เข้าสู่ระบบ", exact: true })).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    expect(await page.evaluate(() => localStorage.getItem("towntrack.language"))).toBe("en");
   });
 }
 
-test("blocked storage still allows switching and keeps an unsent draft", async ({ page }) => {
+test("blocked storage still allows an unsent authentication draft", async ({ page }) => {
   await page.addInitScript(() => {
     Storage.prototype.getItem = () => {
       throw new DOMException("blocked", "SecurityError");
@@ -80,12 +78,13 @@ test("blocked storage still allows switching and keeps an unsent draft", async (
   await authBoundary(page);
   await page.goto("/");
   await page.getByLabel("อีเมล", { exact: true }).fill("memory@example.test");
-  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
-  await expect(page.getByLabel("Email", { exact: true })).toHaveValue("memory@example.test");
-  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await page.getByLabel("รหัสผ่าน", { exact: true }).fill("Memory-password-123");
+  await expect(page.getByLabel("อีเมล", { exact: true })).toHaveValue("memory@example.test");
+  await expect(page.getByLabel("รหัสผ่าน", { exact: true })).toHaveValue("Memory-password-123");
+  await expect(page.locator("html")).toHaveAttribute("lang", "th");
 });
 
-test("privacy chrome switches while the original policy and account name remain intact", async ({
+test("privacy uses the stored language while the original policy and account name remain intact", async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem("towntrack.language", "en"));
@@ -100,26 +99,47 @@ test("privacy chrome switches while the original policy and account name remain 
   await expect(page.getByText("Hello, ชื่อบัญชีเดิม", { exact: true })).toBeVisible();
 });
 
-test("visible validation errors follow language changes without clearing the draft", async ({
-  page,
-}) => {
-  await authBoundary(page);
-  await page.goto("/");
-  await page.getByRole("button", { name: "สมัครสมาชิก", exact: true }).click();
-  await page.getByLabel("ชื่อ-นามสกุล", { exact: true }).fill("ร่างตรวจสอบ");
-  await page.getByLabel("อีเมล", { exact: true }).fill("draft@example.test");
-  await page.getByLabel("รหัสผ่าน", { exact: true }).fill("Draft-password-123");
-  await page.getByLabel("ยืนยันรหัสผ่าน", { exact: true }).fill("Different-password");
-  await page.getByRole("button", { name: "สมัครและเข้าสู่ระบบ", exact: true }).click();
-  await expect(page.getByText("รหัสผ่านไม่ตรงกัน", { exact: true })).toBeVisible();
-  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
-  await expect(page.getByText("Passwords do not match", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Confirm password", { exact: true })).toHaveValue(
-    "Different-password",
-  );
-  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("th");
-  await expect(page.getByText("รหัสผ่านไม่ตรงกัน", { exact: true })).toBeVisible();
-});
+for (const language of ["th", "en"]) {
+  test(`validation errors use stored ${language} without clearing the draft`, async ({ page }) => {
+    const en = language === "en";
+    await page.addInitScript(
+      (language) => localStorage.setItem("towntrack.language", language),
+      language,
+    );
+    await authBoundary(page);
+    await page.goto("/");
+    await page
+      .getByRole("button", { name: en ? "Create account" : "สมัครสมาชิก", exact: true })
+      .click();
+    await page.getByLabel(en ? "Full name" : "ชื่อ-นามสกุล", { exact: true }).fill("ร่างตรวจสอบ");
+    await page.getByLabel(en ? "Email" : "อีเมล", { exact: true }).fill("draft@example.test");
+    await page.getByLabel(en ? "Password" : "รหัสผ่าน", { exact: true }).fill("Draft-password-123");
+    await page
+      .getByLabel(en ? "Confirm password" : "ยืนยันรหัสผ่าน", { exact: true })
+      .fill("Different-password");
+    await page
+      .getByRole("button", {
+        name: en ? "Create account and sign in" : "สมัครและเข้าสู่ระบบ",
+        exact: true,
+      })
+      .click();
+    await expect(
+      page.getByText(en ? "Passwords do not match" : "รหัสผ่านไม่ตรงกัน", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByLabel(en ? "Full name" : "ชื่อ-นามสกุล", { exact: true })).toHaveValue(
+      "ร่างตรวจสอบ",
+    );
+    await expect(page.getByLabel(en ? "Email" : "อีเมล", { exact: true })).toHaveValue(
+      "draft@example.test",
+    );
+    await expect(page.getByLabel(en ? "Password" : "รหัสผ่าน", { exact: true })).toHaveValue(
+      "Draft-password-123",
+    );
+    await expect(
+      page.getByLabel(en ? "Confirm password" : "ยืนยันรหัสผ่าน", { exact: true }),
+    ).toHaveValue("Different-password");
+  });
+}
 
 test("profile follows header language while preserving original profile and residence data", async ({
   page,

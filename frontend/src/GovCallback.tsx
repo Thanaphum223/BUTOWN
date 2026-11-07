@@ -1,4 +1,3 @@
-import LanguageSwitcher from "./LanguageSwitcher";
 import { useI18n } from "./i18n/useI18n";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Card, Spin, Typography } from "antd";
@@ -43,7 +42,6 @@ export default function GovCallback({ returned }: { returned: GovCallbackReturn 
   return (
     <main className="content" style={{ maxWidth: 520, margin: "10vh auto" }}>
       <Card>
-        <LanguageSwitcher />
         <Typography.Title level={3}>{t("ยืนยันตัวตนกับ Gov Center")}</Typography.Title>
         {error || loadError ? (
           <>

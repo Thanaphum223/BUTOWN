@@ -283,19 +283,20 @@ test("administrator switches to municipal reviewers without a department prompt"
   page,
 }) => {
   await setup(page);
+  let activeSession = {
+    id: "admin",
+    username: "iam_admin",
+    display_name: "ผู้ดูแล",
+    role: "ADMIN",
+    account_role: "ADMIN",
+    department_id: "engineering" as string | null,
+  };
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: activeSession }));
   await page.route("**/api/auth/admin-role", async (route) => {
     const body = route.request().postDataJSON();
     expect(body.departmentId).toBeNull();
-    await route.fulfill({
-      json: {
-        id: "admin",
-        username: "iam_admin",
-        display_name: "ผู้ดูแล",
-        role: body.role,
-        account_role: "ADMIN",
-        department_id: null,
-      },
-    });
+    activeSession = { ...activeSession, role: body.role, department_id: null };
+    await route.fulfill({ json: activeSession });
   });
   for (const label of [
     "เจ้าหน้าที่ส่วนกลาง (สำนักปลัด/ศูนย์รับเรื่องราวร้องทุกข์)",
@@ -309,6 +310,8 @@ test("administrator switches to municipal reviewers without a department prompt"
     await expect(
       page.getByRole("combobox", { name: "หน่วยงานสำหรับบทบาท", exact: true }),
     ).not.toBeVisible();
+    await expect(page.locator(".header-identity small")).toContainText(label);
+    await page.reload();
     await expect(page.locator(".header-identity small")).toContainText(label);
   }
 });

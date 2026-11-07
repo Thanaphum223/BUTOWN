@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-test("authentication has one language control and no simulation tools before or after login", async ({
+test("authentication keeps the language control in the authenticated header and has no simulation tools", async ({
   page,
 }) => {
   let signedIn = false;
@@ -22,7 +22,7 @@ test("authentication has one language control and no simulation tools before or 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "เข้าสู่ระบบ", exact: true })).toBeVisible();
   await expect(page.locator(".uat-auth-tools, .uat-auth-host")).toHaveCount(0);
-  await expect(page.locator(".language-switcher")).toHaveCount(1);
+  await expect(page.locator(".language-switcher")).toHaveCount(0);
   signedIn = true;
   await page.reload();
   await expect(page.getByText("Normal person", { exact: true })).toBeVisible();

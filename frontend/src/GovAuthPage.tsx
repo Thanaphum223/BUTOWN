@@ -1,5 +1,4 @@
 import GovAuthBadge from "./GovAuthBadge";
-import LanguageSwitcher from "./LanguageSwitcher";
 import { useI18n } from "./i18n/useI18n";
 import { useState } from "react";
 import { Alert, Card, ConfigProvider, Divider, Typography } from "antd";
@@ -41,7 +40,6 @@ export default function GovAuthPage({
           )}
           <GovAuthBadge />
           <header className="auth-heading">
-            <LanguageSwitcher />
             <Typography.Title level={1}>
               {register ? t("สมัครสมาชิก") : t("เข้าสู่ระบบ")}
             </Typography.Title>

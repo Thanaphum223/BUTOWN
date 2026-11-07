@@ -1,4 +1,3 @@
-import LanguageSwitcher from "./LanguageSwitcher";
 import { useI18n } from "./i18n/useI18n";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Modal, Spin, Typography } from "antd";
@@ -39,7 +38,6 @@ export default function PrivacyGate({
   if (!notice?.acknowledged)
     return (
       <Modal open closable={false} title={t("ประกาศคุ้มครองข้อมูลส่วนบุคคล")} footer={null}>
-        <LanguageSwitcher />
         {error ? (
           <Alert
             type="error"

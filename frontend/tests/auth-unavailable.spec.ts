@@ -161,32 +161,28 @@ test("citizen page and requests remain usable with the genuine Gov profile", asy
 test("authentication preparation stays busy through CSRF and real login 503 denies access", async ({
   page,
 }) => {
+  await page.addInitScript(() => localStorage.setItem("towntrack.language", "en"));
   const seen = await authBoundary(page);
   seen.csrfPending = true;
   seen.auth503 = true;
   await page.goto("/");
-  await page.getByLabel("อีเมล", { exact: true }).fill("synthetic@example.test");
-  await page.getByLabel("รหัสผ่าน", { exact: true }).fill("synthetic-password");
-  await page.getByRole("button", { name: "เข้าสู่ระบบ", exact: true }).click();
+  await page.getByLabel("Email", { exact: true }).fill("synthetic@example.test");
+  await page.getByLabel("Password", { exact: true }).fill("synthetic-password");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   try {
-    await expect(page.getByRole("button", { name: "เข้าสู่ระบบ", exact: true })).toHaveClass(
+    await expect(page.getByRole("button", { name: "Sign in", exact: true })).toHaveClass(
       /ant-btn-loading/,
     );
   } finally {
     seen.release();
   }
-  await expect(page.getByRole("alert")).toContainText(authUnavailable);
-  await expect(page.getByRole("alert")).toContainText("รายละเอียดต้นฉบับจาก Gov");
-  await page.getByRole("combobox", { name: "Language / ภาษา" }).selectOption("en");
   await expect(page.getByRole("alert")).toContainText(
     "Central authentication is unavailable (503). Please try signing in again.",
   );
   await expect(page.getByRole("alert")).toContainText("รายละเอียดต้นฉบับจาก Gov");
-  await page.getByRole("combobox", { name: "Language / ภาษา" }).selectOption("th");
-  await expect(page.getByRole("alert")).toContainText(authUnavailable);
   await expect(page.locator(".staff-shell")).toHaveCount(0);
-  await expect(page.getByLabel("รหัสผ่าน", { exact: true })).toHaveValue("");
-  await expect(page.getByRole("button", { name: "เข้าสู่ระบบ", exact: true })).not.toHaveClass(
+  await expect(page.getByLabel("Password", { exact: true })).toHaveValue("");
+  await expect(page.getByRole("button", { name: "Sign in", exact: true })).not.toHaveClass(
     /ant-btn-loading/,
   );
 });
@@ -215,7 +211,7 @@ for (const endpoint of ["/auth/csrf", "/public/gov-auth", "/auth/me", "/auth/gov
     "ระบบยังไม่พร้อมให้บริการชั่วคราว กรุณาลองอีกครั้ง",
     "ข้อมูลเปลี่ยนแล้ว กรุณาโหลดใหม่",
   ]) {
-    test(`auth 503 original detail survives language switching: ${endpoint} / ${detail}`, async ({
+    test(`auth 503 original detail survives stored locales: ${endpoint} / ${detail}`, async ({
       page,
     }) => {
       await authBoundary(page);
@@ -223,14 +219,25 @@ for (const endpoint of ["/auth/csrf", "/public/gov-auth", "/auth/me", "/auth/gov
         route.fulfill({ status: 503, json: { message: detail } }),
       );
       await page.goto("/");
-      if (endpoint === "/auth/csrf" || endpoint === "/auth/gov/password-login") {
-        await page.getByLabel("อีเมล", { exact: true }).fill("synthetic@example.test");
-        await page.getByLabel("รหัสผ่าน", { exact: true }).fill("synthetic-password");
-        await page.getByRole("button", { name: "เข้าสู่ระบบ", exact: true }).click();
-      }
-      const alert = page.getByRole("alert").first();
       for (const language of ["th", "en", "th"]) {
-        await page.getByRole("combobox", { name: "Language / ภาษา" }).selectOption(language);
+        const en = language === "en";
+        await page.evaluate(
+          (language) => localStorage.setItem("towntrack.language", language),
+          language,
+        );
+        await page.reload();
+        if (endpoint === "/auth/csrf" || endpoint === "/auth/gov/password-login") {
+          await page
+            .getByLabel(en ? "Email" : "อีเมล", { exact: true })
+            .fill("synthetic@example.test");
+          await page
+            .getByLabel(en ? "Password" : "รหัสผ่าน", { exact: true })
+            .fill("synthetic-password");
+          await page
+            .getByRole("button", { name: en ? "Sign in" : "เข้าสู่ระบบ", exact: true })
+            .click();
+        }
+        const alert = page.getByRole("alert").first();
         await expect(alert.locator(".ant-alert-message")).toHaveText(
           language === "en"
             ? "Central authentication is unavailable (503). Please try signing in again."
