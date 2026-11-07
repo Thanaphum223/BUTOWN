@@ -1,4 +1,3 @@
-import DialogTools from "./DialogTools";
 import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
 import { useI18n } from "./i18n/useI18n";
 import { useEffect, useRef, useState } from "react";
@@ -487,7 +486,6 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
           window.scrollTo({ top: 0, behavior: "smooth" });
         }}
       >
-        <DialogTools />
         <p>{t("กรุณาตรวจสอบว่าจุดเกิดเหตุอยู่ที่สถานที่นี้ก่อนดำเนินการต่อ")}</p>
         <Text strong>{t("สถานที่ / จุดสังเกต")}</Text>
         <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>

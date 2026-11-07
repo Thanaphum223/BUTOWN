@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { waitForLoginSlot } from "./login-rate";
 
 export function accountPassword(role: string) {
@@ -31,11 +31,34 @@ export async function signIn(page: Page, role = "citizen", password = accountPas
   } else {
     await expect(
       page.getByRole("heading", {
-        name: role === "field" ? "งานลงพื้นที่ของฉัน" : "ภาพรวมการดำเนินงาน",
+        name:
+          role === "field"
+            ? "งานลงพื้นที่ของฉัน"
+            : role === "approver"
+              ? "ภาพรวมคำร้องทั้งเทศบาล"
+              : "ภาพรวมการดำเนินงาน",
         exact: true,
       }),
     ).toBeVisible();
   }
+}
+export async function signOut(page: Page) {
+  const loggedOut = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/auth/logout") && response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "ออกจากระบบ", exact: true }).click();
+  const logoutResponse = await loggedOut;
+  expect(logoutResponse.status()).toBe(204);
+  await logoutResponse.finished();
+  await expect(
+    page.locator(".auth-page").getByRole("heading", { name: "เข้าสู่ระบบ", exact: true }),
+  ).toBeVisible();
+}
+export async function waitForSettledDialog(dialog: Locator) {
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveCSS("opacity", "1");
+  await expect(dialog).toHaveCSS("transform", "none");
 }
 export async function openReport(page: Page) {
   await page.getByRole("link", { name: /แจ้งปัญหา/ }).click();

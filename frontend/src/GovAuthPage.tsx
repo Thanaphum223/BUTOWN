@@ -1,5 +1,4 @@
 import GovAuthBadge from "./GovAuthBadge";
-import UatAuthToolbar from "./UatAuthToolbar";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { useI18n } from "./i18n/useI18n";
 import { useState } from "react";
@@ -30,7 +29,6 @@ export default function GovAuthPage({
         },
       }}
     >
-      <UatAuthToolbar busy={busy} />
       <main className="auth-page">
         <Card className="auth-card">
           {authError && (

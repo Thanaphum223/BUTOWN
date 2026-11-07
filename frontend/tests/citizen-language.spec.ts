@@ -135,7 +135,7 @@ test("existing citizen validation errors switch language without resetting the r
   );
 });
 
-test("public evidence keeps source categories, filenames and recorded reasons across language changes", async ({
+test("public evidence keeps source categories, filenames and recorded reasons in both header languages", async ({
   page,
 }) => {
   await fixture(page);
@@ -178,24 +178,39 @@ test("public evidence keeps source categories, filenames and recorded reasons ac
     }),
   );
   await page.goto("/");
-  await page.getByRole("button", { name: "ดูรายละเอียด", exact: true }).click();
-  const detail = page.getByRole("dialog");
-  await switchLanguage(page, "en", detail);
-  await expect(detail).toContainText("สมัครสมาชิก");
-  await switchLanguage(page, "th", detail);
-  await detail.getByRole("button", { name: /ดูเอกสาร$/ }).click();
-  const pdf = page.getByRole("dialog", { name: "สมัครสมาชิก.pdf", exact: true });
-  await expect(pdf).toContainText("เอกสารขนาดใหญ่");
-  await switchLanguage(page, "en", pdf);
-  await expect(pdf).toContainText("This document is large.");
-  await expect(pdf.getByRole("link", { name: /Download original document$/ })).toBeVisible();
-  await pdf.getByRole("button", { name: "Close", exact: true }).click();
-  const englishDetail = page.getByRole("dialog", { name: "Problem details", exact: true });
-  await expect(englishDetail.getByRole("heading", { name: category, exact: true })).toBeVisible();
-  await expect(englishDetail.locator(".citizen-outcome-reason")).toHaveText("สมัครสมาชิก");
-  await expect(englishDetail).toContainText("สมัครสมาชิก.pdf");
-  await expect(englishDetail).toContainText("Reason for denial and termination");
-  await expect(englishDetail).toContainText("Terminated");
+  for (const language of ["th", "en"]) {
+    await switchLanguage(page, language);
+    await page
+      .getByRole("button", {
+        name: language === "th" ? "ดูรายละเอียด" : "View details",
+        exact: true,
+      })
+      .click();
+    const detail = page.getByRole("dialog");
+    await expect(detail.locator(".language-switcher")).toHaveCount(0);
+    await expect(detail.getByRole("heading", { name: category, exact: true })).toBeVisible();
+    await expect(detail.locator(".citizen-outcome-reason")).toHaveText("สมัครสมาชิก");
+    await expect(detail).toContainText(
+      language === "th" ? "เหตุผลที่ไม่อนุมัติและยุติเรื่อง" : "Reason for denial and termination",
+    );
+    await expect(detail).toContainText(language === "th" ? "ยุติเรื่องตามผลพิจารณา" : "Terminated");
+    await detail
+      .getByRole("button", { name: language === "th" ? /ดูเอกสาร$/ : /View document$/ })
+      .click();
+    const pdf = page.getByRole("dialog", { name: "สมัครสมาชิก.pdf", exact: true });
+    await expect(pdf.locator(".language-switcher")).toHaveCount(0);
+    await expect(pdf).toContainText(
+      language === "th" ? "เอกสารขนาดใหญ่" : "This document is large.",
+    );
+    await expect(
+      pdf.getByRole("link", {
+        name: language === "th" ? /ดาวน์โหลดเอกสารต้นฉบับ$/ : /Download original document$/,
+      }),
+    ).toHaveAttribute("href", "/api/media/evidence-pdf");
+    await pdf.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(detail).toContainText("สมัครสมาชิก.pdf");
+    await detail.getByRole("button", { name: "Close", exact: true }).click();
+  }
 });
 
 test("emergency links and Leaflet zoom controls follow language without changing the chosen point", async ({

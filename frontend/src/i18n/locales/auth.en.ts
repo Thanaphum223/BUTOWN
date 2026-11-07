@@ -68,18 +68,6 @@ const messages: Record<string, string> = {
     "Authenticated account · Gov Center · Central Gov Auth RBAC",
   "สิทธิ์ใน TownTrack อาจปรับโดยผู้ดูแลระบบ ข้อมูลเซสชันนี้ไม่ได้ยืนยันว่าตรวจสิทธิ์กับ Gov ทุกคำขอ":
     "TownTrack administrators may adjust local permissions. This session does not establish a Gov permission check for every request.",
-  "จำลอง / UAT": "Simulation / UAT",
-  "จำลองสถานะ Gov กลางขัดข้อง (Test Fail-Closed 503)":
-    "Simulate central Gov outage (Test Fail-Closed 503)",
-  รอการบันทึกหรืออัปโหลดให้เสร็จก่อนเริ่มจำลอง:
-    "Wait for the save or upload to finish before starting simulation.",
-  "ไม่สามารถเชื่อมต่อระบบยืนยันตัวตนส่วนกลางได้ เพื่อความปลอดภัยระบบจึงระงับการทำงานชั่วคราว (503 Service Unavailable - Fail-Closed)":
-    "Unable to connect to central authentication. Operations are temporarily suspended for security (503 Service Unavailable - Fail-Closed)",
-  "เป็นการจำลองฝั่ง UI เท่านั้น ไม่ใช่หลักฐานว่า HTTP response ของ Gov เปลี่ยนเป็น 503 จริง":
-    "This is a client UI simulation only. It is not evidence that Gov actually returned an HTTP 503 response.",
-  คืนการเชื่อมต่อปกติ: "Restore normal connection",
-  "จำลอง / UAT: ระงับคำขอใหม่ชั่วคราว กรุณาคืนการเชื่อมต่อปกติ":
-    "Simulation / UAT: New requests are suspended. Restore normal connection to continue.",
   "ระบบยืนยันตัวตนส่วนกลางไม่พร้อมให้บริการ (503) กรุณาลองเข้าสู่ระบบอีกครั้ง":
     "Central authentication is unavailable (503). Please try signing in again.",
 };

@@ -78,26 +78,42 @@ for (const width of [390, 768, 1280])
     });
   }
 
-test("location confirmation language switch is hitable and preserves the chosen point and source address", async ({
-  page,
-}) => {
-  await fixture(page, "CITIZEN");
-  await page.getByRole("link", { name: /แจ้งปัญหา/ }).click();
-  await page.locator("summary").filter({ hasText: "ดูหรือแก้ไขพิกัด GPS" }).click();
-  await page.getByRole("spinbutton", { name: "ละติจูด", exact: true }).fill("13.752");
-  await page.getByRole("spinbutton", { name: "ลองจิจูด", exact: true }).fill("100.502");
-  await page.getByLabel("สถานที่ / จุดสังเกต", { exact: true }).fill("Original landmark");
-  await page.getByRole("button", { name: "ถัดไป", exact: true }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("Original landmark");
-  await expect(dialog.getByRole("button", { name: /UAT/ })).toHaveCount(0);
-  const coordinates = await dialog.locator("p").last().textContent();
-  await switchLanguage(page, "en", dialog);
-  await expect(dialog).toContainText("Original landmark");
-  await expect(dialog.locator("p").last()).toHaveText(coordinates!);
-  await switchLanguage(page, "th", dialog);
-  await expect(dialog).toContainText("Original landmark");
-});
+for (const language of ["th", "en"]) {
+  test(`location confirmation has no language control and preserves the chosen point and address in ${language}`, async ({
+    page,
+  }) => {
+    await fixture(page, "CITIZEN");
+    await page.getByRole("link", { name: /แจ้งปัญหา/ }).click();
+    await page.locator("summary").filter({ hasText: "ดูหรือแก้ไขพิกัด GPS" }).click();
+    await page.getByRole("spinbutton", { name: "ละติจูด", exact: true }).fill("13.752");
+    await page.getByRole("spinbutton", { name: "ลองจิจูด", exact: true }).fill("100.502");
+    await page.getByLabel("สถานที่ / จุดสังเกต", { exact: true }).fill("Original landmark");
+    await switchLanguage(page, language);
+    await page
+      .getByRole("button", { name: language === "th" ? "ถัดไป" : "Next", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.locator(".language-switcher")).toHaveCount(0);
+    // Ant Design retains the dismissed standalone privacy gate in hidden DOM.
+    await expect(page.locator(".topbar .language-switcher")).toHaveCount(1);
+    await expect(dialog).toContainText("Original landmark");
+    await expect(dialog).toContainText("13.752");
+    await expect(dialog).toContainText("100.502");
+    await expect(dialog.getByRole("button", { name: /UAT/ })).toHaveCount(0);
+    await dialog
+      .getByRole("button", {
+        name: language === "th" ? "ยืนยันตำแหน่ง" : "Confirm location",
+        exact: true,
+      })
+      .click();
+    await expect(
+      page.getByRole("heading", {
+        name: language === "th" ? "รายละเอียดปัญหา" : "Problem details",
+        exact: true,
+      }),
+    ).toBeVisible();
+  });
+}
 
 test("password error uses the known local translation and preserves unknown server text exactly", async ({
   page,
@@ -145,102 +161,125 @@ test("known local access error follows language without changing server detail",
   );
 });
 
-test("team creation language control preserves typed team and member selection without reopening", async ({
-  page,
-}) => {
-  await fixture(page, "LEADER");
-  await page.route("**/api/people?role=FIELD", (route) =>
-    route.fulfill({ json: [{ id: "field-original", display_name: "Original member" }] }),
-  );
-  await page.getByRole("menuitem", { name: /ทีมลงพื้นที่$/ }).click();
-  await page.getByRole("button", { name: "สร้างทีม", exact: true }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("ชื่อทีม", { exact: true }).fill("Original team draft");
-  await dialog.getByLabel("สมาชิกทีม", { exact: true }).click();
-  await page.getByText("Original member", { exact: true }).click();
-  await page.keyboard.press("Escape");
-  await switchLanguage(page, "en", dialog);
-  await expect(dialog.getByLabel("Team name", { exact: true })).toHaveValue("Original team draft");
-  await expect(dialog.locator(".ant-select-selection-item")).toContainText("Original member");
-  await switchLanguage(page, "th", dialog);
-  await expect(dialog.getByLabel("ชื่อทีม", { exact: true })).toHaveValue("Original team draft");
-});
-
-for (const stage of ["module-loading", "reader-loading", "module-failure"] as const) {
-  test(`PDF ${stage} overlay exposes its own language control and preserves the source file`, async ({
+for (const language of ["th", "en"]) {
+  test(`team creation uses header language and preserves team and member drafts in ${language}`, async ({
     page,
   }) => {
-    await fixture(page, "CITIZEN");
-    const complaint = {
-      id: "pdf-case",
-      category_name: "Original category",
-      status: "NEW",
-      created_at: "2026-11-01T00:00:00Z",
-      votes: 0,
-    };
-    await page.route("**/api/community/complaints?**", (route) =>
-      route.fulfill({ json: { items: [complaint], top: [], total: 1, stats: {} } }),
+    await fixture(page, "LEADER");
+    await page.route("**/api/people?role=FIELD", (route) =>
+      route.fulfill({ json: [{ id: "field-original", display_name: "Original member" }] }),
     );
-    await page.route("**/api/community/complaints/pdf-case", (route) =>
-      route.fulfill({
-        json: {
-          complaint,
-          history: [],
-          media: [
-            {
-              id: "pdf-file",
-              original_name: "Original file.pdf",
-              content_type: "application/pdf",
-              size_bytes: 100,
-            },
-          ],
-        },
-      }),
-    );
-    let release!: () => void;
-    const pending = new Promise<void>((resolve) => (release = resolve));
-    if (stage.startsWith("module")) {
-      await page.route("**/src/PdfPreview.tsx*", async (route) => {
-        if (stage === "module-failure") return route.abort();
-        await pending;
-        await route.continue();
-      });
-    } else {
-      await page.route("**/api/media/pdf-file", async (route) => {
-        await pending;
-        await route.fulfill({ status: 403, json: {} });
-      });
-    }
-    await page.reload();
-    await page.getByRole("button", { name: "ดูรายละเอียด", exact: true }).click();
+    await page.getByRole("menuitem", { name: /ทีมลงพื้นที่$/ }).click();
+    await switchLanguage(page, language);
     await page
-      .getByRole("dialog")
-      .getByRole("button", { name: /ดูเอกสาร$/ })
+      .getByRole("button", { name: language === "th" ? "สร้างทีม" : "Create team", exact: true })
       .click();
-    const overlay = page.getByRole("dialog").last();
-    try {
-      if (stage === "reader-loading")
+    const dialog = page.getByRole("dialog");
+    const teamName = dialog.getByLabel(language === "th" ? "ชื่อทีม" : "Team name", {
+      exact: true,
+    });
+    await teamName.fill("Original team draft");
+    await dialog
+      .getByLabel(language === "th" ? "สมาชิกทีม" : "Team members", { exact: true })
+      .click();
+    await page.getByText("Original member", { exact: true }).click();
+    await page.keyboard.press("Escape");
+    await expect(dialog.locator(".language-switcher")).toHaveCount(0);
+    await expect(teamName).toHaveValue("Original team draft");
+    await expect(dialog.locator(".ant-select-selection-item")).toContainText("Original member");
+  });
+}
+
+for (const language of ["th", "en"])
+  for (const stage of ["module-loading", "reader-loading", "module-failure"] as const) {
+    test(`PDF ${stage} overlay uses header language ${language} and preserves the source file`, async ({
+      page,
+    }) => {
+      await fixture(page, "CITIZEN");
+      const complaint = {
+        id: "pdf-case",
+        category_name: "Original category",
+        status: "NEW",
+        created_at: "2026-11-01T00:00:00Z",
+        votes: 0,
+      };
+      await page.route("**/api/community/complaints?**", (route) =>
+        route.fulfill({ json: { items: [complaint], top: [], total: 1, stats: {} } }),
+      );
+      await page.route("**/api/community/complaints/pdf-case", (route) =>
+        route.fulfill({
+          json: {
+            complaint,
+            history: [],
+            media: [
+              {
+                id: "pdf-file",
+                original_name: "Original file.pdf",
+                content_type: "application/pdf",
+                size_bytes: 100,
+              },
+            ],
+          },
+        }),
+      );
+      let release!: () => void;
+      const pending = new Promise<void>((resolve) => (release = resolve));
+      if (stage.startsWith("module")) {
+        await page.route("**/src/PdfPreview.tsx*", async (route) => {
+          if (stage === "module-failure") return route.abort();
+          await pending;
+          await route.continue();
+        });
+      } else {
+        await page.route("**/api/media/pdf-file", async (route) => {
+          await pending;
+          await route.fulfill({ status: 403, json: {} });
+        });
+      }
+      await page.reload();
+      await switchLanguage(page, language);
+      await page
+        .getByRole("button", {
+          name: language === "th" ? "ดูรายละเอียด" : "View details",
+          exact: true,
+        })
+        .click();
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: language === "th" ? /ดูเอกสาร$/ : /View document$/ })
+        .click();
+      const overlay = page.getByRole("dialog").last();
+      try {
+        if (stage === "reader-loading")
+          await expect(
+            page.getByRole("dialog", { name: "Original file.pdf", exact: true }),
+          ).toBeVisible();
+        await expect(overlay.locator(".language-switcher")).toHaveCount(0);
+        // Ant Design retains the dismissed standalone privacy gate in hidden DOM.
+        await expect(page.locator(".topbar .language-switcher")).toHaveCount(1);
+        if (stage === "module-failure")
+          await expect(overlay).toContainText(
+            language === "th"
+              ? "เปิดโปรแกรมอ่านเอกสารไม่ได้"
+              : "Could not open the document reader",
+          );
+        else
+          await expect(overlay).toContainText(
+            language === "th" ? "กำลังเปิดเอกสาร" : "Opening document",
+          );
+      } finally {
+        release();
+      }
+      if (stage !== "module-failure")
         await expect(
           page.getByRole("dialog", { name: "Original file.pdf", exact: true }),
         ).toBeVisible();
-      if (stage === "module-failure")
-        await expect(overlay).toContainText("เปิดโปรแกรมอ่านเอกสารไม่ได้");
-      else await expect(overlay).toContainText("กำลังเปิดเอกสาร");
-      await switchLanguage(page, "en", overlay);
-      if (stage === "module-failure")
-        await expect(overlay).toContainText("Could not open the document reader");
-      else await expect(overlay).toContainText("Opening document");
-    } finally {
-      release();
-    }
-    if (stage !== "module-failure")
-      await expect(
-        page.getByRole("dialog", { name: "Original file.pdf", exact: true }),
-      ).toBeVisible();
-    const download = page
-      .getByRole("dialog")
-      .last()
-      .getByRole("link", { name: /Download original document$/ });
-    await expect(download).toHaveAttribute("href", "/api/media/pdf-file");
-  });
-}
+      const download = page
+        .getByRole("dialog")
+        .last()
+        .getByRole("link", {
+          name: language === "th" ? /ดาวน์โหลดเอกสารต้นฉบับ$/ : /Download original document$/,
+        });
+      await expect(download).toHaveAttribute("href", "/api/media/pdf-file");
+    });
+  }

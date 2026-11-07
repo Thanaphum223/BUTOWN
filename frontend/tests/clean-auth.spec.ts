@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
-test("normal build defaults to no simulation tools before or after login", async ({ page }) => {
+test("authentication has one language control and no simulation tools before or after login", async ({
+  page,
+}) => {
   let signedIn = false;
   await page.route("**/api/**", (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -19,9 +21,11 @@ test("normal build defaults to no simulation tools before or after login", async
   });
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "เข้าสู่ระบบ", exact: true })).toBeVisible();
-  await expect(page.locator(".uat-auth-tools")).toHaveCount(0);
+  await expect(page.locator(".uat-auth-tools, .uat-auth-host")).toHaveCount(0);
+  await expect(page.locator(".language-switcher")).toHaveCount(1);
   signedIn = true;
   await page.reload();
   await expect(page.getByText("Normal person", { exact: true })).toBeVisible();
-  await expect(page.locator(".uat-auth-tools")).toHaveCount(0);
+  await expect(page.locator(".uat-auth-tools, .uat-auth-host")).toHaveCount(0);
+  await expect(page.locator(".language-switcher")).toHaveCount(1);
 });

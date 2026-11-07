@@ -3402,84 +3402,6 @@ button.queue-item .queue-item-top .ant-tag {
   margin-bottom: 16px;
   border-radius: 8px;
 }
-.uat-auth-host:popover-open {
-  position: fixed;
-  inset: auto 12px 12px auto;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  width: min(460px, calc(100vw - 24px));
-  max-height: calc(100dvh - 24px);
-  overflow: auto;
-}
-.uat-auth-tools {
-  background: #fff9e8;
-  color: #554218;
-  border: 1px solid #b69a4a;
-  border-radius: 10px;
-  padding: 10px 12px;
-  box-shadow: 0 3px 16px #0002;
-  font-size: 12px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-.uat-auth-control {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.uat-auth-control strong {
-  white-space: nowrap;
-}
-.uat-auth-control label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-.uat-auth-control .ant-switch {
-  flex-shrink: 0;
-}
-.uat-auth-tools.is-blocked {
-  padding: 18px;
-}
-.uat-auth-tools .ant-alert {
-  margin-top: 14px;
-}
-.uat-auth-tools small {
-  display: block;
-  margin-top: 6px;
-}
-/* Leave room to scroll bottom form controls above the always reachable UAT control. */
-body:has(.uat-auth-host:popover-open) {
-  padding-bottom: 110px;
-}
-body:has(.uat-auth-host:popover-open) .ant-modal-wrap {
-  padding-bottom: 110px;
-}
-
-[data-uat-suspended] {
-  display: none !important;
-}
-
-body:has(.uat-auth-host:popover-open) .staff-shell .split-action-dock {
-  bottom: 110px;
-}
-@media (max-width: 991px) {
-  body:has(.uat-auth-host:popover-open) .staff-shell .workspace-detail:has(.split-action-dock) {
-    padding-bottom: 260px;
-  }
-}
-
-.dialog-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
 /* Both flex items and their role labels must fit the header, including long
    municipal role names. A document-overflow check cannot detect a negative left edge. */
 .staff-shell .topbar {
@@ -3515,4 +3437,80 @@ body:has(.uat-auth-host:popover-open) .staff-shell .split-action-dock {
   min-width: 0 !important;
   max-width: 100%;
   width: 100%;
+}
+
+.approver-overview .page-heading > div:first-child {
+  max-width: 760px;
+}
+.approver-overview .overview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.approver-overview > .ant-alert {
+  margin-bottom: 20px;
+}
+.approver-overview .overview-list {
+  border-radius: 18px;
+}
+.approver-overview .overview-filters,
+.approver-overview .overview-filters .ant-select {
+  width: 100%;
+}
+.approver-overview .overview-filters {
+  margin-top: 12px;
+}
+.approver-overview .overview-scope-note {
+  display: block;
+  margin: 16px 0;
+}
+.approver-overview .overview-summaries {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.approver-overview .overview-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--gov-border-neutral);
+  border-radius: 12px;
+  padding: 18px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.approver-overview .overview-summary-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: space-between;
+  align-items: center;
+}
+.approver-overview .overview-summary h3 {
+  font-size: 17px;
+  margin: 4px 0;
+}
+.approver-overview .ant-pagination {
+  margin-top: 20px;
+}
+@media (max-width: 768px) {
+  .approver-overview .page-heading {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .approver-overview .overview-summaries {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .approver-overview .overview-list .ant-card-body {
+    padding: 16px;
+  }
+  .approver-overview .overview-list .ant-card-head {
+    padding: 0 16px;
+  }
+  .approver-overview .overview-actions .ant-btn {
+    height: auto;
+    min-height: 36px;
+    white-space: normal;
+  }
 }

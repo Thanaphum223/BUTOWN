@@ -10,23 +10,10 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  webServer: [
-    {
-      command: "npm run dev -- --port 5173 --strictPort",
-      url: "http://127.0.0.1:5173",
-      env: { VITE_ENABLE_UAT_TOOLS: "false" },
-      reuseExistingServer: true,
-    },
-    {
-      command: "npm run dev -- --port 5175 --strictPort",
-      url: "http://127.0.0.1:5175",
-      env: { VITE_ENABLE_UAT_TOOLS: "true" },
-      reuseExistingServer: false,
-    },
-  ],
-  projects: [
-    { name: "normal", testIgnore: "uat-auth.spec.ts" },
-    { name: "uat", testMatch: "uat-auth.spec.ts", use: { baseURL: "http://127.0.0.1:5175" } },
-  ],
+  webServer: {
+    command: "npm run dev -- --port 5173 --strictPort",
+    url: "http://127.0.0.1:5173",
+    reuseExistingServer: true,
+  },
   outputDir: "../work/playwright-results",
 });

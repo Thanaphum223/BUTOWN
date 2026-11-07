@@ -62,16 +62,17 @@ async function setup(page: Page, role = "FIELD") {
   return writes;
 }
 
-test("open category edit retains authored fields and stable request identifiers across language changes", async ({
+test("category edit uses header language and retains authored fields and stable request identifiers", async ({
   page,
 }) => {
   const writes = await setup(page);
   await page.getByRole("tab", { name: "ประเภทปัญหา / แบบฟอร์ม / SLA", exact: true }).click();
-  await page.getByRole("button", { name: "แก้ไข", exact: true }).click();
+  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("ชื่อ", { exact: true }).fill("ร่างต้นฉบับ");
-  await dialog.getByLabel("ชื่อช่องข้อมูล", { exact: true }).fill("บันทึก");
-  await dialog.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
+  await dialog.getByLabel("Name", { exact: true }).fill("ร่างต้นฉบับ");
+  await dialog.getByLabel("Field label", { exact: true }).fill("บันทึก");
+  await expect(dialog.locator(".language-switcher")).toHaveCount(0);
   await expect(dialog).toContainText("System settings");
   await expect(dialog.getByLabel("Name", { exact: true })).toHaveValue("ร่างต้นฉบับ");
   await expect(dialog.getByLabel("Field label", { exact: true })).toHaveValue("บันทึก");
@@ -103,9 +104,10 @@ test("role edit keeps stable role keys and original account names", async ({ pag
   const row = page
     .getByRole("row")
     .filter({ has: page.getByRole("cell", { name: "original", exact: true }) });
-  await row.getByRole("button", { name: "กำหนดบทบาท", exact: true }).click();
+  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
+  await row.getByRole("button", { name: "Assign role", exact: true }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
+  await expect(dialog.locator(".language-switcher")).toHaveCount(0);
   await expect(dialog).toContainText("บันทึก");
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect(dialog).not.toBeVisible();
@@ -123,14 +125,18 @@ for (const width of [390, 768, 1280])
       await page.setViewportSize({ width, height: 900 });
       await setup(page, "OFFICER");
       await page
-        .getByRole("row")
-        .filter({ has: page.getByRole("cell", { name: "original", exact: true }) })
-        .getByRole("button", { name: "กำหนดบทบาท", exact: true })
-        .click();
-      const dialog = page.getByRole("dialog");
-      await dialog
         .getByRole("combobox", { name: "Language / ภาษา", exact: true })
         .selectOption(language);
+      await page
+        .getByRole("row")
+        .filter({ has: page.getByRole("cell", { name: "original", exact: true }) })
+        .getByRole("button", {
+          name: language === "en" ? "Assign role" : "กำหนดบทบาท",
+          exact: true,
+        })
+        .click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog.locator(".language-switcher")).toHaveCount(0);
       await expect(dialog).toBeVisible();
       await expect(dialog).toHaveCSS("transform", "none");
       await expect(dialog).toHaveCSS("opacity", "1");

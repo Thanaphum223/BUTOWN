@@ -1,7 +1,4 @@
-import DialogTools from "./DialogTools";
 import GovAuthBadge from "./GovAuthBadge";
-import UatAuthToolbar from "./UatAuthToolbar";
-import { setUatAccount } from "./uatAuth";
 import { AuthUnavailableError } from "./api";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { useI18n } from "./i18n/useI18n";
@@ -21,6 +18,7 @@ const Admin = lazy(() => import("./Admin"));
 const Detail = lazy(() => import("./Detail"));
 const CitizenHome = lazy(() => import("./CitizenHome"));
 const StaffWorkspace = lazy(() => import("./StaffWorkspace"));
+const ApproverOverview = lazy(() => import("./ApproverOverview"));
 import { useEffect, useState } from "react";
 import {
   App as AntApp,
@@ -145,13 +143,11 @@ function TownTrackApp() {
       .then((next) => {
         setAuthError("");
         setAuthErrorDetail("");
-        setUatAccount(next as { id: string; role: string });
         setUser(next);
       })
       .catch((error) => {
         setAuthError(error instanceof AuthUnavailableError ? error.message : "");
         setAuthErrorDetail(error instanceof AuthUnavailableError ? error.detail : "");
-        setUatAccount(null);
         setUser(null);
       });
   useEffect(() => {
@@ -179,7 +175,6 @@ function TownTrackApp() {
           departmentId: ["LEADER", "FIELD"].includes(role) ? departmentId : null,
         }),
       });
-      setUatAccount(next as { id: string; role: string });
       setUser(next);
       setPendingAdminRole(null);
       setView("dashboard");
@@ -244,7 +239,6 @@ function TownTrackApp() {
   ];
   return (
     <PrivacyGate key={user.id} user={user}>
-      {user.role !== "CITIZEN" && <UatAuthToolbar busy={switchingRole} />}
       <Modal
         title={t("เลือกหน่วยงานสำหรับ{{role}}", {
           role: pendingAdminRole ? t(roleNames[pendingAdminRole]) : t("บทบาท"),
@@ -261,7 +255,6 @@ function TownTrackApp() {
           void switchAdminRole(pendingAdminRole, pendingDepartment)
         }
       >
-        <DialogTools />
         <p>
           {t(
             "เลือกหน่วยงานเพื่อแสดงงานและสิทธิ์ที่ตรงกับบทบาท คุณสามารถสลับกลับผู้ดูแลระบบได้ทุกเมื่อ",
@@ -323,7 +316,6 @@ function TownTrackApp() {
         )}
         <Drawer
           title={t("เมนู TownTrack")}
-          extra={<DialogTools />}
           placement="left"
           width="min(320px, 90vw)"
           open={mobileMenu}
@@ -440,7 +432,6 @@ function TownTrackApp() {
                 onClick={async () => {
                   try {
                     await api("/auth/logout", { method: "POST" });
-                    setUatAccount(null);
                     setUser(null);
                   } catch (e) {
                     message.error(t((e as Error).message));
@@ -453,6 +444,8 @@ function TownTrackApp() {
           <Layout.Content className="content">
             {view === "dashboard" && user.role === "CITIZEN" ? (
               <CitizenHome onFollowing={() => setView("following")} />
+            ) : view === "dashboard" && user.role === "APPROVER" ? (
+              <ApproverOverview key={user.id} onQueue={() => setView("cases")} />
             ) : (view === "dashboard" || view === "cases" || view === "history") &&
               user.role !== "CITIZEN" ? (
               <StaffWorkspace
@@ -501,7 +494,6 @@ function TownTrackApp() {
             ) : (
               <Password
                 onDone={() => {
-                  setUatAccount(null);
                   setUser(null);
                 }}
               />

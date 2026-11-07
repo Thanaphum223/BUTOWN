@@ -81,7 +81,9 @@ async function workspace(page: Page, role: string, status: string, actions: stri
   });
   await page.route("https://**/*", (route) => route.abort());
   await page.goto("/");
-  await page.getByRole("button", { name: /เปิดงาน Original title/ }).click();
+  if (role === "APPROVER")
+    await page.getByRole("button", { name: "เปิดคิวงานอนุมัติ", exact: true }).click();
+  await page.getByRole("button", { name: /(?:เปิดงาน|Open task) Original title/ }).click();
   return { data, writes };
 }
 async function switchEnglish(page: Page) {
@@ -108,7 +110,7 @@ test("decline requires a reason and preserves DECLINE/version/idempotency; ACCEP
     reason: "Original decline reason",
   });
   expect(writes[0].key).toMatch(/^[\w-]{36}$/);
-  await page.getByRole("button", { name: /เปิดงาน Original title/ }).click();
+  await page.getByRole("button", { name: /(?:เปิดงาน|Open task) Original title/ }).click();
   for (const name of [
     "กดรับงานและลงพื้นที่สำรวจ",
     "เริ่มปฏิบัติงานซ่อมแซม (ใช้วัสดุ/อุปกรณ์ปกติ)",
@@ -125,28 +127,27 @@ test("decline requires a reason and preserves DECLINE/version/idempotency; ACCEP
   ]);
 });
 
-test("denial preset fills once and preserves manual edits and existing DENY payload across language changes", async ({
+test("denial preset fills once and preserves manual edits and existing DENY payload in header English", async ({
   page,
 }) => {
   const { writes } = await workspace(page, "APPROVER", "RESOURCE_APPROVAL", ["DENY"]);
-  await page.getByRole("button", { name: /^ไม่อนุมัติงบประมาณเฉพาะกิจ/ }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByRole("button", { name: /^ยืนยัน/ }).click();
-  await expect(dialog.getByText("กรุณาระบุเหตุผลให้ครบถ้วน", { exact: true })).toBeVisible();
-  expect(writes).toHaveLength(0);
-  await dialog.getByRole("button", { name: /^เกินวงเงินซ่อมบำรุงปกติ/ }).click();
-  const reason = dialog.getByRole("textbox");
-  await expect(reason).toHaveValue(/เกินวงเงินซ่อมบำรุงปกติ/);
-  await reason.fill("รายละเอียด edited by approver");
   await switchEnglish(page);
+  await page.getByRole("button", { name: /^Deny special budget/ }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: /^Confirm / }).click();
+  await expect(dialog.getByText("Provide a complete reason", { exact: true })).toBeVisible();
+  expect(writes).toHaveLength(0);
+  await dialog.getByRole("button", { name: /^Exceeds the normal maintenance budget/ }).click();
+  const reason = dialog.getByRole("textbox");
+  await expect(reason).toHaveValue(/Exceeds the normal maintenance budget/);
+  await reason.fill("รายละเอียด edited by approver");
+  await expect(dialog.locator(".language-switcher")).toHaveCount(0);
   await expect(reason).toHaveValue("รายละเอียด edited by approver");
   await dialog.getByRole("button", { name: /^Confirm / }).click();
   const confirm = page.getByRole("dialog").last();
   await expect(confirm).toContainText("ends in TownTrack");
-  await switchLanguage(page, "th");
-  await expect(confirm).toContainText("คำร้องนี้สิ้นสุดใน TownTrack");
+  await expect(confirm.locator(".language-switcher")).toHaveCount(0);
   await expect(confirm).toContainText("รายละเอียด edited by approver");
-  await switchEnglish(page);
   await confirm.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect.poll(() => writes.length).toBe(1);
   expect(writes[0].body).toEqual({
@@ -157,18 +158,19 @@ test("denial preset fills once and preserves manual edits and existing DENY payl
   expect(writes[0].key).toMatch(/^[\w-]{36}$/);
 });
 
-test("resource language changes preserve editable rows and source department data", async ({
+test("resource form follows header language and preserves editable rows and source department data", async ({
   page,
 }) => {
   await workspace(page, "LEADER", "RESOURCE_DRAFT", ["PROPOSE"]);
-  await page.getByRole("button", { name: "ส่งข้อเสนอทรัพยากร", exact: true }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("ชื่อคำขอทรัพยากร", { exact: true }).fill("Original proposal");
-  await dialog.getByRole("textbox", { name: "ชื่อรายการ 1", exact: true }).fill("Original sand");
-  await dialog.getByRole("spinbutton", { name: "ราคารายการ 1", exact: true }).fill("125");
-  await dialog.getByRole("button", { name: /เพิ่มรายการ$/ }).click();
-  await dialog.getByRole("textbox", { name: "ชื่อรายการ 2", exact: true }).fill("Original cement");
   await switchEnglish(page);
+  await page.getByRole("button", { name: "Submit resource proposal", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Resource request title", { exact: true }).fill("Original proposal");
+  await dialog.getByRole("textbox", { name: "Item name 1", exact: true }).fill("Original sand");
+  await dialog.getByRole("spinbutton", { name: "Item price 1", exact: true }).fill("125");
+  await dialog.getByRole("button", { name: /Add item$/ }).click();
+  await dialog.getByRole("textbox", { name: "Item name 2", exact: true }).fill("Original cement");
+  await expect(dialog.locator(".language-switcher")).toHaveCount(0);
   await expect(dialog.getByLabel("Resource request title", { exact: true })).toHaveValue(
     "Original proposal",
   );
@@ -187,15 +189,29 @@ test("resource language changes preserve editable rows and source department dat
 });
 
 for (const width of [390, 768, 1280]) {
-  test(`operational review and denial draft fit both languages at ${width}`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 1000 });
-    await workspace(page, "APPROVER", "RESOURCE_APPROVAL", ["DENY", "APPROVE"]);
-    await page.getByRole("button", { name: /^ไม่อนุมัติงบประมาณเฉพาะกิจ/ }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByRole("button", { name: /^เกินวงเงินซ่อมบำรุงปกติ/ }).click();
-    await dialog.getByRole("textbox").fill("Original reason edited at mobile width");
-    for (const language of ["th", "en"]) {
+  for (const language of ["th", "en"]) {
+    test(`operational review and denial draft fit header language ${language} at ${width}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 1000 });
+      await workspace(page, "APPROVER", "RESOURCE_APPROVAL", ["DENY", "APPROVE"]);
       await switchLanguage(page, language);
+      await page
+        .getByRole("button", {
+          name: language === "th" ? /^ไม่อนุมัติงบประมาณเฉพาะกิจ/ : /^Deny special budget/,
+        })
+        .click();
+      const dialog = page.getByRole("dialog");
+      await dialog
+        .getByRole("button", {
+          name:
+            language === "th"
+              ? /^เกินวงเงินซ่อมบำรุงปกติ/
+              : /^Exceeds the normal maintenance budget/,
+        })
+        .click();
+      await dialog.getByRole("textbox").fill("Original reason edited at mobile width");
+      await expect(dialog.locator(".language-switcher")).toHaveCount(0);
       await expect(dialog.getByRole("textbox")).toHaveValue(
         "Original reason edited at mobile width",
       );
@@ -211,18 +227,19 @@ for (const width of [390, 768, 1280]) {
         path: `../work/task3/operational-denial-${language}-${width}.png`,
         fullPage: true,
       });
-    }
-  });
+    });
+  }
 }
 
-test("report text and attached before/after evidence survive language changes and retain the REPORT contract", async ({
+test("report uses header language and retains text, before/after evidence and the REPORT contract", async ({
   page,
 }) => {
   const { writes } = await workspace(page, "FIELD", "IN_PROGRESS", ["REPORT"]);
-  await page.getByRole("button", { name: "ส่งรายงานผล", exact: true }).click();
+  await switchEnglish(page);
+  await page.getByRole("button", { name: "Submit work report", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog
-    .getByLabel("ข้อเท็จจริงและผลดำเนินการ", { exact: true })
+    .getByLabel("Findings and work results", { exact: true })
     .fill("Original findings and work results");
   const sections = dialog.locator(".field-evidence-steps section");
   await sections
@@ -241,7 +258,7 @@ test("report text and attached before/after evidence survive language changes an
   await expect(
     sections.nth(1).getByRole("link", { name: "original-after.png", exact: true }),
   ).toBeVisible();
-  await switchEnglish(page);
+  await expect(dialog.locator(".language-switcher")).toHaveCount(0);
   await expect(dialog.getByLabel("Findings and work results", { exact: true })).toHaveValue(
     "Original findings and work results",
   );
@@ -262,10 +279,11 @@ test("local workflow conflict is translated while the unsent reason and request 
   page,
 }) => {
   await workspace(page, "FIELD", "ASSIGNED", ["DECLINE"]);
-  await page.getByRole("button", { name: "กดปฏิเสธงาน", exact: true }).click();
+  await switchEnglish(page);
+  await page.getByRole("button", { name: "Decline assignment", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("textbox").fill("ข้อมูลเปลี่ยนแล้ว กรุณาโหลดใหม่");
-  await switchLanguage(page, "en", dialog);
+  await expect(dialog.locator(".language-switcher")).toHaveCount(0);
   const attempts: any[] = [];
   await page.route("**/api/complaints/operational-case/actions", (route) => {
     attempts.push(route.request().postDataJSON());
@@ -281,7 +299,7 @@ test("local workflow conflict is translated while the unsent reason and request 
   ]);
 });
 
-test("publication overlay language control keeps selected evidence and consent without publishing", async ({
+test("publication overlay uses header language and keeps selected evidence and consent without publishing", async ({
   page,
 }) => {
   const { data, writes } = await workspace(page, "OFFICER", "RESOLVED", []);
@@ -293,17 +311,16 @@ test("publication overlay language control keeps selected evidence and consent w
     size_bytes: 100,
   });
   await page.reload();
-  await page.getByRole("button", { name: /เปิดงาน Original title/ }).click();
+  await page.getByRole("button", { name: /(?:เปิดงาน|Open task) Original title/ }).click();
   await page.locator("summary").filter({ hasText: "ข้อมูลคำร้อง เอกสาร และรายงานทั้งหมด" }).click();
-  await page.getByRole("button", { name: "เผยแพร่สำเนา", exact: true }).click();
+  await switchEnglish(page);
+  await page.getByRole("button", { name: "Share a copy", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.locator('input[type="file"]').setInputFiles(photo("Original cleaned copy.png"));
   await dialog.getByRole("checkbox").check();
-  await switchLanguage(page, "en", dialog);
+  await expect(dialog.locator(".language-switcher")).toHaveCount(0);
   await expect(dialog).toContainText("Original evidence.png");
   await expect(dialog).toContainText("Original cleaned copy.png");
-  await expect(dialog.getByRole("checkbox")).toBeChecked();
-  await switchLanguage(page, "th", dialog);
   await expect(dialog.getByRole("checkbox")).toBeChecked();
   expect(writes).toEqual([]);
 });

@@ -1,4 +1,3 @@
-import DialogTools from "./DialogTools";
 import { useI18n } from "./i18n/useI18n";
 import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
 import { useRef, useState } from "react";
@@ -146,7 +145,6 @@ export default function DepartmentPeople({
         keyboard={!busy}
         destroyOnHidden
       >
-        <DialogTools />
         <Space direction="vertical" style={{ width: "100%", marginBottom: 20 }}>
           <Typography.Text>
             {t("หน่วยงาน:")}

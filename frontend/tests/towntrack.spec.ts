@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 import {
   signIn as login,
+  signOut as logout,
+  waitForSettledDialog,
   createReport as createThroughWizard,
   accountPassword,
   pdfEvidence,
@@ -88,8 +90,10 @@ test("full approved resource workflow across all municipal and field roles close
     "เทศบาลทดสอบ",
   );
   async function switchUser(name: string) {
-    await page.getByRole("button", { name: "ออกจากระบบ", exact: true }).click();
+    await logout(page);
     await login(page, name);
+    if (name === "approver")
+      await page.getByRole("button", { name: "เปิดคิวงานอนุมัติ", exact: true }).click();
     await page.getByRole("searchbox", { name: "ค้นหาเลขเรื่อง / หัวข้อ" }).fill(title);
     await page.getByRole("button", { name: new RegExp("เปิดงาน " + title) }).click();
     await expect(
@@ -99,6 +103,7 @@ test("full approved resource workflow across all municipal and field roles close
   async function perform(label: string, fill?: (dialog: any) => Promise<void>) {
     await page.getByRole("button", { name: label, exact: true }).click();
     const dialog = page.getByRole("dialog", { name: label, exact: true });
+    await waitForSettledDialog(dialog);
     if (label === "รับเรื่องและส่งหน่วยงาน") {
       await dialog.getByLabel("วิธีดำเนินงาน", { exact: true }).fill("ซ่อมและตรวจสอบพื้นที่");
       await dialog.getByLabel("ความเร่งด่วน", { exact: true }).click();
@@ -133,10 +138,12 @@ test("full approved resource workflow across all municipal and field roles close
         "ไม่อนุมัติงบประมาณเฉพาะกิจ (ยุติใบงานซ่อมด่วนเพื่อนำเข้าแผนฯ / ประสานหน่วยงานภายนอก)",
       ].includes(label)
     ) {
-      await page
-        .getByRole("dialog", { name: "ตรวจสอบก่อนยืนยัน" })
-        .getByRole("button", { name: "ยืนยัน", exact: true })
-        .click();
+      const confirmation = page.getByRole("dialog", {
+        name: "ตรวจสอบก่อนยืนยัน",
+        exact: true,
+      });
+      await waitForSettledDialog(confirmation);
+      await confirmation.getByRole("button", { name: "ยืนยัน", exact: true }).click();
     }
     const response = await completed;
     expect(response.ok(), await response.text()).toBeTruthy();
@@ -192,6 +199,7 @@ test("full approved resource workflow across all municipal and field roles close
     .locator(".ant-select-dropdown:visible")
     .getByText("ผู้อนุมัติ", { exact: true })
     .click();
+  await page.getByRole("button", { name: "เปิดคิวงานอนุมัติ", exact: true }).click();
   await expect(
     page.getByRole("alert").filter({ hasText: "งานอนุมัติทั้งหมดในเทศบาล" }),
   ).toBeVisible();
@@ -283,7 +291,7 @@ test("full approved resource workflow across all municipal and field roles close
     path: "../work/screenshots/closed-complaint.png",
     fullPage: true,
   });
-  await page.getByRole("button", { name: "ออกจากระบบ", exact: true }).click();
+  await logout(page);
   await login(page, "citizen");
   await page.getByRole("link", { name: /ติดตามสถานะ/ }).click();
   const tracked = page
@@ -310,8 +318,10 @@ test("resource refusal by approver terminates a real complaint", async ({ page, 
     "เทศบาลทดสอบ",
   );
   async function switchUser(name: string) {
-    await page.getByRole("button", { name: "ออกจากระบบ", exact: true }).click();
+    await logout(page);
     await login(page, name);
+    if (name === "approver")
+      await page.getByRole("button", { name: "เปิดคิวงานอนุมัติ", exact: true }).click();
     await page.getByRole("searchbox", { name: "ค้นหาเลขเรื่อง / หัวข้อ" }).fill(title);
     await page.getByRole("button", { name: new RegExp("เปิดงาน " + title) }).click();
     await expect(
@@ -321,6 +331,7 @@ test("resource refusal by approver terminates a real complaint", async ({ page, 
   async function perform(label: string, fill?: (dialog: any) => Promise<void>) {
     await page.getByRole("button", { name: label, exact: true }).click();
     const dialog = page.getByRole("dialog", { name: label, exact: true });
+    await waitForSettledDialog(dialog);
     if (label === "รับเรื่องและส่งหน่วยงาน") {
       await dialog.getByLabel("วิธีดำเนินงาน", { exact: true }).fill("ซ่อมและตรวจสอบพื้นที่");
       await dialog.getByLabel("ความเร่งด่วน", { exact: true }).click();
@@ -349,10 +360,12 @@ test("resource refusal by approver terminates a real complaint", async ({ page, 
         "ไม่อนุมัติงบประมาณเฉพาะกิจ (ยุติใบงานซ่อมด่วนเพื่อนำเข้าแผนฯ / ประสานหน่วยงานภายนอก)",
       ].includes(label)
     ) {
-      await page
-        .getByRole("dialog", { name: "ตรวจสอบก่อนยืนยัน" })
-        .getByRole("button", { name: "ยืนยัน", exact: true })
-        .click();
+      const confirmation = page.getByRole("dialog", {
+        name: "ตรวจสอบก่อนยืนยัน",
+        exact: true,
+      });
+      await waitForSettledDialog(confirmation);
+      await confirmation.getByRole("button", { name: "ยืนยัน", exact: true }).click();
     }
     await expect(dialog).not.toBeVisible();
   }

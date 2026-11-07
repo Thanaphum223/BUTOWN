@@ -23,7 +23,7 @@ jobs:
       - name: Build runtime images
         run: |
           docker build -f deploy/Dockerfile.backend -t "towntrack-backend:$RELEASE_SHA" .
-          docker build -f deploy/Dockerfile.frontend --build-arg VITE_ENABLE_UAT_TOOLS=true -t "towntrack-frontend:$RELEASE_SHA" .
+          docker build -f deploy/Dockerfile.frontend -t "towntrack-frontend:$RELEASE_SHA" .
       - name: Configure SSH
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}

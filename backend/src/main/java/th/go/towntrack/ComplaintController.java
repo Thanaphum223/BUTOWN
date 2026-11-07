@@ -183,7 +183,8 @@ public class ComplaintController {
       @RequestParam(defaultValue = "newest") String sort,
       @RequestParam(defaultValue = "false") boolean activeOnly,
       @RequestParam(defaultValue = "false") boolean completedOnly,
-      @RequestParam(defaultValue = "false") boolean historyOnly) {
+      @RequestParam(defaultValue = "false") boolean historyOnly,
+      @RequestParam(defaultValue = "false") boolean overview) {
     if (page < 0
         || page > 1000000
         || size < 1
@@ -191,26 +192,33 @@ public class ComplaintController {
         || q.length() > 200
         || status.length() > 40) throw new IllegalArgumentException();
     var u = access.user(a);
+    if (overview) {
+      access.role(u, "APPROVER");
+      if (historyOnly || !queue.isBlank()) throw new IllegalArgumentException();
+    }
     String scope =
-        switch ((String) u.get("role")) {
-          case "ADMIN", "OFFICER" -> "true";
-          case "CITIZEN" -> "c.reporter_id=?";
-          case "LEADER" -> "c.leader_id=?";
-          case "FIELD" ->
-              "EXISTS(SELECT 1 FROM work_order w WHERE w.complaint_id=c.id AND (w.assignee_id=? OR"
-                  + " EXISTS(SELECT 1 FROM work_member wm WHERE wm.work_order_id=w.id AND"
-                  + " wm.user_id=?)) AND NOT w.handed_off AND w.status NOT IN ('DECLINED','CANCELLED'))";
-          case "APPROVER" ->
-              "EXISTS(SELECT 1 FROM resource_request r WHERE r.complaint_id=c.id AND"
-                  + (Access.approvalOverview(u)
-                      ? " NOT r.handed_off AND r.approver_id IS NOT NULL)"
-                      : " NOT r.handed_off AND r.approver_id=?)");
-          default -> "false";
-        };
+        overview
+            ? "true"
+            : switch ((String) u.get("role")) {
+              case "ADMIN", "OFFICER" -> "true";
+              case "CITIZEN" -> "c.reporter_id=?";
+              case "LEADER" -> "c.leader_id=?";
+              case "FIELD" ->
+                  "EXISTS(SELECT 1 FROM work_order w WHERE w.complaint_id=c.id AND (w.assignee_id=? OR"
+                      + " EXISTS(SELECT 1 FROM work_member wm WHERE wm.work_order_id=w.id AND"
+                      + " wm.user_id=?)) AND NOT w.handed_off AND w.status NOT IN ('DECLINED','CANCELLED'))";
+              case "APPROVER" ->
+                  "EXISTS(SELECT 1 FROM resource_request r WHERE r.complaint_id=c.id AND"
+                      + (Access.approvalOverview(u)
+                          ? " NOT r.handed_off AND r.approver_id IS NOT NULL)"
+                          : " NOT r.handed_off AND r.approver_id=?)");
+              default -> "false";
+            };
     var args = new ArrayList<Object>();
     args.add(u.get("municipality_id"));
-    if (!List.of("ADMIN", "OFFICER").contains(u.get("role")) && !Access.approvalOverview(u))
-      args.add(u.get("id"));
+    if (!overview
+        && !List.of("ADMIN", "OFFICER").contains(u.get("role"))
+        && !Access.approvalOverview(u)) args.add(u.get("id"));
     if (u.get("role").equals("FIELD")) args.add(u.get("id"));
     if (historyOnly) {
       if (activeOnly || completedOnly) throw new IllegalArgumentException();

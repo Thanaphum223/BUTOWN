@@ -1,4 +1,3 @@
-import DialogTools from "./DialogTools";
 import { useI18n } from "./i18n/useI18n";
 import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
 import { useEffect, useRef, useState } from "react";
@@ -381,7 +380,6 @@ export default function Admin() {
         footer={null}
         destroyOnHidden
       >
-        <DialogTools />
         <Form form={form} layout="vertical" onFinish={save}>
           <Form.Item name="id" hidden>
             <Input />

@@ -1,4 +1,14 @@
 const messages: Record<string, string> = {
+  "โหลดประเภทคำร้องไม่สำเร็จ กรุณากดโหลดใหม่":
+    "Could not load complaint categories. Select Refresh to retry.",
+  ภาพรวมคำร้องทั้งเทศบาล: "Municipal overview",
+  คำร้องทั้งหมดในเทศบาล: "All municipal cases",
+  เปิดคิวงานอนุมัติ: "Open approval queue",
+  สถานะคำร้องทั้งเทศบาล: "Municipal case statuses",
+  "ติดตามจำนวนและสถานะคำร้องทุกเรื่องในเทศบาล เปิดคิวงานอนุมัติเพื่อตรวจรายละเอียดและเอกสารตามสิทธิ์ของคุณ":
+    "Track totals and statuses for every municipal case. Open the approval queue to review details and documents available to you.",
+  "รายการนี้แสดงข้อมูลสรุปเท่านั้น จำนวนด้านบนรวมทุกสถานะและไม่เปลี่ยนตามตัวกรอง":
+    "This list shows summaries only. The totals above cover all statuses and stay unchanged by filters.",
   หน่วยงานตามคำร้อง: "Complaint department",
   "เปิดร่างในอุปกรณ์ไม่ได้ กรุณาตรวจพื้นที่ว่าง":
     "Cannot open the local draft. Check available device storage.",

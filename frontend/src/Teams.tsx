@@ -1,4 +1,3 @@
-import DialogTools from "./DialogTools";
 import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
 import { useI18n } from "./i18n/useI18n";
 import { useEffect, useState } from "react";
@@ -105,7 +104,6 @@ export default function Teams() {
         onCancel={() => setOpen(false)}
         footer={null}
       >
-        <DialogTools />
         <Form
           form={form}
           layout="vertical"

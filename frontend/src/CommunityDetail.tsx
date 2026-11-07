@@ -1,4 +1,3 @@
-import DialogTools from "./DialogTools";
 import { useI18n } from "./i18n/useI18n";
 import { useEffect, useState } from "react";
 import { Alert, Descriptions, Modal, Spin, Tag, Timeline, Typography } from "antd";
@@ -26,7 +25,6 @@ export default function CommunityDetail({ id, onClose }: { id?: string; onClose:
   const c = data?.complaint;
   return (
     <Modal open={!!id} title={t("รายละเอียดปัญหา")} onCancel={onClose} footer={null} width={640}>
-      <DialogTools />
       {error ? (
         <Alert type="warning" message={t(error)} />
       ) : !c ? (

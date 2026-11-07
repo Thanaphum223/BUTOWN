@@ -1,4 +1,3 @@
-import DialogTools from "./DialogTools";
 import { useI18n } from "./i18n/useI18n";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Modal, Space, Spin, Typography } from "antd";
@@ -152,7 +151,6 @@ export default function PdfPreview({
         </Button>
       }
     >
-      <DialogTools />
       {error ? (
         <Alert
           type="error"

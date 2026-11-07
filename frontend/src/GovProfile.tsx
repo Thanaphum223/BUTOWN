@@ -1,4 +1,3 @@
-import DialogTools from "./DialogTools";
 import { useI18n } from "./i18n/useI18n";
 import { useState } from "react";
 import {
@@ -58,13 +57,7 @@ export default function GovProfile() {
           onClick={() => void load()}
         />
       </Tooltip>
-      <Drawer
-        title={t("ข้อมูล Gov Center")}
-        extra={<DialogTools />}
-        width={480}
-        open={open}
-        onClose={() => setOpen(false)}
-      >
+      <Drawer title={t("ข้อมูล Gov Center")} width={480} open={open} onClose={() => setOpen(false)}>
         {busy && <Spin aria-label={t("กำลังโหลดข้อมูลบัญชี")} />}
         {error && (
           <Space direction="vertical">

@@ -1,4 +1,3 @@
-import DialogTools from "./DialogTools";
 import { useI18n } from "./i18n/useI18n";
 import { translate as t } from "./i18n/core";
 import { Component, lazy, Suspense, useState, type ReactNode } from "react";
@@ -35,7 +34,6 @@ class PdfLoadBoundary extends Component<
           </Button>
         }
       >
-        <DialogTools />
         <Alert
           type="error"
           message={t("เปิดโปรแกรมอ่านเอกสารไม่ได้ กรุณาดาวน์โหลดต้นฉบับเพื่ออ่านด้วยแอป PDF")}
@@ -119,7 +117,6 @@ export default function AttachmentList({
                 onCancel={() => setPreview(undefined)}
                 footer={null}
               >
-                <DialogTools />
                 <Spin />
               </Modal>
             }

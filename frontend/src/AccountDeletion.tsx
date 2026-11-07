@@ -1,4 +1,3 @@
-import DialogTools from "./DialogTools";
 import { useI18n } from "./i18n/useI18n";
 import { useEffect, useRef, useState } from "react";
 import { Alert, App, Button, Modal, Space, Typography, type GetRef } from "antd";
@@ -56,7 +55,6 @@ export default function AccountDeletion({
       }}
       destroyOnHidden
     >
-      <DialogTools />
       <Typography.Paragraph>{t("ต้องการลบบัญชีนี้ออกจาก TownTrack หรือไม่?")}</Typography.Paragraph>
       <Typography.Paragraph>
         <strong>{account?.display_name}</strong>

@@ -121,7 +121,7 @@ test("visible validation errors follow language changes without clearing the dra
   await expect(page.getByText("รหัสผ่านไม่ตรงกัน", { exact: true })).toBeVisible();
 });
 
-test("an open profile switches chrome while preserving original profile and residence data", async ({
+test("profile follows header language while preserving original profile and residence data", async ({
   page,
 }) => {
   await authBoundary(page, true);
@@ -149,11 +149,16 @@ test("an open profile switches chrome while preserving original profile and resi
   await page.getByRole("button", { name: "ข้อมูล Gov Center", exact: true }).click();
   const drawer = page.getByRole("dialog");
   await expect(drawer.getByText("สมัครสมาชิก", { exact: true })).toBeVisible();
-  await drawer.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
+  await expect(drawer.locator(".language-switcher")).toHaveCount(0);
+  await drawer.getByRole("button", { name: "ปิด", exact: true }).click();
+  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
+  await page.getByRole("button", { name: "Gov Center profile", exact: true }).click();
   await expect(drawer).toContainText("Gov Center profile");
   await expect(drawer).toContainText("Linked residences");
   await expect(drawer.getByText("สมัครสมาชิก", { exact: true })).toBeVisible();
   await expect(drawer.getByText("บ้านเดิม เลขที่ 12", { exact: true })).toBeVisible();
-  await drawer.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("th");
+  await drawer.getByRole("button", { name: "Close", exact: true }).click();
+  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("th");
+  await page.getByRole("button", { name: "ข้อมูล Gov Center", exact: true }).click();
   await expect(drawer).toContainText("ข้อมูล Gov Center");
 });

@@ -1,4 +1,3 @@
-import DialogTools from "./DialogTools";
 import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
 import { useI18n } from "./i18n/useI18n";
 import { govTokens } from "./govTheme";
@@ -298,7 +297,6 @@ export default function Detail({
             title: t("ตรวจสอบก่อนยืนยัน"),
             content: (
               <div>
-                <DialogTools />
                 <p>
                   {t("เลขเรื่อง #")} {id.slice(0, 8).toUpperCase()} · {t("ฉบับที่")}{" "}
                   {data!.complaint.version}
@@ -1195,7 +1193,6 @@ export default function Detail({
           }
         }}
       >
-        <DialogTools />
         <Alert
           type="info"
           message={t(
@@ -1245,7 +1242,6 @@ export default function Detail({
         footer={null}
         destroyOnHidden
       >
-        <DialogTools />
         <Form
           form={form}
           layout="vertical"
