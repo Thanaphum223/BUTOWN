@@ -1,5 +1,5 @@
 import GovAuthBadge from "./GovAuthBadge";
-import { AuthUnavailableError } from "./api";
+import { AuthUnavailableError, sessionExpiredEvent, sessionExpiredMessage } from "./api";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { useI18n } from "./i18n/useI18n";
 import { MenuOutlined } from "@ant-design/icons";
@@ -164,6 +164,19 @@ function TownTrackApp() {
           setDepartmentError(true);
           message.error(t("โหลดหน่วยงานไม่สำเร็จ กรุณารีเฟรชหน้า"));
         });
+  }, [user]);
+  useEffect(() => {
+    if (!user) return;
+    const expired = () => {
+      setAuthError(sessionExpiredMessage);
+      setAuthErrorDetail("");
+      setSelected("");
+      setView("dashboard");
+      setMobileMenu(false);
+      setUser(null);
+    };
+    window.addEventListener(sessionExpiredEvent, expired);
+    return () => window.removeEventListener(sessionExpiredEvent, expired);
   }, [user]);
   const switchAdminRole = async (role: string, departmentId = user?.department_id) => {
     setSwitchingRole(true);

@@ -341,7 +341,7 @@ export default function Detail({
       }
       message.success(t("บันทึกแล้ว"));
       setAction("");
-      if (action === "DECLINE") {
+      if (action === "DECLINE" || action === "RETURN_ASSIGNMENT") {
         back();
         return;
       }

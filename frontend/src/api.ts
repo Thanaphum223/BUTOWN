@@ -25,11 +25,18 @@ function isAuthEndpoint(url: string) {
     "/public/gov-auth",
   ]).has(url.split("?")[0]);
 }
+export const sessionExpiredEvent = "towntrack:session-expired";
+export const sessionExpiredMessage = "เซสชันหมดอายุหรือออกจากระบบแล้ว กรุณาเข้าสู่ระบบอีกครั้ง";
+function expireSession() {
+  csrf = "";
+  window.dispatchEvent(new Event(sessionExpiredEvent));
+}
 let csrf = "";
 let header = "X-CSRF-TOKEN";
 export async function refreshCsrf() {
   const r = await fetch("/api/auth/csrf", { credentials: "same-origin" });
   if (!r.ok) {
+    if (r.status === 401) expireSession();
     if (r.status === 503) throw new AuthUnavailableError(await responseErrorDetail(r));
     throw new Error("การตรวจสอบความปลอดภัยไม่สำเร็จ กรุณาเริ่มเข้าสู่ระบบใหม่");
   }
@@ -54,6 +61,7 @@ export async function api<T = any>(url: string, options: RequestInit = {}): Prom
     credentials: "same-origin",
   });
   if (!r.ok) {
+    if (r.status === 401) expireSession();
     const message =
       r.status === 401
         ? "กรุณาเข้าสู่ระบบ"
@@ -97,17 +105,21 @@ export async function uploadFile<T = any>(
         result = {};
       }
       if (request.status >= 200 && request.status < 300) resolve(result);
-      else
+      else {
+        if (request.status === 401) expireSession();
         reject(
           new Error(
             result.message ||
-              (request.status === 429
-                ? "ทำรายการถี่เกินไป กรุณารอสักครู่แล้วแนบไฟล์อีกครั้ง"
-                : request.status === 413
-                  ? "ไฟล์มีขนาดเกินที่ระบบรองรับ"
-                  : "ส่งไฟล์ไม่สำเร็จ กรุณาลองอีกครั้ง"),
+              (request.status === 401
+                ? sessionExpiredMessage
+                : request.status === 429
+                  ? "ทำรายการถี่เกินไป กรุณารอสักครู่แล้วแนบไฟล์อีกครั้ง"
+                  : request.status === 413
+                    ? "ไฟล์มีขนาดเกินที่ระบบรองรับ"
+                    : "ส่งไฟล์ไม่สำเร็จ กรุณาลองอีกครั้ง"),
           ),
         );
+      }
     };
     request.onerror = () =>
       reject(new Error("เชื่อมต่อไม่ได้ กรุณาตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง"));

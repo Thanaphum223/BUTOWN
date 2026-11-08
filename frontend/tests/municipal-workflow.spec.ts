@@ -366,3 +366,33 @@ test("community modal shows receiving department while a handoff is underway", a
   const dialog = page.getByRole("dialog", { name: "รายละเอียดปัญหา", exact: true });
   await expect(dialog).toContainText("กำลังดำเนินการ · ส่งต่อให้กองสาธารณสุขรับช่วงต่อ");
 });
+
+test("returning a misassigned job leaves detail before its leader access is removed", async ({
+  page,
+}) => {
+  await workspace(page, "LEADER", "TRIAGED", ["RETURN_ASSIGNMENT"]);
+  let staleReads = 0;
+  let submitted = false;
+  await page.route("**/api/complaints/municipal-case", (route) => {
+    staleReads++;
+    return route.fulfill({ status: 403, json: { message: "ไม่มีสิทธิ์ดำเนินการ" } });
+  });
+  await page.route("**/api/complaints/municipal-case/actions", (route) => {
+    submitted = true;
+    return route.fulfill({
+      json: { id: "municipal-case", status: "DEPARTMENT_RETURNED", version: 2 },
+    });
+  });
+  await page.getByRole("button", { name: "ส่งคืนงานที่จ่ายผิด", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true })
+    .fill("งานนี้เป็นงานกองสาธารณสุข");
+  await dialog.getByRole("button", { name: "ยืนยันส่งคืนงานที่จ่ายผิด", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /เปิดงาน งานเทศบาลทดสอบ/ })).toBeVisible({
+    timeout: 2000,
+  });
+  expect(submitted).toBe(true);
+  expect(staleReads).toBe(0);
+});

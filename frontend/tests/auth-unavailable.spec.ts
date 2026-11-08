@@ -249,3 +249,66 @@ for (const endpoint of ["/auth/csrf", "/public/gov-auth", "/auth/me", "/auth/gov
     });
   }
 }
+
+for (const role of ["CITIZEN", "OFFICER", "LEADER", "FIELD", "APPROVER", "ADMIN"]) {
+  test(`expired session returns ${role} to sign in instead of leaving unusable actions`, async ({
+    page,
+  }) => {
+    await authBoundary(page, role);
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "ออกจากระบบ", exact: true })).toBeVisible();
+    let attempts = 0;
+    await page.route("**/api/complaints/expired/actions", (route) => {
+      attempts++;
+      return route.fulfill({ status: 401, json: {} });
+    });
+    await page.evaluate(async () => {
+      const path = "/src/api.ts";
+      await (
+        await import(path)
+      )
+        .post("/complaints/expired/actions", { action: "ACCEPT", version: 1 })
+        .catch(() => {});
+    });
+    await expect(page.getByRole("button", { name: "เข้าสู่ระบบ", exact: true })).toBeVisible({
+      timeout: 2000,
+    });
+    await expect(page.getByRole("alert").first()).toContainText("เซสชันหมดอายุ");
+    await expect(page.getByRole("button", { name: "ออกจากระบบ", exact: true })).toHaveCount(0);
+    expect(attempts).toBe(1);
+  });
+}
+
+test("permission denial keeps the valid session", async ({ page }) => {
+  await authBoundary(page, "FIELD");
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "ออกจากระบบ", exact: true })).toBeVisible();
+  await page.route("**/api/complaints/forbidden/actions", (route) =>
+    route.fulfill({ status: 403, json: {} }),
+  );
+  await page.evaluate(async () => {
+    const path = "/src/api.ts";
+    await (await import(path)).post("/complaints/forbidden/actions", {}).catch(() => {});
+  });
+  await expect(page.getByRole("button", { name: "ออกจากระบบ", exact: true })).toBeVisible();
+});
+
+test("expired upload session also returns to sign in", async ({ page }) => {
+  await authBoundary(page, "FIELD");
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "ออกจากระบบ", exact: true })).toBeVisible();
+  await page.route("**/api/complaints/expired/files", (route) =>
+    route.fulfill({ status: 401, json: {} }),
+  );
+  await page.evaluate(async () => {
+    const path = "/src/api.ts";
+    await (
+      await import(path)
+    )
+      .uploadFile("/complaints/expired/files", new FormData(), () => {})
+      .catch(() => {});
+  });
+  await expect(page.getByRole("button", { name: "เข้าสู่ระบบ", exact: true })).toBeVisible({
+    timeout: 2000,
+  });
+});
