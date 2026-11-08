@@ -239,8 +239,7 @@ test("filters and pagination query summaries while global totals stay municipal"
   await expect.poll(() => lists.at(-1)!.searchParams.get("sort")).toBe("oldest");
   await expect(page.locator(".ant-select-dropdown:visible")).toHaveCount(0);
   await overview.getByRole("combobox", { name: "กรองสถานะคำร้อง", exact: true }).click();
-  await page.locator(".ant-select-dropdown:visible").hover();
-  await page.mouse.wheel(0, 1000);
+  await overview.getByRole("combobox", { name: "กรองสถานะคำร้อง", exact: true }).press("ArrowUp");
   await page
     .locator(".ant-select-dropdown:visible")
     .getByText("ปิดเรื่องแล้ว", { exact: true })

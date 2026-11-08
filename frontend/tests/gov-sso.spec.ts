@@ -22,6 +22,14 @@ async function boundary(page: Page, loggedIn = false) {
       },
     }),
   );
+  // This fixture authenticates in the browser boundary, not in the real backend.
+  // Keep the post-login workspace in that same boundary too.
+  await page.route("**/api/catalog", (r) =>
+    r.fulfill({ json: { categories: [], departments: [], queues: [] } }),
+  );
+  await page.route("**/api/complaints?*", (r) =>
+    r.fulfill({ json: { items: [], total: 0, stats: {} } }),
+  );
   await page.route("**/api/public/line", (r) => r.fulfill({ json: { enabled: false } }));
   await page.route("**/api/public/municipalities", (r) => r.fulfill({ json: [] }));
   await page.route("**/api/auth/csrf", (r) =>
@@ -108,6 +116,7 @@ test("SSO button registers matching state before redirect without token entry", 
   callback.searchParams.set("service", "towntrack-test");
   callback.searchParams.set("ticket", "unused-one-time-iam-ticket");
   await page.goto(callback.toString());
+  await expect(page.getByText("ไม่พบงานตามตัวกรอง", { exact: true })).toBeVisible();
   await expect(page.getByText("SSO Test User", { exact: true })).toBeVisible();
   expect(seen.callbacks).toEqual([{ code: "gov-after-line-code", state: seen.starts[0].state }]);
   expect(new URL(page.url()).origin).toBe("http://127.0.0.1:5173");
