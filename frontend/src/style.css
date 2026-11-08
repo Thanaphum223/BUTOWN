@@ -3509,3 +3509,55 @@ button.queue-item .queue-item-top .ant-tag {
     white-space: normal;
   }
 }
+
+/* Keep all six workflow labels visible inside narrow split detail panels. */
+.workflow-progress .ant-steps {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(min(132px, 100%), 1fr));
+  gap: 16px 20px;
+  min-width: 0 !important;
+}
+.workflow-progress .ant-steps-item {
+  min-width: 0 !important;
+  width: auto !important;
+  padding: 0 !important;
+}
+.workflow-progress .ant-steps-item-container {
+  display: flex;
+  align-items: flex-start;
+}
+.workflow-progress .ant-steps-item-content {
+  min-width: 0;
+  width: auto !important;
+}
+.workflow-progress .ant-steps-item-icon {
+  flex-shrink: 0;
+}
+.workflow-progress .ant-steps-item-title {
+  max-width: 100%;
+  font-size: 13px !important;
+  line-height: 1.65;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere;
+}
+.workflow-progress .ant-steps-item-tail,
+.workflow-progress .ant-steps-item-title::after {
+  display: none !important;
+}
+.workflow-section > h3 {
+  margin: 16px 0 10px;
+}
+.field-evidence-steps > section {
+  min-width: 0;
+}
+
+.staff-shell .workspace-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 767px) {
+  .staff-shell .workspace-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

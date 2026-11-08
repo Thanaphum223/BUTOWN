@@ -39,7 +39,6 @@ import {
   ReloadOutlined,
   UploadOutlined,
   EnvironmentOutlined,
-  CalendarOutlined,
 } from "@ant-design/icons";
 import {
   api,
@@ -269,11 +268,16 @@ export default function Detail({
     );
     if (
       action === "PROPOSE" &&
-      !pendingFiles.some(
-        (f: D) => f.content_type === "application/pdf" && Number(f.size_bytes) <= 15_000_000,
-      )
+      (!pendingFiles.length ||
+        pendingFiles.some(
+          (f: D) =>
+            !["application/pdf", "image/jpeg", "image/png"].includes(f.content_type) ||
+            Number(f.size_bytes) > 15_000_000,
+        ))
     ) {
-      message.error(t("กรุณาแนบเอกสารคำขอ PDF ขนาดไม่เกิน 15 MB ในแบบฟอร์มนี้"));
+      message.error(
+        t("กรุณาแนบเอกสารคำขอ PDF หรือรูปภาพ PNG/JPEG ขนาดไม่เกิน 15 MB ต่อไฟล์ในแบบฟอร์มนี้"),
+      );
       return;
     }
     if (
@@ -376,7 +380,9 @@ export default function Detail({
       className="pending-evidence"
       locale={{ emptyText: t("ยังไม่ได้แนบไฟล์") }}
       dataSource={pendingEvidence.filter((f: D) =>
-        stage ? f.evidence_stage === stage : f.content_type === "application/pdf",
+        stage
+          ? f.evidence_stage === stage
+          : ["application/pdf", "image/jpeg", "image/png"].includes(f.content_type),
       )}
       renderItem={(file: D) => (
         <List.Item>
@@ -517,15 +523,6 @@ export default function Detail({
             column={1}
             items={[
               {
-                key: "appointment",
-                label: t("วันนัดหมายเดิม (อ่านอย่างเดียว)"),
-                children:
-                  (typeof c.assignment_details === "string"
-                    ? JSON.parse(c.assignment_details || "{}")
-                    : c.assignment_details
-                  )?.appointment || t("ยังไม่ระบุวันนัดหมาย"),
-              },
-              {
                 key: "urgency",
                 label: t("ความเร่งด่วน"),
                 children: t(
@@ -567,10 +564,6 @@ export default function Detail({
             <span>
               <EnvironmentOutlined /> {c.address || t("ไม่ระบุสถานที่")}
             </span>
-            <span>
-              <CalendarOutlined />
-              {t("กำหนดเสร็จ")} {date(c.due_at)}
-            </span>
           </div>
           <h3>{t("รายละเอียด")}</h3>
           <Paragraph style={{ whiteSpace: "pre-wrap" }}>{c.description}</Paragraph>
@@ -583,11 +576,8 @@ export default function Detail({
           />
         </section>
       )}
-      <details
-        className={embedded ? "split-section" : "workflow-section"}
-        open={embedded ? undefined : true}
-      >
-        <summary>{t("ขั้นตอนการดำเนินงาน")}</summary>
+      <section className="workflow-section" aria-label={t("ขั้นตอนการดำเนินงาน")}>
+        <h3>{t("ขั้นตอนการดำเนินงาน")}</h3>
         <Card className="workflow-progress" style={{ marginBottom: 20 }}>
           <Steps
             current={current}
@@ -598,7 +588,7 @@ export default function Detail({
                   ? "finish"
                   : "process"
             }
-            responsive={citizen}
+            responsive={false}
             items={[
               t("รับคำร้อง"),
               t("จัดหน่วยงาน"),
@@ -618,7 +608,7 @@ export default function Detail({
             })}
           />
         </Card>
-      </details>
+      </section>
       {citizen && <CitizenOutcome status={c.status} history={data.history || []} />}
       {data.readOnlyHistory && (
         <Alert
@@ -725,25 +715,26 @@ export default function Detail({
                     typeof c.assignment_details === "string"
                       ? JSON.parse(c.assignment_details)
                       : c.assignment_details,
-                  ).map(([key, value]) => ({
-                    key,
-                    label:
-                      (
-                        {
-                          operationMethod: t("วิธีดำเนินงาน"),
-                          urgency: t("ความเร่งด่วน"),
-                          appointment: t("วันนัดหมาย"),
-                          workScope: t("ขอบเขตงาน"),
-                          precautions: t("ข้อควรระวัง"),
-                          coordinator: t("ช่องทางประสานงาน"),
-                        } as D
-                      )[key] || key,
-                    children:
-                      key === "urgency"
-                        ? ({ NORMAL: t("ปกติ"), PRIORITY: t("เร่งด่วน") } as D)[String(value)] ||
-                          String(value)
-                        : String(value),
-                  }))}
+                  )
+                    .filter(([key]) => key !== "appointment")
+                    .map(([key, value]) => ({
+                      key,
+                      label:
+                        (
+                          {
+                            operationMethod: t("วิธีดำเนินงาน"),
+                            urgency: t("ความเร่งด่วน"),
+                            workScope: t("ขอบเขตงาน"),
+                            precautions: t("ข้อควรระวัง"),
+                            coordinator: t("ช่องทางประสานงาน"),
+                          } as D
+                        )[key] || key,
+                      children:
+                        key === "urgency"
+                          ? ({ NORMAL: t("ปกติ"), PRIORITY: t("เร่งด่วน") } as D)[String(value)] ||
+                            String(value)
+                          : String(value),
+                    }))}
                 />
                 {c.latitude != null && (
                   <a
@@ -802,7 +793,6 @@ export default function Detail({
                     label: t("วันที่แจ้ง"),
                     children: date(c.created_at),
                   },
-                  { key: "due", label: t("กำหนดเสร็จ"), children: date(c.due_at) },
                 ]}
               />
               {user.role !== "LEADER" && c.latitude != null && (
@@ -1386,9 +1376,6 @@ export default function Detail({
                   ]}
                 />
               </Form.Item>
-              <Form.Item name="appointment" label={t("วันนัดหมาย")} rules={[{ required: true }]}>
-                <Input type="date" />
-              </Form.Item>
               <Form.Item name="workScope" label={t("ขอบเขตงาน")} rules={[{ required: true }]}>
                 <Input.TextArea />
               </Form.Item>
@@ -1406,18 +1393,6 @@ export default function Detail({
           )}
           {action === "ASSIGN" && (
             <>
-              <Form.Item label={t("วันนัดหมายเดิม (อ่านอย่างเดียว)")}>
-                <Input
-                  aria-label={t("วันนัดหมายเดิม (อ่านอย่างเดียว)")}
-                  readOnly
-                  value={
-                    (typeof c.assignment_details === "string"
-                      ? JSON.parse(c.assignment_details || "{}")
-                      : c.assignment_details
-                    )?.appointment || t("ยังไม่ระบุวันนัดหมาย")
-                  }
-                />
-              </Form.Item>
               <Form.Item
                 name="teamId"
                 label={t("เลือกทีม (หรือเลือกผู้ลงพื้นที่รายบุคคลด้านล่าง)")}
@@ -1591,10 +1566,10 @@ export default function Detail({
               >
                 <InputNumber min={1} max={3650} precision={0} />
               </Form.Item>
-              <Form.Item label={t("เอกสารคำขอ (PDF ไม่เกิน 15 MB)")} required>
+              <Form.Item label={t("เอกสารคำขอ (PDF หรือ PNG/JPEG ไม่เกิน 15 MB ต่อไฟล์)")} required>
                 <EvidenceUpload
                   complaintId={id}
-                  pdf
+                  proposalDocument
                   used={pendingBytes}
                   onUploaded={load}
                   onBusy={setUploadBusy}
@@ -1634,19 +1609,19 @@ export default function Detail({
                     {evidenceList(item.stage)}
                   </section>
                 ))}
+                <section className="additional-evidence">
+                  <h4>{t("3. วิดีโอหรือเอกสารประกอบเพิ่มเติม (ไม่บังคับ)")}</h4>
+                  <EvidenceUpload
+                    complaintId={id}
+                    used={pendingBytes}
+                    disabled={uploadBusy}
+                    onUploaded={load}
+                    onBusy={setUploadBusy}
+                    onFailed={saveFailedFile}
+                  />
+                  {evidenceList("GENERAL")}
+                </section>
               </div>
-              <details className="additional-evidence">
-                <summary>{t("วิดีโอหรือเอกสารประกอบเพิ่มเติม")}</summary>
-                <EvidenceUpload
-                  complaintId={id}
-                  used={pendingBytes}
-                  disabled={uploadBusy}
-                  onUploaded={load}
-                  onBusy={setUploadBusy}
-                  onFailed={saveFailedFile}
-                />
-                {evidenceList("GENERAL")}
-              </details>
               <Text type="secondary">
                 {t("ภาพก่อนและหลังต้องเป็น PNG/JPEG ·")}
                 {t(ATTACHMENT_HELP)}

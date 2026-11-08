@@ -458,7 +458,7 @@ function TownTrackApp() {
             {view === "dashboard" && user.role === "CITIZEN" ? (
               <CitizenHome onFollowing={() => setView("following")} />
             ) : view === "dashboard" && user.role === "APPROVER" ? (
-              <ApproverOverview key={user.id} onQueue={() => setView("cases")} />
+              <ApproverOverview key={user.id} onQueue={() => setView("cases")} onOpen={open} />
             ) : (view === "dashboard" || view === "cases" || view === "history") &&
               user.role !== "CITIZEN" ? (
               <StaffWorkspace
@@ -624,7 +624,6 @@ function CaseList({
             [t("คำร้องทั้งหมด"), data?.stats.total || 0],
             [t("กำลังดำเนินการ"), data?.stats.in_progress || 0],
             [t("ปิดเรื่องสำเร็จ"), data?.stats.closed || 0],
-            [t("เกินกำหนด"), data?.stats.overdue || 0],
           ].map(([label, n], i) => (
             <Col xs={12} xl={6} key={i}>
               <Card>
@@ -705,19 +704,6 @@ function CaseList({
               render: (v) => <StateTag value={v} />,
             },
             { title: t("วันที่แจ้ง"), dataIndex: "created_at", render: date },
-            {
-              title: t("กำหนดเสร็จ"),
-              dataIndex: "due_at",
-              render: (v, r) => (
-                <Text
-                  type={
-                    !terminal.includes(r.status) && new Date(v) < new Date() ? "danger" : undefined
-                  }
-                >
-                  {date(v)}
-                </Text>
-              ),
-            },
             {
               title: "",
               render: (_, r) => <Button onClick={() => open(r.id)}>{t("ดูรายละเอียด")}</Button>,

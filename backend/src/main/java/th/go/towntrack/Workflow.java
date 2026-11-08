@@ -133,7 +133,9 @@ public class Workflow {
       Object reportId = latest.get("id");
       var evidence =
           db.one(
-              "SELECT count(*) FILTER(WHERE evidence_stage='BEFORE') before_count,count(*) FILTER(WHERE evidence_stage='AFTER') after_count FROM attachment WHERE report_id=? AND content_type LIKE 'image/%'",
+              "SELECT count(*) FILTER(WHERE evidence_stage='BEFORE') before_count,count(*)"
+                  + " FILTER(WHERE evidence_stage='AFTER') after_count FROM attachment WHERE"
+                  + " report_id=? AND content_type LIKE 'image/%'",
               reportId);
       if (((Number) evidence.get("before_count")).longValue() == 0
           || ((Number) evidence.get("after_count")).longValue() == 0)
@@ -218,7 +220,8 @@ public class Workflow {
           assignee = team.get("representative_id");
           var members =
               db.list(
-                  "SELECT p.id,p.role,p.enabled,p.department_id FROM team_member m JOIN app_user p ON p.id=m.user_id WHERE m.team_id=? FOR SHARE OF p",
+                  "SELECT p.id,p.role,p.enabled,p.department_id FROM team_member m JOIN app_user p"
+                      + " ON p.id=m.user_id WHERE m.team_id=? FOR SHARE OF p",
                   teamId);
           if (members.isEmpty()
               || members.stream()
@@ -255,10 +258,12 @@ public class Workflow {
       case "ACCEPT", "DECLINE", "START", "REQUEST_RESOURCE", "REPORT" -> {
         if (action.equals("REQUEST_RESOURCE") && from.equals("TRIAGED")) {
           db.run(
-              "INSERT INTO resource_request(id,complaint_id,requested_by,workflow_origin) VALUES(?,?,?,'PRE_ASSIGN')",
+              "INSERT INTO resource_request(id,complaint_id,requested_by,workflow_origin,necessity)"
+                  + " VALUES(?,?,?,'PRE_ASSIGN',?)",
               UUID.randomUUID(),
               id,
-              u.get("id"));
+              u.get("id"),
+              reason);
           notifyUser(
               c.get("officer_id"), id, "หัวหน้าผู้ลงพื้นที่เริ่มจัดทำข้อเสนอทรัพยากรก่อนจัดทีม");
           break;
@@ -277,12 +282,13 @@ public class Workflow {
               db.run("UPDATE work_order SET status='IN_PROGRESS' WHERE id=?", w.get("id"));
           case "REQUEST_RESOURCE" -> {
             db.run(
-                "INSERT INTO resource_request(id,complaint_id,work_order_id,requested_by)"
-                    + " VALUES(?,?,?,?)",
+                "INSERT INTO resource_request(id,complaint_id,work_order_id,requested_by,necessity)"
+                    + " VALUES(?,?,?,?,?)",
                 UUID.randomUUID(),
                 id,
                 w.get("id"),
-                u.get("id"));
+                u.get("id"),
+                reason);
             notifyUser(c.get("leader_id"), id, "ทีมขอใช้ทรัพยากร กรุณาจัดทำข้อเสนอ");
           }
           case "REPORT" -> {
@@ -306,7 +312,10 @@ public class Workflow {
                   HttpStatus.BAD_REQUEST, "กรุณาแนบหลักฐานก่อนส่งรายงาน");
             var stages =
                 db.one(
-                    "SELECT count(*) FILTER(WHERE evidence_stage='BEFORE') b,count(*) FILTER(WHERE evidence_stage='AFTER') a FROM attachment WHERE complaint_id=? AND uploaded_by=? AND report_id IS NULL AND resource_id IS NULL AND content_type LIKE 'image/%'",
+                    "SELECT count(*) FILTER(WHERE evidence_stage='BEFORE') b,count(*) FILTER(WHERE"
+                        + " evidence_stage='AFTER') a FROM attachment WHERE complaint_id=? AND"
+                        + " uploaded_by=? AND report_id IS NULL AND resource_id IS NULL AND"
+                        + " content_type LIKE 'image/%'",
                     id, u.get("id"));
             if (((Number) stages.get("b")).longValue() == 0
                 || ((Number) stages.get("a")).longValue() == 0)
@@ -334,13 +343,26 @@ public class Workflow {
       }
       case "PROPOSE" -> {
         var r = resource(id);
-        if (db.list(
-                "SELECT id FROM attachment WHERE complaint_id=? AND uploaded_by=? AND report_id IS NULL AND resource_id IS NULL AND content_type='application/pdf' AND size_bytes<=15000000",
+        var documents =
+            db.list(
+                "SELECT content_type,size_bytes FROM attachment WHERE complaint_id=? AND"
+                    + " uploaded_by=? AND report_id IS NULL AND resource_id IS NULL",
                 id,
-                u.get("id"))
-            .isEmpty())
+                u.get("id"));
+        if (documents.isEmpty())
           throw new ResponseStatusException(
-              HttpStatus.BAD_REQUEST, "กรุณาแนบเอกสารคำขอ PDF ขนาดไม่เกิน 15 MB");
+              HttpStatus.BAD_REQUEST, "กรุณาแนบเอกสารคำขอ PDF หรือรูปภาพ PNG/JPEG");
+        if (documents.stream()
+            .anyMatch(
+                document ->
+                    !List.of("application/pdf", "image/jpeg", "image/png")
+                        .contains(document.get("content_type"))))
+          throw new ResponseStatusException(
+              HttpStatus.BAD_REQUEST, "รองรับเอกสาร PDF หรือรูปภาพ PNG/JPEG");
+        if (documents.stream()
+            .anyMatch(document -> ((Number) document.get("size_bytes")).longValue() > 15_000_000))
+          throw new ResponseStatusException(
+              HttpStatus.BAD_REQUEST, "ไฟล์เอกสารแต่ละไฟล์ต้องไม่เกิน 15 MB");
         String proposal = text(b, "proposal", 20000);
         var lineItems = new ArrayList<Map<String, Object>>();
         java.math.BigDecimal itemTotal = java.math.BigDecimal.ZERO;
@@ -416,8 +438,8 @@ public class Workflow {
             u.get("id"),
             json.valueToTree(lineItems).toString());
         db.run(
-            "UPDATE attachment SET resource_id=?,resource_revision_id=? WHERE complaint_id=? AND uploaded_by=? AND"
-                + " report_id IS NULL AND resource_id IS NULL",
+            "UPDATE attachment SET resource_id=?,resource_revision_id=? WHERE complaint_id=? AND"
+                + " uploaded_by=? AND report_id IS NULL AND resource_id IS NULL",
             r.get("id"),
             resourceRevision,
             id,
@@ -554,7 +576,9 @@ public class Workflow {
 
   Map<String, Object> latestReport(UUID id) {
     return db.one(
-        "SELECT r.* FROM field_report r JOIN work_order w ON w.id=r.work_order_id WHERE r.complaint_id=? AND NOT w.handed_off ORDER BY r.created_at DESC,r.revision DESC LIMIT 1",
+        "SELECT r.* FROM field_report r JOIN work_order w ON w.id=r.work_order_id WHERE"
+            + " r.complaint_id=? AND NOT w.handed_off ORDER BY r.created_at DESC,r.revision DESC"
+            + " LIMIT 1",
         id);
   }
 

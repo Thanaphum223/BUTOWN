@@ -212,7 +212,7 @@ export const requiredReasonActions = new Set([
 ]);
 export function progressLabel(item: Record<string, any>) {
   return item.transfer_department_name
-    ? translate("กำลังดำเนินการ · ส่งต่อให้{{department}}รับช่วงต่อ", {
+    ? translate("กำลังดำเนินการ · ส่งต่อให้หน่วยงาน {{department}} รับช่วงต่อ", {
         department: item.transfer_department_name,
       })
     : translate(statusNames[item.status] || item.status);

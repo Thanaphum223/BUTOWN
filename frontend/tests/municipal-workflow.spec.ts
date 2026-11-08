@@ -162,8 +162,8 @@ test("supplementary report PDF visibly persists and confirms successful upload",
   await workspace(page, "FIELD", "IN_PROGRESS", ["REPORT"]);
   await page.getByRole("button", { name: "ส่งรายงานผล", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "ส่งรายงานผล", exact: true });
-  await dialog.locator("summary", { hasText: "วิดีโอหรือเอกสารประกอบเพิ่มเติม" }).click();
-  const extra = dialog.locator("details").filter({ hasText: "วิดีโอหรือเอกสารประกอบเพิ่มเติม" });
+  const extra = dialog.locator(".additional-evidence");
+  await expect(extra.getByRole("heading")).toBeVisible();
   await extra.locator("input[type=file]").setInputFiles(pdfEvidence("extra.pdf"));
   await expect(extra.getByRole("status")).toContainText("แนบไฟล์แล้ว");
   await expect(extra.getByRole("link", { name: "extra.pdf", exact: true })).toBeVisible();
@@ -364,7 +364,7 @@ test("community modal shows receiving department while a handoff is underway", a
   await page.goto("/");
   await page.getByRole("button", { name: "ดูรายละเอียด", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "รายละเอียดปัญหา", exact: true });
-  await expect(dialog).toContainText("กำลังดำเนินการ · ส่งต่อให้กองสาธารณสุขรับช่วงต่อ");
+  await expect(dialog).toContainText("กำลังดำเนินการ · ส่งต่อให้หน่วยงาน กองสาธารณสุข รับช่วงต่อ");
 });
 
 test("returning a misassigned job leaves detail before its leader access is removed", async ({

@@ -9,6 +9,7 @@ type Props = {
   complaintId: string;
   stage?: string;
   pdf?: boolean;
+  proposalDocument?: boolean;
   photos?: boolean;
   used: number;
   disabled?: boolean;
@@ -20,6 +21,7 @@ export default function EvidenceUpload({
   complaintId,
   stage = "GENERAL",
   pdf = false,
+  proposalDocument = false,
   photos = false,
   used,
   disabled = false,
@@ -33,15 +35,27 @@ export default function EvidenceUpload({
   const [error, setError] = useState("");
   const [lastFile, setLastFile] = useState("");
   const [success, setSuccess] = useState("");
-  const accept = pdf ? ".pdf" : photos ? ".jpg,.jpeg,.png" : ATTACHMENT_ACCEPT;
+  const accept = proposalDocument
+    ? ".jpg,.jpeg,.png,.pdf"
+    : pdf
+      ? ".pdf"
+      : photos
+        ? ".jpg,.jpeg,.png"
+        : ATTACHMENT_ACCEPT;
   const send = async (file: File) => {
     if (busy || disabled) return false;
     setSuccess("");
     const problem =
-      attachmentError(file, used) ||
-      (pdf && (!/\.pdf$/i.test(file.name) || file.size > 15_000_000)
-        ? "ใช้ไฟล์ PDF ขนาดไม่เกิน 15 MB"
+      ((proposalDocument || pdf) &&
+      !(proposalDocument ? /\.(pdf|png|jpe?g)$/i : /\.pdf$/i).test(file.name)
+        ? proposalDocument
+          ? "รองรับเอกสาร PDF หรือรูปภาพ PNG/JPEG"
+          : "ใช้ไฟล์ PDF เท่านั้น"
         : undefined) ||
+      ((proposalDocument || pdf) && file.size > 15_000_000
+        ? "ไฟล์เอกสารแต่ละไฟล์ต้องไม่เกิน 15 MB"
+        : undefined) ||
+      attachmentError(file, used) ||
       (photos && !/\.(jpe?g|png)$/i.test(file.name)
         ? "ใช้ภาพถ่าย PNG หรือ JPEG สำหรับหลักฐานก่อนและหลังทำ"
         : undefined);
@@ -73,7 +87,7 @@ export default function EvidenceUpload({
   return (
     <div className="evidence-upload">
       <Space wrap>
-        {photos && (
+        {(photos || proposalDocument) && (
           <Upload
             accept="image/jpeg,image/png"
             capture="environment"
@@ -82,8 +96,14 @@ export default function EvidenceUpload({
             beforeUpload={send}
           >
             <Button icon={<CameraOutlined />} loading={busy} disabled={busy || disabled}>
-              {t("ถ่ายรูป")}
-              {stage === "BEFORE" ? t("ก่อนทำ") : t("หลังทำ")}
+              {proposalDocument ? (
+                t("ถ่ายรูปเอกสาร")
+              ) : (
+                <>
+                  {t("ถ่ายรูป")}
+                  {stage === "BEFORE" ? t("ก่อนทำ") : t("หลังทำ")}
+                </>
+              )}
             </Button>
           </Upload>
         )}
@@ -94,11 +114,13 @@ export default function EvidenceUpload({
           beforeUpload={send}
         >
           <Button icon={<UploadOutlined />} loading={busy} disabled={busy || disabled}>
-            {pdf
-              ? t("เลือกเอกสาร PDF")
-              : photos
-                ? t("เลือกรูปจากเครื่อง")
-                : t("แนบภาพ วิดีโอ หรือเอกสาร")}
+            {proposalDocument
+              ? t("เลือกรูปหรือเอกสาร PDF")
+              : pdf
+                ? t("เลือกเอกสาร PDF")
+                : photos
+                  ? t("เลือกรูปจากเครื่อง")
+                  : t("แนบภาพ วิดีโอ หรือเอกสาร")}
           </Button>
         </Upload>
       </Space>

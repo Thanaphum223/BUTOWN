@@ -108,7 +108,6 @@ test("full approved resource workflow across all municipal and field roles close
       await dialog.getByLabel("วิธีดำเนินงาน", { exact: true }).fill("ซ่อมและตรวจสอบพื้นที่");
       await dialog.getByLabel("ความเร่งด่วน", { exact: true }).click();
       await page.locator(".ant-select-dropdown:visible").getByText("ปกติ", { exact: true }).click();
-      await dialog.getByLabel("วันนัดหมาย", { exact: true }).fill("2026-12-01");
       await dialog.getByLabel("ขอบเขตงาน", { exact: true }).fill("ซ่อมทางเท้าบริเวณที่แจ้ง");
       await dialog.getByLabel("ข้อควรระวัง", { exact: true }).fill("กั้นพื้นที่ปลอดภัย");
       await dialog.getByLabel("ช่องทางประสานงาน", { exact: true }).fill("หัวหน้าทีม");
@@ -174,7 +173,9 @@ test("full approved resource workflow across all municipal and field roles close
     await d.getByRole("textbox", { name: "ชื่อรายการ 1", exact: true }).fill("วัสดุซ่อมทางเท้า");
     await d.getByRole("spinbutton", { name: "ราคารายการ 1", exact: true }).fill("2500");
     await d.getByLabel("ระยะเวลาดำเนินการ (วัน)", { exact: true }).fill("2");
-    await d.locator("input[type=file]").setInputFiles(pdfEvidence("approved-proposal.pdf"));
+    await d
+      .locator("input[type=file]:not([capture])")
+      .setInputFiles(pdfEvidence("approved-proposal.pdf"));
     await expect(d.getByRole("link", { name: "approved-proposal.pdf", exact: true })).toBeVisible();
   });
   await switchUser("officer");
@@ -336,7 +337,6 @@ test("resource refusal by approver terminates a real complaint", async ({ page, 
       await dialog.getByLabel("วิธีดำเนินงาน", { exact: true }).fill("ซ่อมและตรวจสอบพื้นที่");
       await dialog.getByLabel("ความเร่งด่วน", { exact: true }).click();
       await page.locator(".ant-select-dropdown:visible").getByText("ปกติ", { exact: true }).click();
-      await dialog.getByLabel("วันนัดหมาย", { exact: true }).fill("2026-12-01");
       await dialog.getByLabel("ขอบเขตงาน", { exact: true }).fill("ซ่อมทางเท้าบริเวณที่แจ้ง");
       await dialog.getByLabel("ข้อควรระวัง", { exact: true }).fill("กั้นพื้นที่ปลอดภัย");
       await dialog.getByLabel("ช่องทางประสานงาน", { exact: true }).fill("หัวหน้าทีม");
@@ -394,7 +394,7 @@ test("resource refusal by approver terminates a real complaint", async ({ page, 
     await d.getByRole("textbox", { name: "ชื่อรายการ 1", exact: true }).fill("วัสดุซ่อมถนน");
     await d.getByRole("spinbutton", { name: "ราคารายการ 1", exact: true }).fill("1000");
     await d.getByLabel("ระยะเวลาดำเนินการ (วัน)", { exact: true }).fill("2");
-    await d.locator("input[type=file]").setInputFiles(pdfEvidence("proposal.pdf"));
+    await d.locator("input[type=file]:not([capture])").setInputFiles(pdfEvidence("proposal.pdf"));
     await expect(d.getByRole("link", { name: "proposal.pdf", exact: true })).toBeVisible();
     await expect(d.locator(".resource-total")).toContainText("1,000.00");
   });

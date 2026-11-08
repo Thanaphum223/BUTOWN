@@ -23,6 +23,7 @@ type Summary = {
   status: string;
   created_at: string;
   category_name: string;
+  can_open: boolean;
 };
 type Overview = {
   items: Summary[];
@@ -31,7 +32,13 @@ type Overview = {
 };
 const { Title, Text } = Typography;
 
-export default function ApproverOverview({ onQueue }: { onQueue: () => void }) {
+export default function ApproverOverview({
+  onQueue,
+  onOpen,
+}: {
+  onQueue: () => void;
+  onOpen: (id: string) => void;
+}) {
   const { t } = useI18n();
   const [data, setData] = useState<Overview>();
   const [error, setError] = useState("");
@@ -125,7 +132,6 @@ export default function ApproverOverview({ onQueue }: { onQueue: () => void }) {
           [t("คำร้องทั้งหมดในเทศบาล"), data?.stats.total ?? "—"],
           [t("กำลังดำเนินการ"), data?.stats.in_progress ?? "—"],
           [t("ปิดเรื่องแล้ว"), data?.stats.closed ?? "—"],
-          [t("เกินกำหนด"), data?.stats.overdue ?? "—"],
         ].map(([label, value]) => (
           <Card key={label}>
             <Statistic title={label} value={value} />
@@ -284,6 +290,9 @@ export default function ApproverOverview({ onQueue }: { onQueue: () => void }) {
                 <Text type="secondary">
                   {t("วันที่แจ้ง")} {date(item.created_at)}
                 </Text>
+                {item.can_open && (
+                  <Button onClick={() => onOpen(item.id)}>{t("ดูรายละเอียด")}</Button>
+                )}
               </article>
             ))
           )}

@@ -17,7 +17,6 @@ import {
 import {
   FileTextOutlined,
   ReloadOutlined,
-  ClockCircleOutlined,
   EnvironmentOutlined,
   RightOutlined,
   LikeOutlined,
@@ -134,7 +133,7 @@ export default function StaffWorkspace({
             { signal: controller.signal },
           );
           result = { complaint: detail.complaint };
-          if (!result.complaint) throw new Error("โหลดวันนัดหมายและตำแหน่งไม่สำเร็จ");
+          if (!result.complaint) throw new Error("โหลดตำแหน่งไม่สำเร็จ");
         } catch (error) {
           if (!alive) return;
           result = { error: (error as Error).message };
@@ -220,7 +219,6 @@ export default function StaffWorkspace({
             [t("งานในขอบเขต"), error ? "—" : (data?.stats.total ?? "—")],
             [t("กำลังดำเนินการ"), error ? "—" : (data?.stats.in_progress ?? "—")],
             [t("ปิดเรื่องแล้ว"), error ? "—" : (data?.stats.closed ?? "—")],
-            [t("เกินกำหนด"), error ? "—" : (data?.stats.overdue ?? "—")],
           ].map(([label, value]) => (
             <Card key={String(label)}>
               <Statistic title={label} value={value} />
@@ -229,18 +227,6 @@ export default function StaffWorkspace({
         </div>
       )}
       {error && <Alert type="error" showIcon message={t(error)} style={{ marginBottom: 20 }} />}
-      {dashboard && !history && !selected && Number(data?.stats.overdue) > 0 && (
-        <div className="attention-panel">
-          <div>
-            <ClockCircleOutlined />
-            <strong>{t("งานที่ต้องติดตาม")}</strong>
-            <p>
-              {t("มี")} {data?.stats.overdue} {t("คำร้องที่เกินกำหนดดำเนินการในขอบเขตของคุณ")}
-            </p>
-          </div>
-          <Tag color="red">{t("เกิน SLA")}</Tag>
-        </div>
-      )}
       <div className={"work-grid" + (selected ? " has-selection" : "")}>
         <Card
           className="queue-panel"
@@ -392,9 +378,6 @@ export default function StaffWorkspace({
               />
             ) : (
               data.items.map((r: D) => {
-                const overdue =
-                  new Date(r.due_at).getTime() < Date.now() &&
-                  !["CLOSED", "RESOLVED", "REJECTED", "TERMINATED"].includes(r.status);
                 if (user.role === "FIELD")
                   return (
                     <FieldTaskCard
@@ -458,14 +441,6 @@ export default function StaffWorkspace({
                       <span>{r.address || t("ไม่ระบุสถานที่")}</span>
                     </span>
                     <span className="queue-card-footer">
-                      <span className={"queue-card-due" + (overdue ? " is-overdue" : "")}>
-                        <ClockCircleOutlined />
-                        <span>
-                          {t("กำหนดเสร็จ")}
-                          {date(r.due_at)}
-                          {overdue ? t(" · เกินกำหนด") : ""}
-                        </span>
-                      </span>
                       <span className="queue-open-hint">
                         {r.id === selected
                           ? t("กำลังเปิด")

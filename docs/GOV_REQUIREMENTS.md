@@ -19,15 +19,16 @@ Source: GOV02111020.pdf (107 pages), eight draw.io diagrams and six workflow ima
 | FR-FLD-003 | IndexedDB local report draft including failed media uploads and manual retry. Going online does not auto-submit. | Browser workflow check; full device offline matrix pending. |
 | FR-FLD-004 | Latest report must contain image BEFORE and AFTER; latest report-specific leader/staff reviews required before closure. | Full workflow plus missing-photo rejection tests. |
 | FR-UI-006 | Two tracking tabs, server limit five, independent paging, cancel follow. | Eleven issues split 5/5/1 and empty other tab test. |
-| FR-RES-001 | Proposal requires a PDF no larger than 15,000,000 bytes. | Resource revision workflow tests. |
+| FR-RES-001 | Proposal requires at least one PDF or PNG/JPEG document; each document is no larger than 15,000,000 bytes. | Resource revision workflow tests. |
 | FR-RES-002 | Server records PRE_ASSIGN versus POST_ACCEPT origin, ignoring forged client origin. Pre-assignment approval returns to team planning; field-origin approval returns to field work. | Pre-assignment origin/approval test and original field resource workflow. |
 | FR-MAP-004 | Emergency registry in PostgreSQL/PostGIS; nearest registered facilities within 20 km, source and checked date preserved. | Directory tests; no invented phone numbers or coordinates. |
 | FR-UI-007 | Existing persisted LINE delivery queue and retry retained. Staff dashboard polls every four seconds without resetting filters or open forms. | Existing notification tests. |
 
 ## Usability follow-up (2026-11-02)
 
+- Resource drafts show the field requester, timestamp and recorded necessity before a proposal exists. Historical necessity is recovered only for an exact one-to-one audit association; ambiguous records remain explicitly unavailable.
 - Private PDFs have a local viewer, page controls and original downloads. Latest resource evidence appears before review actions. Files are linked to their submitted revision; ambiguous legacy files remain explicitly unversioned.
-- Proposal PDF upload is in the proposal form, with a 15 MB check and an uploaded-file list. Proposals now include 1–50 named price rows, server-calculated decimal totals, persisted per-revision JSON items, and a department display inherited from the complaint. Older free-text revisions remain readable.
+- Proposal document upload accepts PDF or PNG/JPEG, including camera capture, in the proposal form with a separate type check, a 15 MB per-file limit and an uploaded-file list. Proposals now include 1–50 named price rows, server-calculated decimal totals, persisted per-revision JSON items, and a department display inherited from the complaint. Older free-text revisions remain readable.
 - Field report has separate required BEFORE/AFTER photo inputs, rear-camera capture hints, optional video/documents and local failed-upload drafts. Upload progress includes server scan/save state; submit is disabled during upload.
 - Attachment quota now counts every attachment on the complaint, including earlier revisions and other uploaders. Concurrent uploads retain the complaint lock.
 - Staff mobile navigation has a menu drawer, folded field filters and a focused work detail view. Desktop keeps the queue beside details. Staff statistics show a dash when loading fails.

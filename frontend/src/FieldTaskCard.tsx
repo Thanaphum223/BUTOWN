@@ -23,10 +23,6 @@ export default function FieldTaskCard({
 }) {
   const { t } = useI18n();
   const detail = metadata?.complaint;
-  const assignment =
-    typeof detail?.assignment_details === "string"
-      ? JSON.parse(detail.assignment_details || "{}")
-      : detail?.assignment_details;
   return (
     <Card className={"field-task-card" + (selected ? " selected" : "")}>
       <Space wrap>
@@ -49,7 +45,7 @@ export default function FieldTaskCard({
         {item.votes ?? 0} {t("โหวต")}
       </p>
       {!metadata ? (
-        <Spin size="small" aria-label={t("กำลังโหลดวันนัดหมายและตำแหน่ง")} />
+        <Spin size="small" aria-label={t("กำลังโหลดตำแหน่ง")} />
       ) : metadata.error ? (
         <Alert
           type="error"
@@ -57,11 +53,7 @@ export default function FieldTaskCard({
           message={t(metadata.error)}
           action={<Button onClick={onRetry}>{t("ลองใหม่")}</Button>}
         />
-      ) : (
-        <p>
-          {t("วันนัดหมาย")}: {assignment?.appointment || t("ยังไม่ระบุวันนัดหมาย")}
-        </p>
-      )}
+      ) : null}
       <Space wrap>
         <Button
           type="primary"

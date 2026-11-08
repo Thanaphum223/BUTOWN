@@ -160,7 +160,9 @@ public class ComplaintController {
     db.run(
         "UPDATE complaint SET form_schema=?::jsonb WHERE id=?", cat.get("fields").toString(), id);
     db.run(
-        "UPDATE complaint SET contact_name=?,contact_phone=?,contact_email=(SELECT NULLIF(btrim(email),'') FROM iam_user_profile WHERE local_user_id=? AND municipality_id=?) WHERE id=?",
+        "UPDATE complaint SET contact_name=?,contact_phone=?,contact_email=(SELECT"
+            + " NULLIF(btrim(email),'') FROM iam_user_profile WHERE local_user_id=? AND"
+            + " municipality_id=?) WHERE id=?",
         b.contactName(),
         b.contactPhone(),
         u.get("id"),
@@ -204,9 +206,10 @@ public class ComplaintController {
               case "CITIZEN" -> "c.reporter_id=?";
               case "LEADER" -> "c.leader_id=?";
               case "FIELD" ->
-                  "EXISTS(SELECT 1 FROM work_order w WHERE w.complaint_id=c.id AND (w.assignee_id=? OR"
-                      + " EXISTS(SELECT 1 FROM work_member wm WHERE wm.work_order_id=w.id AND"
-                      + " wm.user_id=?)) AND NOT w.handed_off AND w.status NOT IN ('DECLINED','CANCELLED'))";
+                  "EXISTS(SELECT 1 FROM work_order w WHERE w.complaint_id=c.id AND (w.assignee_id=?"
+                      + " OR EXISTS(SELECT 1 FROM work_member wm WHERE wm.work_order_id=w.id AND"
+                      + " wm.user_id=?)) AND NOT w.handed_off AND w.status NOT IN"
+                      + " ('DECLINED','CANCELLED'))";
               case "APPROVER" ->
                   "EXISTS(SELECT 1 FROM resource_request r WHERE r.complaint_id=c.id AND"
                       + (Access.approvalOverview(u)
@@ -278,14 +281,20 @@ public class ComplaintController {
     Object count = db.one("SELECT count(*) total" + base, args.toArray()).get("total");
     args.add(size);
     args.add((long) page * size);
+    var itemArgs = new ArrayList<Object>();
+    itemArgs.add(u.get("id"));
+    itemArgs.addAll(args);
     var items =
         db.list(
-            "SELECT c.id,c.title,c.address,c.status,c.created_at,c.due_at,c.version,k.name category_name,(SELECT count(*) FROM complaint_vote v WHERE v.complaint_id=c.id) votes"
+            "SELECT c.id,c.title,c.address,c.status,c.created_at,c.due_at,c.version,k.name"
+                + " category_name,(SELECT count(*) FROM complaint_vote v WHERE v.complaint_id=c.id)"
+                + " votes,EXISTS(SELECT 1 FROM resource_request r WHERE r.complaint_id=c.id AND NOT"
+                + " r.handed_off AND r.approver_id=?) can_open"
                 + base
                 + " ORDER BY "
                 + order
                 + " LIMIT ? OFFSET ?",
-            args.toArray());
+            itemArgs.toArray());
     return Map.of("items", items, "total", count, "page", page, "size", size, "stats", stats);
   }
 
@@ -339,7 +348,10 @@ public class ComplaintController {
     result.put(
         "transfers",
         db.list(
-            "SELECT t.*,s.name source_department_name,d.name target_department_name FROM department_transfer t JOIN department s ON s.id=t.source_department_id JOIN department d ON d.id=t.target_department_id WHERE t.complaint_id=? ORDER BY t.created_at",
+            "SELECT t.*,s.name source_department_name,d.name target_department_name FROM"
+                + " department_transfer t JOIN department s ON s.id=t.source_department_id JOIN"
+                + " department d ON d.id=t.target_department_id WHERE t.complaint_id=? ORDER BY"
+                + " t.created_at",
             id));
     c.put("assignment_details", c.get("assignment_details").toString());
     c.put("answers", c.get("answers").toString());
@@ -360,14 +372,18 @@ public class ComplaintController {
     result.put(
         "resources",
         db.list(
-            "SELECT r.*,u.display_name approver_name,COALESCE((SELECT json_agg(v ORDER BY v.revision) FROM resource_revision v"
-                + " WHERE v.resource_id=r.id),'[]'::json)::text revisions FROM resource_request r"
-                + " LEFT JOIN app_user u ON u.id=r.approver_id WHERE r.complaint_id=? ORDER BY r.handed_off DESC,r.created_at",
+            "SELECT r.*,u.display_name approver_name,requester.display_name"
+                + " requester_name,COALESCE((SELECT json_agg(v ORDER BY v.revision) FROM"
+                + " resource_revision v WHERE v.resource_id=r.id),'[]'::json)::text revisions FROM"
+                + " resource_request r LEFT JOIN app_user u ON u.id=r.approver_id LEFT JOIN"
+                + " app_user requester ON requester.id=r.requested_by WHERE r.complaint_id=? ORDER"
+                + " BY r.handed_off DESC,r.created_at",
             id));
     result.put(
         "reports",
         db.list(
-            "SELECT r.* FROM field_report r JOIN work_order w ON w.id=r.work_order_id WHERE r.complaint_id=? ORDER BY w.handed_off DESC,r.created_at,r.revision",
+            "SELECT r.* FROM field_report r JOIN work_order w ON w.id=r.work_order_id WHERE"
+                + " r.complaint_id=? ORDER BY w.handed_off DESC,r.created_at,r.revision",
             id));
     result.put(
         "reviews",
@@ -378,8 +394,9 @@ public class ComplaintController {
     result.put(
         "files",
         db.list(
-            "SELECT id,original_name,size_bytes,uploaded_by,report_id,resource_id,resource_revision_id,evidence_stage,content_type,public_approved,public_copy_of,created_at FROM attachment"
-                + " WHERE complaint_id=? ORDER BY created_at",
+            "SELECT"
+                + " id,original_name,size_bytes,uploaded_by,report_id,resource_id,resource_revision_id,evidence_stage,content_type,public_approved,public_copy_of,created_at"
+                + " FROM attachment WHERE complaint_id=? ORDER BY created_at",
             id));
     result.put(
         "approvalStages",
@@ -449,8 +466,9 @@ public class ComplaintController {
           department,
           u.get("municipality_id"));
     return db.list(
-        "SELECT id,display_name,department_id FROM app_user WHERE municipality_id=? AND role IN (?,'ADMIN') AND"
-            + " enabled=true AND (?::uuid IS NULL OR department_id=?) ORDER BY display_name",
+        "SELECT id,display_name,department_id FROM app_user WHERE municipality_id=? AND role IN"
+            + " (?,'ADMIN') AND enabled=true AND (?::uuid IS NULL OR department_id=?) ORDER BY"
+            + " display_name",
         u.get("municipality_id"),
         role,
         department,
@@ -491,15 +509,18 @@ public class ComplaintController {
     }
     var stats =
         db.one(
-            "SELECT COALESCE(sum((SELECT count(*) FROM complaint_vote v WHERE v.complaint_id=c.id)),0) votes,count(*) total,count(*) FILTER(WHERE c.status NOT IN"
-                + " ('CLOSED','REJECTED','TERMINATED')) in_progress,count(*) FILTER(WHERE c.status='CLOSED') closed"
+            "SELECT COALESCE(sum((SELECT count(*) FROM complaint_vote v WHERE"
+                + " v.complaint_id=c.id)),0) votes,count(*) total,count(*) FILTER(WHERE c.status"
+                + " NOT IN ('CLOSED','REJECTED','TERMINATED')) in_progress,count(*) FILTER(WHERE"
+                + " c.status='CLOSED') closed"
                 + base,
             parameters.toArray());
     String fields =
-        "SELECT (c.external_id LIKE 'mock-community-v1:%') mock,c.id,c.category_id,k.name category_name,c.status,c.created_at,"
-            + "(SELECT count(*) FROM complaint_vote v WHERE v.complaint_id=c.id) votes,"
-            + "EXISTS(SELECT 1 FROM follower f WHERE f.complaint_id=c.id AND f.user_id=?::uuid) following,"
-            + "EXISTS(SELECT 1 FROM complaint_vote v WHERE v.complaint_id=c.id AND v.user_id=?::uuid) voted,";
+        "SELECT (c.external_id LIKE 'mock-community-v1:%') mock,c.id,c.category_id,k.name"
+            + " category_name,c.status,c.created_at,(SELECT count(*) FROM complaint_vote v WHERE"
+            + " v.complaint_id=c.id) votes,EXISTS(SELECT 1 FROM follower f WHERE"
+            + " f.complaint_id=c.id AND f.user_id=?::uuid) following,EXISTS(SELECT 1 FROM"
+            + " complaint_vote v WHERE v.complaint_id=c.id AND v.user_id=?::uuid) voted,";
     var readerParameters = new ArrayList<Object>(List.of(u.get("id"), u.get("id")));
     readerParameters.addAll(parameters);
     var pagedParameters = new ArrayList<Object>(readerParameters);
@@ -545,11 +566,11 @@ public class ComplaintController {
     access.role(u, "CITIZEN");
     var c =
         db.one(
-            "SELECT c.id,k.name category_name,k.name title,c.status,c.created_at,c.updated_at,c.due_at,"
-                + "round(ST_Y(c.location::geometry)::numeric,3) latitude,"
-                + "round(ST_X(c.location::geometry)::numeric,3) longitude,"
-                + "(c.external_id LIKE 'mock-community-v1:%') mock"
-                + " FROM complaint c JOIN category k ON k.id=c.category_id WHERE c.id=? AND c.municipality_id=?",
+            "SELECT c.id,k.name category_name,k.name"
+                + " title,c.status,c.created_at,c.updated_at,c.due_at,round(ST_Y(c.location::geometry)::numeric,3)"
+                + " latitude,round(ST_X(c.location::geometry)::numeric,3) longitude,(c.external_id"
+                + " LIKE 'mock-community-v1:%') mock FROM complaint c JOIN category k ON"
+                + " k.id=c.category_id WHERE c.id=? AND c.municipality_id=?",
             id, u.get("municipality_id"));
     transfers.publicProgress(c);
     return Map.of(
@@ -568,7 +589,8 @@ public class ComplaintController {
   private List<Map<String, Object>> citizenHistory(UUID id, String status) {
     var history =
         db.list(
-            "SELECT action,from_status,to_status,created_at,reason FROM audit_event WHERE complaint_id=? AND to_status IS NOT NULL ORDER BY created_at,id",
+            "SELECT action,from_status,to_status,created_at,reason FROM audit_event WHERE"
+                + " complaint_id=? AND to_status IS NOT NULL ORDER BY created_at,id",
             id);
     String terminalAction =
         Map.of("REJECTED", "REJECT", "TERMINATED", "DENY", "CLOSED", "CLOSE").get(status);

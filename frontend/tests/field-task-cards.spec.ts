@@ -3,8 +3,8 @@ import { test, expect } from "@playwright/test";
 for (const failure of [false, true]) {
   test(
     failure
-      ? "card metadata errors offer retry without inventing an appointment"
-      : "stale card metadata cannot replace the current page appointment or pin",
+      ? "card metadata errors offer retry without inventing a location"
+      : "stale card metadata cannot replace the current page pin",
     async ({ page }) => {
       let firstRequests = 0;
       let release: (() => void) | undefined;
@@ -71,11 +71,13 @@ for (const failure of [false, true]) {
         await expect(cards).toContainText("Metadata unavailable");
         await expect(cards).not.toContainText("2026-12-01");
         await cards.getByRole("button", { name: "ลองใหม่", exact: true }).click();
-        await expect(cards).toContainText("2026-12-01");
+        await expect(cards.getByRole("button", { name: "เปิดตำแหน่ง", exact: true })).toBeEnabled();
+        await cards.getByRole("button", { name: "เปิดตำแหน่ง", exact: true }).click();
+        await expect(cards).toContainText("13.10000");
       } else {
         await expect.poll(() => firstRequests).toBe(1);
         await page.locator(".ant-pagination-next").click();
-        await expect(cards).toContainText("2026-12-02");
+        await expect(cards.getByRole("button", { name: "เปิดตำแหน่ง", exact: true })).toBeEnabled();
         release!();
         await expect(cards).not.toContainText("2026-12-01");
         await cards.getByRole("button", { name: "เปิดตำแหน่ง", exact: true }).click();
@@ -86,9 +88,7 @@ for (const failure of [false, true]) {
   );
 }
 
-test("changing account cancels old metadata and keeps the new account's appointment and pin", async ({
-  page,
-}) => {
+test("changing account cancels old metadata and keeps the new account's pin", async ({ page }) => {
   let account = "old",
     oldRequested = false;
   let release!: () => void;
@@ -145,7 +145,7 @@ test("changing account cancels old metadata and keeps the new account's appointm
   account = "new";
   await page.evaluate(() => (window as any).renderField("new"));
   const card = page.locator("#account-harness .field-task-card");
-  await expect(card).toContainText("2026-12-15");
+  await expect(card.getByRole("button", { name: "เปิดตำแหน่ง", exact: true })).toBeEnabled();
   release();
   await card.getByRole("button", { name: "เปิดตำแหน่ง", exact: true }).click();
   await expect(card).toContainText("14.00000");
@@ -208,7 +208,7 @@ test("slow card metadata completes across unchanged list polling", async ({ page
   const card = page.locator(".field-task-card");
   await expect(card).toContainText("Updated title after poll");
   release();
-  await expect(card).toContainText("2026-12-19");
+  await expect(card.getByRole("button", { name: "เปิดตำแหน่ง", exact: true })).toBeEnabled();
   await card.getByRole("button", { name: "เปิดตำแหน่ง", exact: true }).click();
   await expect(card).toContainText("14.50000");
   expect(details).toBe(1);

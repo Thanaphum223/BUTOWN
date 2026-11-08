@@ -35,14 +35,16 @@ class ApproverOverviewIntegrationTest {
     workflowId = workflow.createDefault(town, 1);
     category = UUID.randomUUID();
     db.run(
-        "INSERT INTO category(id,municipality_id,workflow_id,name,sla_hours) VALUES(?,?,?,'Road',72)",
+        "INSERT INTO category(id,municipality_id,workflow_id,name,sla_hours)"
+            + " VALUES(?,?,?,'Road',72)",
         category,
         town,
         workflowId);
     for (var role : List.of("CITIZEN", "OFFICER", "LEADER", "FIELD", "APPROVER", "ADMIN")) {
       UUID id = UUID.randomUUID();
       db.run(
-          "INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role) VALUES(?,?,?,'x','Overview user',?)",
+          "INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role)"
+              + " VALUES(?,?,?,'x','Overview user',?)",
           id,
           town,
           "overview" + role,
@@ -52,7 +54,8 @@ class ApproverOverviewIntegrationTest {
     }
     otherApprover = UUID.randomUUID();
     db.run(
-        "INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role) VALUES(?,?,'overviewOther','x','Other','APPROVER')",
+        "INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role)"
+            + " VALUES(?,?,'overviewOther','x','Other','APPROVER')",
         otherApprover,
         town);
     for (var entry :
@@ -75,7 +78,10 @@ class ApproverOverviewIntegrationTest {
       UUID id = UUID.randomUUID();
       cases.put(entry.getKey(), id);
       db.run(
-          "INSERT INTO complaint(id,municipality_id,category_id,reporter_id,workflow_id,title,description,address,status,due_at,contact_name,contact_phone,contact_email) VALUES(?,?,?,?,?,?,'Private description','Original address',?,now()-interval '1 day','Private name','0999999999','private@example.invalid')",
+          "INSERT INTO"
+              + " complaint(id,municipality_id,category_id,reporter_id,workflow_id,title,description,address,status,due_at,contact_name,contact_phone,contact_email)"
+              + " VALUES(?,?,?,?,?,?,'Private description','Original address',?,now()-interval '1"
+              + " day','Private name','0999999999','private@example.invalid')",
           id,
           town,
           category,
@@ -86,7 +92,8 @@ class ApproverOverviewIntegrationTest {
     }
     for (var name : List.of("assigned", "other", "unassigned"))
       db.run(
-          "INSERT INTO resource_request(id,complaint_id,requested_by,approver_id,status) VALUES(?,?,?,?,'PENDING')",
+          "INSERT INTO resource_request(id,complaint_id,requested_by,approver_id,status)"
+              + " VALUES(?,?,?,?,'PENDING')",
           UUID.randomUUID(),
           cases.get(name),
           reporter,
@@ -109,12 +116,15 @@ class ApproverOverviewIntegrationTest {
     db.run("INSERT INTO municipality(id,name) VALUES(?,'Foreign')", foreign);
     UUID foreignWorkflow = workflow.createDefault(foreign, 1);
     db.run(
-        "INSERT INTO category(id,municipality_id,workflow_id,name,sla_hours) VALUES(?,?,?,'Foreign category',72)",
+        "INSERT INTO category(id,municipality_id,workflow_id,name,sla_hours) VALUES(?,?,?,'Foreign"
+            + " category',72)",
         foreignCategory,
         foreign,
         foreignWorkflow);
     db.run(
-        "INSERT INTO complaint(id,municipality_id,category_id,reporter_id,workflow_id,title,description,address,due_at) VALUES(?,?,?,?,?,'Foreign case','Secret','Secret',now())",
+        "INSERT INTO"
+            + " complaint(id,municipality_id,category_id,reporter_id,workflow_id,title,description,address,due_at)"
+            + " VALUES(?,?,?,?,?,'Foreign case','Secret','Secret',now())",
         UUID.randomUUID(),
         foreign,
         foreignCategory,
@@ -143,10 +153,43 @@ class ApproverOverviewIntegrationTest {
               "due_at",
               "version",
               "category_name",
-              "votes"),
+              "votes",
+              "can_open"),
           fields);
     }
     assertEquals(new HashSet<>(cases.values().stream().map(UUID::toString).toList()), ids);
+  }
+
+  @Test
+  void overviewOpeningRequiresCurrentAccountRecipientAndExcludesHandedOffRequests()
+      throws Exception {
+    db.run(
+        "UPDATE resource_request SET approver_id=?,handed_off=true WHERE complaint_id=?",
+        approver,
+        cases.get("unassigned"));
+    var result = list("?overview=true");
+    assertEquals(7, result.path("total").asInt());
+    for (var item : result.path("items")) {
+      assertTrue(item.path("can_open").isBoolean(), "Overview needs explicit opening eligibility");
+      assertEquals(
+          cases.get("assigned").toString().equals(item.path("id").asText()),
+          item.path("can_open").asBoolean(),
+          item.path("title").asText());
+    }
+    mvc.perform(get("/api/complaints/" + cases.get("unassigned")).with(user("overviewAPPROVER")))
+        .andExpect(status().isForbidden());
+    var other =
+        json.readTree(
+            mvc.perform(get("/api/complaints?overview=true").with(user("overviewOther")))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+    for (var item : other.path("items"))
+      assertEquals(
+          cases.get("other").toString().equals(item.path("id").asText()),
+          item.path("can_open").asBoolean(),
+          item.path("title").asText());
   }
 
   @Test

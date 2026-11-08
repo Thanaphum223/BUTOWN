@@ -18,6 +18,7 @@ const items = [
   due_at: "2026-10-02T00:00:00Z",
   version: 1,
   votes: 0,
+  can_open: id === "assigned",
 }));
 const stats = { total: 7, in_progress: 4, closed: 1, overdue: 4 };
 
@@ -90,7 +91,7 @@ async function setup(
 
 for (const width of [390, 768, 1280])
   for (const language of ["th", "en"])
-    test(`municipal summaries are read-only and responsive ${language} at ${width}`, async ({
+    test(`municipal summaries preserve recipient access and responsive layout ${language} at ${width}`, async ({
       page,
     }) => {
       await page.setViewportSize({ width, height: 1000 });
@@ -107,19 +108,14 @@ for (const width of [390, 768, 1280])
       await expect(overview.locator(".workspace-stats")).toContainText(
         language === "en" ? "All municipal cases" : "คำร้องทั้งหมดในเทศบาล",
       );
-      await expect(overview.locator(".ant-statistic-content-value")).toHaveText([
-        "7",
-        "4",
-        "1",
-        "4",
-      ]);
+      await expect(overview.locator(".ant-statistic-content-value")).toHaveText(["7", "4", "1"]);
       await expect(overview).toContainText("Original category สมัครสมาชิก");
       for (const id of ["closed", "rejected", "terminated", "unrouted", "unassigned"])
         await expect(
           overview.getByRole("heading", { name: `Original ${id}`, exact: true }),
         ).toBeVisible();
       await expect(overview.locator(".overview-summary button, .overview-summary a")).toHaveCount(
-        0,
+        1,
       );
       await overview.getByRole("heading", { name: "Original other", exact: true }).click();
       expect(detailRequests).toEqual([]);
@@ -194,6 +190,33 @@ for (const width of [390, 768, 1280])
       await expect(page.getByText("Assigned detail", { exact: true })).toHaveCount(0);
     });
 
+for (const language of ["th", "en"])
+  test(`overview opens only the recipient's routed complaint in ${language}`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 1000 });
+    const { detailRequests } = await setup(page);
+    await page.locator(".topbar .language-switcher").selectOption(language);
+    const overview = page.locator(".approver-overview");
+    const assigned = overview.locator(".overview-summary").filter({ hasText: "Original assigned" });
+    await expect(overview.locator(".overview-summary")).toHaveCount(7);
+    for (const id of ["other", "unassigned", "unrouted", "closed", "rejected", "terminated"]) {
+      const summary = overview.locator(".overview-summary").filter({ hasText: `Original ${id}` });
+      await expect(summary.getByRole("button")).toHaveCount(0);
+      await expect(summary.getByRole("link")).toHaveCount(0);
+      await summary.getByRole("heading", { name: `Original ${id}`, exact: true }).click();
+    }
+    expect(detailRequests).toEqual([]);
+    const open = assigned.getByRole("button", {
+      name: language === "en" ? "View details" : "ดูรายละเอียด",
+      exact: true,
+    });
+    await expect(open).toBeVisible();
+    await open.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByText("Assigned detail", { exact: true })).toBeVisible();
+    expect([...new Set(detailRequests)]).toEqual(["/api/complaints/assigned"]);
+    await expect(overview).toHaveCount(0);
+  });
+
 test("filters and pagination query summaries while global totals stay municipal", async ({
   page,
 }) => {
@@ -249,7 +272,7 @@ test("filters and pagination query summaries while global totals stay municipal"
   await expect.poll(() => lists.at(-1)!.searchParams.has("status")).toBe(false);
   expect(lists.at(-1)!.searchParams.has("categoryId")).toBe(false);
   expect(lists.at(-1)!.searchParams.get("area")).toBe("");
-  await expect(overview.locator(".ant-statistic-content-value")).toHaveText(["7", "4", "1", "4"]);
+  await expect(overview.locator(".ant-statistic-content-value")).toHaveText(["7", "4", "1"]);
 });
 
 test("failed overview hides stale totals and rows and retries successfully", async ({ page }) => {
@@ -261,7 +284,7 @@ test("failed overview hides stale totals and rows and retries successfully", asy
   await overview.getByRole("button", { name: /โหลดใหม่/ }).click();
   await expect(overview.getByRole("alert")).toContainText("Overview unavailable");
   await expect(overview.locator(".overview-summary")).toHaveCount(0);
-  await expect(overview.locator(".ant-statistic-content-value")).toHaveText(["—", "—", "—", "—"]);
+  await expect(overview.locator(".ant-statistic-content-value")).toHaveText(["—", "—", "—"]);
   failure = false;
   await overview.getByRole("button", { name: /โหลดใหม่/ }).click();
   await expect(overview.locator(".overview-summary")).toHaveCount(7);
