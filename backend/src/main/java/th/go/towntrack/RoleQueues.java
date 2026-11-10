@@ -66,6 +66,25 @@ public class RoleQueues {
     return groups(role).stream().map(g -> Map.of("value", g.value, "label", g.label)).toList();
   }
 
+  String predicate(String role, String queue) {
+    var states = statuses(role, queue);
+    String statuses =
+        "c.status IN ("
+            + String.join(",", states.stream().map(state -> "'" + state + "'").toList())
+            + ")";
+    return "OFFICER".equals(role) && "handoff".equals(queue)
+        ? "(" + statuses + " OR " + WorkflowPolicy.RECOVERABLE_ASSIGNMENT + ")"
+        : statuses;
+  }
+
+  String actionable(String role) {
+    if (List.of("ADMIN", "CITIZEN").contains(role)) return "true";
+    return "("
+        + String.join(
+            " OR ", groups(role).stream().map(group -> predicate(role, group.value())).toList())
+        + ")";
+  }
+
   List<String> statuses(String role, String queue) {
     return groups(role).stream()
         .filter(g -> g.value.equals(queue))

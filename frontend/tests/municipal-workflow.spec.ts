@@ -124,6 +124,7 @@ async function workspace(
   });
   await page.goto("/");
   if (historical) await page.getByRole("menuitem", { name: /ประวัติงาน/ }).click();
+  else if (role === "APPROVER") await page.getByRole("menuitem", { name: /คิวงาน/ }).click();
   await page.getByRole("button", { name: /เปิดงาน งานเทศบาลทดสอบ/ }).click();
   return payload;
 }
@@ -202,11 +203,7 @@ test("leader can render a valid proposal PDF and distinguish broken documents", 
   await page.route("**/api/files/sample-pdf", (route) =>
     route.fulfill({ contentType: "application/pdf", body: sample }),
   );
-  await page
-    .getByRole("button", { name: /โหลดใหม่/ })
-    .last()
-    .click();
-  await expect(page.locator(".resource-review-card")).toContainText("Proposal");
+  await expect(page.locator(".resource-review-card")).toContainText("Proposal", { timeout: 10000 });
   await page
     .getByRole("button", { name: /ดูเอกสาร/ })
     .first()
@@ -395,4 +392,138 @@ test("returning a misassigned job leaves detail before its leader access is remo
   });
   expect(submitted).toBe(true);
   expect(staleReads).toBe(0);
+});
+
+for (const [role, status, action, label] of [
+  ["OFFICER", "TRIAGED", "REASSIGN_LEADER", "เลือกหัวหน้าหน่วยงานใหม่"],
+  ["LEADER", "TRIAGED", "ASSIGN", "มอบหมายทีม"],
+  ["FIELD", "ASSIGNED", "ACCEPT", "กดรับงานและลงพื้นที่สำรวจ"],
+  ["APPROVER", "RESOURCE_APPROVAL", "APPROVE", "อนุมัติ"],
+])
+  test(`automatically refreshes open work for ${role} without reload controls`, async ({
+    page,
+  }) => {
+    const payload = await workspace(page, role, status, []);
+    await expect(page.getByRole("heading", { name: "รายละเอียด", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "โหลดใหม่", exact: true })).toHaveCount(0);
+    payload.complaint.description = "ข้อมูลใหม่จากผู้รับผิดชอบ";
+    payload.complaint.version = 2;
+    payload.actions = [{ action }];
+    await expect(
+      page.locator(".split-case-summary").getByText("ข้อมูลใหม่จากผู้รับผิดชอบ", { exact: true }),
+    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("button", { name: label, exact: true })).toBeVisible();
+    expect(payload.writes).toHaveLength(0);
+  });
+
+test("automatic refresh preserves an open action draft and resumes after closing", async ({
+  page,
+}) => {
+  const payload = await workspace(page, "LEADER", "TRIAGED", ["RETURN_ASSIGNMENT"]);
+  await page.getByRole("button", { name: "ส่งคืนงานที่จ่ายผิด", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  const reason = dialog.getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true });
+  await reason.fill("รายละเอียดที่กำลังกรอก");
+  payload.complaint.description = "รายละเอียดเปลี่ยนระหว่างกรอก";
+  const reads = () =>
+    payload.requests.filter(
+      (url: string) => new URL(url).pathname === "/api/complaints/municipal-case",
+    ).length;
+  const initialReads = reads();
+  await page.waitForTimeout(5000);
+  await expect(reason).toHaveValue("รายละเอียดที่กำลังกรอก");
+  expect(reads()).toBe(initialReads);
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(
+    page.locator(".split-case-summary").getByText("รายละเอียดเปลี่ยนระหว่างกรอก", { exact: true }),
+  ).toBeVisible({
+    timeout: 10000,
+  });
+  expect(payload.writes).toHaveLength(0);
+});
+
+test("officer can select a replacement head with a required reason", async ({ page }) => {
+  const payload = await workspace(page, "OFFICER", "TRIAGED", ["REASSIGN_LEADER"]);
+  await page.getByRole("button", { name: "เลือกหัวหน้าหน่วยงานใหม่", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "เลือกหัวหน้าหน่วยงานใหม่", exact: true });
+  await dialog.getByLabel("หัวหน้าหน่วยงาน", { exact: true }).click();
+  await page
+    .locator(".ant-select-dropdown:visible")
+    .getByText("หัวหน้ากองสาธารณสุข", { exact: true })
+    .click();
+  await dialog.getByRole("button", { name: "ยืนยันเลือกหัวหน้าหน่วยงานใหม่", exact: true }).click();
+  expect(payload.writes).toHaveLength(0);
+  await dialog
+    .getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true })
+    .fill("บัญชีเดิมปิดใช้งานแล้ว");
+  await dialog.getByRole("button", { name: "ยืนยันเลือกหัวหน้าหน่วยงานใหม่", exact: true }).click();
+  await expect.poll(() => payload.writes.length).toBe(1);
+  expect(payload.writes[0]).toMatchObject({
+    action: "REASSIGN_LEADER",
+    leaderId: "health-leader",
+    reason: "บัญชีเดิมปิดใช้งานแล้ว",
+    version: 1,
+  });
+  expect(
+    payload.requests.some((url: string) =>
+      url.includes("/people?role=LEADER&departmentId=engineering"),
+    ),
+  ).toBe(true);
+});
+
+test("a failed refresh after submission preserves the draft and retries only the read", async ({
+  page,
+}) => {
+  const payload = await workspace(page, "FIELD", "ACCEPTED", ["REQUEST_RESOURCE"]);
+  let readFailure = false;
+  let writes = 0;
+  await page.route("**/api/complaints/municipal-case/actions", (route) => {
+    writes++;
+    readFailure = true;
+    return route.fulfill({ status: 409, json: { message: "ข้อมูลเปลี่ยนแล้ว" } });
+  });
+  await page.route("**/api/complaints/municipal-case", (route) =>
+    route.fulfill(
+      readFailure
+        ? { status: 503, json: { message: "ข้อมูลชั่วคราวไม่พร้อม" } }
+        : { json: payload },
+    ),
+  );
+  await page
+    .getByRole("button", { name: "ส่งเอกสารประเมินทรัพยากร/ของบจากหน้างาน", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true })
+    .fill("ต้องใช้อุปกรณ์เพิ่ม");
+  await dialog
+    .getByRole("button", { name: "ยืนยันส่งเอกสารประเมินทรัพยากร/ของบจากหน้างาน", exact: true })
+    .click();
+  await expect(page.getByRole("alert").filter({ hasText: "ข้อมูลชั่วคราวไม่พร้อม" })).toBeVisible();
+  await expect(dialog.getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true })).toHaveValue(
+    "ต้องใช้อุปกรณ์เพิ่ม",
+  );
+  readFailure = false;
+  await expect(page.getByRole("alert").filter({ hasText: "ข้อมูลชั่วคราวไม่พร้อม" })).toHaveCount(
+    0,
+    { timeout: 10000 },
+  );
+  await expect(dialog.getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true })).toHaveValue(
+    "ต้องใช้อุปกรณ์เพิ่ม",
+  );
+  expect(writes).toBe(1);
+});
+
+test("permission loss removes the cached case without signing out a valid account", async ({
+  page,
+}) => {
+  await workspace(page, "OFFICER", "TRIAGED", []);
+  await expect(page.getByRole("heading", { name: "รายละเอียด", exact: true })).toBeVisible();
+  await page.route("**/api/complaints/municipal-case", (route) =>
+    route.fulfill({ status: 403, json: { message: "ไม่มีสิทธิ์ดูคำร้องนี้แล้ว" } }),
+  );
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByRole("alert")).toContainText("ไม่มีสิทธิ์ดูคำร้องนี้แล้ว");
+  await expect(page.locator(".split-case-summary")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "เข้าสู่ระบบ", exact: true })).toHaveCount(0);
 });

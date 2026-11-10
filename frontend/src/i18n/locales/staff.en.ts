@@ -1,4 +1,14 @@
 const messages: Record<string, string> = {
+  "ข้อมูลล่าสุดยังอัปเดตไม่ได้ ระบบจะลองใหม่อัตโนมัติ":
+    "Unable to refresh the latest data. Retrying automatically.",
+  เลือกหัวหน้าหน่วยงานใหม่: "Select a replacement department head",
+  "หัวหน้าที่รับผิดชอบเดิมไม่สามารถรับงานต่อได้ กรุณาเลือกหัวหน้าหน่วยงานใหม่ก่อนจัดทีม":
+    "The previous head is unavailable. Select a replacement head before assigning the team.",
+  "แสดงเฉพาะงานที่ถึงขั้นตอนของบทบาทคุณ อัปเดตให้อัตโนมัติ":
+    "Shows tasks ready for your role, updated automatically.",
+  "โหลดรายการงานไม่สำเร็จ ระบบจะลองใหม่อัตโนมัติ": "Could not load tasks. Retrying automatically.",
+  "โหลดประเภทคำร้องไม่สำเร็จ ระบบจะลองใหม่อัตโนมัติ":
+    "Could not load categories. Retrying automatically.",
   "โหลดประเภทคำร้องไม่สำเร็จ กรุณากดโหลดใหม่":
     "Could not load complaint categories. Select Refresh to retry.",
   ภาพรวมคำร้องทั้งเทศบาล: "Municipal overview",

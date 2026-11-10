@@ -1,3 +1,4 @@
+import { useLiveQuery } from "./useLiveQuery";
 import FieldTaskCard, { type CardMetadata } from "./FieldTaskCard";
 import { useI18n } from "./i18n/useI18n";
 import { useEffect, useRef, useState } from "react";
@@ -16,7 +17,6 @@ import {
 } from "antd";
 import {
   FileTextOutlined,
-  ReloadOutlined,
   EnvironmentOutlined,
   RightOutlined,
   LikeOutlined,
@@ -49,14 +49,11 @@ export default function StaffWorkspace({
       .then(setCatalog)
       .catch(() => {});
   }, []);
-  const [data, setData] = useState<D>(),
-    [error, setError] = useState(""),
-    [search, setSearch] = useState(""),
+  const [search, setSearch] = useState(""),
     [query, setQuery] = useState(""),
     [status, setStatus] = useState<string>(),
     [selected, setSelected] = useState(""),
-    [page, setPage] = useState(1),
-    [refresh, setRefresh] = useState(0);
+    [page, setPage] = useState(1);
   useEffect(() => {
     if (search === query) return;
     const timer = setTimeout(() => {
@@ -65,39 +62,27 @@ export default function StaffWorkspace({
     }, 300);
     return () => clearTimeout(timer);
   }, [search]);
+  const { data, error, reload } = useLiveQuery<D>(
+    "/complaints?page=" +
+      (page - 1) +
+      `&size=10&${history ? "historyOnly" : "activeOnly"}=true&q=` +
+      encodeURIComponent(query) +
+      (history ? "&status=" : "&queue=") +
+      encodeURIComponent(status || "") +
+      `&sort=${sort}&area=${encodeURIComponent(area)}${category ? `&categoryId=${category}` : ""}`,
+    0,
+    `${user.id}:${user.role}`,
+  );
   useEffect(() => {
-    let alive = true;
-    setError("");
-    api<D>(
-      "/complaints?page=" +
-        (page - 1) +
-        `&size=10&${history ? "historyOnly" : "activeOnly"}=true&q=` +
-        encodeURIComponent(query) +
-        (history ? "&status=" : "&queue=") +
-        encodeURIComponent(status || "") +
-        `&sort=${sort}&area=${encodeURIComponent(area)}${category ? `&categoryId=${category}` : ""}`,
-    )
-      .then((d) => {
-        if (alive) {
-          if (page > 1 && !d.items.length && d.total <= (page - 1) * 10) {
-            setPage(Math.max(1, Math.ceil(d.total / 10)));
-          } else setData(d);
-        }
-      })
-      .catch((e) => {
-        if (alive) setError(e.message);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [page, query, status, refresh, category, area, sort, history, user.id, user.role]);
+    if (data && page > 1 && !data.items.length && data.total <= (page - 1) * 10)
+      setPage(Math.max(1, Math.ceil(data.total / 10)));
+  }, [data, page]);
   // Cache belongs to this account; workers never publish results after cleanup.
   useEffect(() => {
     metadataCache.current.clear();
     setMetadata({});
     setSelected("");
     setOpenMap("");
-    setData(undefined);
   }, [user.id, user.role, history]);
   // Polls may update card text without changing the metadata each card needs.
   // Only membership/version changes invalidate the current batch of requests.
@@ -154,13 +139,6 @@ export default function StaffWorkspace({
       controller.abort();
     };
   }, [metadataItems, user.id, user.role, history, metadataRetry]);
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (document.visibilityState === "visible") setRefresh((v) => v + 1);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, []);
-  const reload = () => setRefresh((x) => x + 1);
   return (
     <div
       className={
@@ -186,14 +164,11 @@ export default function StaffWorkspace({
               ? t("งานที่ปิดเรื่องหรือยุติแล้วในขอบเขตสิทธิ์ของคุณ ค้นหาและเปิดดูรายละเอียดได้")
               : user.role === "FIELD"
                 ? t("เลือกงานเพื่อรับงาน ดูตำแหน่ง ถ่ายรูป และส่งรายงาน")
-                : t("ตรวจข้อมูล ประสานทีม และติดตามผลจนทุกเรื่องได้รับการดูแล")}
+                : t("แสดงเฉพาะงานที่ถึงขั้นตอนของบทบาทคุณ อัปเดตให้อัตโนมัติ")}
           </Text>
         </div>
         <Space>
           <Tag color="green">{t("พื้นที่ทำงานของคุณ")}</Tag>
-          <Button icon={<ReloadOutlined />} onClick={reload}>
-            {t("โหลดใหม่")}
-          </Button>
         </Space>
       </div>
       {user.role === "APPROVER" && !history && (
@@ -373,7 +348,9 @@ export default function StaffWorkspace({
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
                 description={
-                  error ? t("โหลดรายการงานไม่สำเร็จ กรุณากดโหลดใหม่") : t("ไม่พบงานตามตัวกรอง")
+                  error
+                    ? t("โหลดรายการงานไม่สำเร็จ ระบบจะลองใหม่อัตโนมัติ")
+                    : t("ไม่พบงานตามตัวกรอง")
                 }
               />
             ) : (

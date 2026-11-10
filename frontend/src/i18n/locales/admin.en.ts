@@ -1,4 +1,6 @@
 const messages: Record<string, string> = {
+  "ถ้าไม่พบรายชื่อ ให้ผู้ใช้เข้าสู่ TownTrack ผ่าน Gov Center ก่อน รายชื่อจะอัปเดตอัตโนมัติ":
+    "If an account is missing, ask the user to sign in through Gov Center. The list updates automatically.",
   ไม่สามารถดำเนินการได้: "Unable to complete the action",
   ข้อมูลไม่ครบหรือรูปแบบไม่ถูกต้อง: "Required information is missing or invalid",
   "ข้อมูลซ้ำหรือขัดกับข้อมูลที่มีอยู่ กรุณาตรวจสอบแล้วลองใหม่":

@@ -17,7 +17,7 @@ import {
   Tabs,
   Typography,
 } from "antd";
-import { DeleteOutlined, ReloadOutlined } from "@ant-design/icons";
+import { DeleteOutlined } from "@ant-design/icons";
 import { api, post, roleNames } from "./api";
 import DepartmentPeople from "./DepartmentPeople";
 import AccountDeletion from "./AccountDeletion";
@@ -174,13 +174,6 @@ export default function Admin() {
                           .map(([value, label]) => ({ value, label: t(label) })),
                       ]}
                     />
-                    <Button
-                      icon={<ReloadOutlined />}
-                      loading={refreshing}
-                      onClick={() => void load()}
-                    >
-                      {t("โหลดรายชื่อใหม่")}
-                    </Button>
                     <Button type="primary" onClick={() => create("roles")}>
                       {t("กำหนดบทบาทให้บัญชีที่มีอยู่")}
                     </Button>

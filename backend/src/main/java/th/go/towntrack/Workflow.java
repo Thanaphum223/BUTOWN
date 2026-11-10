@@ -77,7 +77,18 @@ public class Workflow {
 
   public void audit(
       Map<String, Object> u, UUID id, String action, String from, String to, String reason) {
-    var details = new LinkedHashMap<String, Object>();
+    audit(u, id, action, from, to, reason, Map.of());
+  }
+
+  void audit(
+      Map<String, Object> u,
+      UUID id,
+      String action,
+      String from,
+      String to,
+      String reason,
+      Map<String, Object> extra) {
+    var details = new LinkedHashMap<String, Object>(extra);
     details.put("actorRole", u.get("role"));
     details.put("actorName", u.get("display_name"));
     if (u.get("department_id") != null) details.put("actorDepartmentId", u.get("department_id"));
@@ -170,6 +181,16 @@ public class Workflow {
       case "RETURN_ASSIGNMENT" -> {
         db.run("UPDATE complaint SET leader_id=NULL WHERE id=?", id);
         notifyUser(c.get("officer_id"), id, "หัวหน้าส่งคืนงาน กรุณาตรวจหน่วยงานที่รับผิดชอบ");
+      }
+      case "REASSIGN_LEADER" -> {
+        var leader = access.target(b.get("leaderId"), u, "LEADER", c.get("department_id"));
+        db.run(
+            "UPDATE complaint SET officer_id=?,leader_id=? WHERE id=?",
+            u.get("id"),
+            leader.get("id"),
+            id);
+        // Keep original dispatch details and all earlier history intact.
+        notifyUser(leader.get("id"), id, "มีคำร้องรอจัดทีม หลังเปลี่ยนหัวหน้าผู้รับผิดชอบ");
       }
       case "TRIAGE" -> {
         var leader = access.target(b.get("leaderId"), u, "LEADER", c.get("department_id"));
@@ -561,7 +582,12 @@ public class Workflow {
           throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ไม่รองรับการดำเนินการนี้");
     }
     db.run("UPDATE complaint SET status=?,version=version+1,updated_at=now() WHERE id=?", to, id);
-    audit(u, id, action, from, to, reason);
+    var assignmentAudit = new LinkedHashMap<String, Object>();
+    if (action.equals("REASSIGN_LEADER")) {
+      assignmentAudit.put("previousLeaderId", c.get("leader_id"));
+      assignmentAudit.put("leaderId", b.get("leaderId"));
+    }
+    audit(u, id, action, from, to, reason, assignmentAudit);
     notifyUser(c.get("reporter_id"), id, "สถานะคำร้องเปลี่ยนเป็น " + to);
     for (var f :
         db.list(

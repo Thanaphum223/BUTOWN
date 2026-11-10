@@ -275,18 +275,20 @@ test("filters and pagination query summaries while global totals stay municipal"
   await expect(overview.locator(".ant-statistic-content-value")).toHaveText(["7", "4", "1"]);
 });
 
-test("failed overview hides stale totals and rows and retries successfully", async ({ page }) => {
+test("temporary read failure preserves cached summaries and retries successfully", async ({
+  page,
+}) => {
   let failure = false;
   const { detailRequests } = await setup(page, async () => (failure ? "failure" : undefined));
   const overview = page.locator(".approver-overview");
   await expect(overview.locator(".overview-summary")).toHaveCount(7);
   failure = true;
-  await overview.getByRole("button", { name: /โหลดใหม่/ }).click();
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(overview.getByRole("alert")).toContainText("Overview unavailable");
-  await expect(overview.locator(".overview-summary")).toHaveCount(0);
-  await expect(overview.locator(".ant-statistic-content-value")).toHaveText(["—", "—", "—"]);
+  await expect(overview.locator(".overview-summary")).toHaveCount(7);
+  await expect(overview.locator(".ant-statistic-content-value")).toHaveText(["7", "4", "1"]);
   failure = false;
-  await overview.getByRole("button", { name: /โหลดใหม่/ }).click();
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(overview.locator(".overview-summary")).toHaveCount(7);
   await expect(overview.getByRole("alert")).toHaveCount(0);
   expect(detailRequests).toEqual([]);
@@ -347,7 +349,7 @@ test("catalog failure stays visible while municipal summaries remain usable and 
   await expect(overview.locator(".overview-summary")).toHaveCount(7);
   await expect(overview.getByRole("alert")).toContainText("Categories unavailable");
   failure = false;
-  await overview.getByRole("button", { name: /โหลดใหม่/ }).click();
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(overview.getByRole("alert")).toHaveCount(0);
   await overview.locator("summary").click();
   await overview.getByRole("combobox", { name: "ประเภทปัญหา", exact: true }).click();

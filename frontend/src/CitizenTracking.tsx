@@ -1,5 +1,6 @@
+import { useLiveQuery } from "./useLiveQuery";
 import { useI18n } from "./i18n/useI18n";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   App,
   Alert,
@@ -13,7 +14,7 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { BellOutlined, CalendarOutlined, EyeOutlined, ReloadOutlined } from "@ant-design/icons";
+import { BellOutlined, CalendarOutlined, EyeOutlined } from "@ant-design/icons";
 import { api, date, progressLabel } from "./api";
 type D = Record<string, any>;
 export default function CitizenTracking({
@@ -27,26 +28,13 @@ export default function CitizenTracking({
   const [tab, setTab] = useState(initialTab),
     [page, setPage] = useState(1),
     [revision, setRevision] = useState(0);
-  const [data, setData] = useState<D>(),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [removing, setRemoving] = useState<string>();
+  const [removing, setRemoving] = useState<string>();
   const { message } = App.useApp();
-  useEffect(() => {
-    const c = new AbortController();
-    setBusy(true);
-    setError("");
-    setData(undefined);
-    api<D>(`/citizen/tracking?tab=${tab}&page=${page - 1}`, { signal: c.signal })
-      .then(setData)
-      .catch((e) => {
-        if (!c.signal.aborted) setError(e.message);
-      })
-      .finally(() => {
-        if (!c.signal.aborted) setBusy(false);
-      });
-    return () => c.abort();
-  }, [tab, page, revision]);
+  const {
+    data,
+    error,
+    loading: busy,
+  } = useLiveQuery<D>(`/citizen/tracking?tab=${tab}&page=${page - 1}`, revision);
   async function unfollow(id: string) {
     setRemoving(id);
     try {
@@ -69,9 +57,6 @@ export default function CitizenTracking({
             {t("ความคืบหน้าของเรื่องที่แจ้งและเรื่องที่ติดตาม")}
           </Typography.Text>
         </div>
-        <Button icon={<ReloadOutlined />} loading={busy} onClick={() => setRevision((v) => v + 1)}>
-          {t("โหลดใหม่")}
-        </Button>
       </div>
       <Tabs
         activeKey={tab}

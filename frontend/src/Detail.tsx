@@ -1,3 +1,4 @@
+import { useLiveQuery } from "./useLiveQuery";
 import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
 import { useI18n } from "./i18n/useI18n";
 import { govTokens } from "./govTheme";
@@ -34,12 +35,7 @@ import {
   Typography,
   Upload,
 } from "antd";
-import {
-  ArrowLeftOutlined,
-  ReloadOutlined,
-  UploadOutlined,
-  EnvironmentOutlined,
-} from "@ant-design/icons";
+import { ArrowLeftOutlined, UploadOutlined, EnvironmentOutlined } from "@ant-design/icons";
 import {
   api,
   post,
@@ -97,9 +93,7 @@ export default function Detail({
         actionNames[key] ||
         key,
     );
-  const [data, setData] = useState<D>(),
-    [error, setError] = useState(""),
-    [action, setAction] = useState(""),
+  const [action, setAction] = useState(""),
     [teams, setTeams] = useState<D[]>([]),
     [people, setPeople] = useState<D[]>([]),
     [busy, setBusy] = useState(false);
@@ -148,24 +142,18 @@ export default function Detail({
   const [evidenceStage, setEvidenceStage] = useState("BEFORE");
   const { message, modal } = App.useApp();
   const submitting = useRef(false);
-  async function load() {
-    setError("");
-    try {
-      setData(
-        await api(
-          (publicView ? "/community/complaints/" : "/complaints/") +
-            id +
-            (!publicView && historyOnly ? "?historyOnly=true" : ""),
-        ),
-      );
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-  useEffect(() => {
-    setData(undefined);
-    void load();
-  }, [id, historyOnly, publicView]);
+  const {
+    data,
+    error,
+    reload: load,
+  } = useLiveQuery<D>(
+    (publicView ? "/community/complaints/" : "/complaints/") +
+      id +
+      (!publicView && historyOnly ? "?historyOnly=true" : ""),
+    0,
+    `${user.id}:${user.role}`,
+    !action && !busy && !uploadBusy && !publishing && !publishSource,
+  );
   async function choose(a: string) {
     if (publicView || data?.readOnlyHistory) return;
     form.resetFields();
@@ -227,14 +215,13 @@ export default function Detail({
         message.error(t((e as Error).message));
       }
     }
-    const role =
-      a === "TRIAGE"
-        ? "LEADER"
-        : a === "ASSIGN"
-          ? "FIELD"
-          : a === "SEND_APPROVAL"
-            ? "APPROVER"
-            : null;
+    const role = ["TRIAGE", "REASSIGN_LEADER"].includes(a)
+      ? "LEADER"
+      : a === "ASSIGN"
+        ? "FIELD"
+        : a === "SEND_APPROVAL"
+          ? "APPROVER"
+          : null;
     if (role) {
       try {
         const department =
@@ -359,7 +346,7 @@ export default function Detail({
       setBusy(false);
     }
   }
-  if (error)
+  if (error && !data)
     return (
       <>
         <Button onClick={back}>{t("กลับรายการ")}</Button>
@@ -462,10 +449,25 @@ export default function Detail({
             </Tag>
           </Space>
         </div>
-        <Button icon={<ReloadOutlined />} onClick={load}>
-          {t("โหลดใหม่")}
-        </Button>
       </div>
+      {error && !action && (
+        <Alert
+          type="warning"
+          showIcon
+          message={t("ข้อมูลล่าสุดยังอัปเดตไม่ได้ ระบบจะลองใหม่อัตโนมัติ")}
+          description={t(error)}
+        />
+      )}
+      {!publicView && data.actions?.some((item: D) => item.action === "REASSIGN_LEADER") && (
+        <Alert
+          className="operational-guidance"
+          type="warning"
+          showIcon
+          message={t(
+            "หัวหน้าที่รับผิดชอบเดิมไม่สามารถรับงานต่อได้ กรุณาเลือกหัวหน้าหน่วยงานใหม่ก่อนจัดทีม",
+          )}
+        />
+      )}
       {c.status === "TERMINATED" && (
         <Alert
           className="operational-guidance"
@@ -1081,6 +1083,7 @@ export default function Detail({
                     <Button
                       block
                       key={r.action}
+                      disabled={!!error}
                       type={
                         [
                           "REJECT",
@@ -1136,6 +1139,7 @@ export default function Detail({
             {data.actions.map((r: D) => (
               <Button
                 key={r.action}
+                disabled={!!error}
                 type={
                   [
                     "REJECT",
@@ -1248,6 +1252,15 @@ export default function Detail({
               }
           }}
         >
+          {error && (
+            <Alert
+              type="warning"
+              showIcon
+              message={t("ข้อมูลล่าสุดยังอัปเดตไม่ได้ ระบบจะลองใหม่อัตโนมัติ")}
+              description={t(error)}
+              style={{ marginBottom: 16 }}
+            />
+          )}
           {action === "REPORT" && (
             <Alert
               style={{ marginBottom: 16 }}
@@ -1407,17 +1420,17 @@ export default function Detail({
               </Form.Item>
             </>
           )}
-          {["TRIAGE", "ASSIGN", "SEND_APPROVAL"].includes(action) && (
+          {["TRIAGE", "REASSIGN_LEADER", "ASSIGN", "SEND_APPROVAL"].includes(action) && (
             <Form.Item
               label={
-                action === "TRIAGE"
+                ["TRIAGE", "REASSIGN_LEADER"].includes(action)
                   ? t("หัวหน้าหน่วยงาน")
                   : action === "ASSIGN"
                     ? t("ผู้ลงพื้นที่")
                     : t("ผู้อนุมัติตามลำดับ (เลือก ") + data.approvalStages + t(" คน)")
               }
               name={
-                action === "TRIAGE"
+                ["TRIAGE", "REASSIGN_LEADER"].includes(action)
                   ? "leaderId"
                   : action === "ASSIGN"
                     ? "assigneeId"
@@ -1656,7 +1669,7 @@ export default function Detail({
             type="primary"
             danger={action === "DENY"}
             loading={busy}
-            disabled={uploadBusy || (action === "REPORT" && !online)}
+            disabled={!!error || uploadBusy || (action === "REPORT" && !online)}
             block
           >
             {t("ยืนยัน{{action}}", { action: actionButton(action) })}

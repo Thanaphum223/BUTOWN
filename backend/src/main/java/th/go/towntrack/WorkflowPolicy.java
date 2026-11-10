@@ -14,6 +14,7 @@ public class WorkflowPolicy {
           "REJECT",
           "DECLINE",
           "RETURN_ASSIGNMENT",
+          "REASSIGN_LEADER",
           "REQUEST_RESOURCE",
           "RETURN_RESOURCE",
           "RETURN_FIELD",
@@ -43,7 +44,27 @@ public class WorkflowPolicy {
         .isEmpty();
   }
 
+  // Only undispatched work can be recovered without changing an existing team's scope.
+  static final String RECOVERABLE_ASSIGNMENT =
+      "(c.status='TRIAGED' AND NOT EXISTS(SELECT 1 FROM work_order w WHERE w.complaint_id=c.id AND NOT w.handed_off)"
+          + " AND NOT EXISTS(SELECT 1 FROM app_user head WHERE head.id=c.leader_id AND head.enabled=true"
+          + " AND head.role IN ('LEADER','ADMIN') AND head.municipality_id=c.municipality_id AND head.department_id=c.department_id))";
+
+  boolean recoverableAssignment(Map<String, Object> c) {
+    return !db.list(
+            "SELECT c.id FROM complaint c WHERE c.id=? AND " + RECOVERABLE_ASSIGNMENT, c.get("id"))
+        .isEmpty();
+  }
+
   Map<String, Object> transition(Map<String, Object> c, String action, Map<String, Object> user) {
+    if (action.equals("REASSIGN_LEADER")) {
+      accessRecoveryRole(user);
+      if (!recoverableAssignment(c))
+        throw new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "งานนี้ยังมีหัวหน้ารับผิดชอบหรือเคยมอบหมายทีมแล้ว ไม่สามารถเลือกหัวหน้าใหม่ในขั้นตอนนี้ได้");
+      return Map.of("role", "OFFICER", "to_status", "TRIAGED");
+    }
     if (action.equals("REQUEST_RESOURCE") && !"FIELD".equals(user.get("role"))) Access.deny();
     if (action.equals("RETURN_ASSIGNMENT") && "TRIAGED".equals(c.get("status"))) {
       if (dispatched(c.get("id")))
@@ -68,6 +89,10 @@ public class WorkflowPolicy {
         action);
   }
 
+  private void accessRecoveryRole(Map<String, Object> user) {
+    if (!"OFFICER".equals(user.get("role"))) Access.deny();
+  }
+
   List<Map<String, Object>> actions(Map<String, Object> c, Map<String, Object> user) {
     var result =
         new ArrayList<>(
@@ -86,6 +111,7 @@ public class WorkflowPolicy {
         && List.of("LEADER_REVIEW", "LEADER_REVISION").contains(from))
       result.add(Map.of("action", "REQUEST_TRANSFER"));
     if ("OFFICER".equals(user.get("role"))) {
+      if (recoverableAssignment(c)) result.add(Map.of("action", "REASSIGN_LEADER"));
       if (List.of("TRANSFER_PENDING", "DEPARTMENT_RETURNED").contains(from))
         result.add(Map.of("action", "TRANSFER_DEPARTMENT"));
       if (from.equals("TRANSFER_PENDING")) result.add(Map.of("action", "RETURN_TRANSFER"));

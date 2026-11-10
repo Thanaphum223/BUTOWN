@@ -1,3 +1,4 @@
+import { useLiveQuery } from "./useLiveQuery";
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -12,8 +13,8 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { FilterOutlined, ReloadOutlined } from "@ant-design/icons";
-import { api, date, statusNames } from "./api";
+import { FilterOutlined } from "@ant-design/icons";
+import { date, statusNames } from "./api";
 import { useI18n } from "./i18n/useI18n";
 
 type Summary = {
@@ -40,34 +41,19 @@ export default function ApproverOverview({
   onOpen: (id: string) => void;
 }) {
   const { t } = useI18n();
-  const [data, setData] = useState<Overview>();
-  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState("all");
   const [page, setPage] = useState(1);
-  const [refresh, setRefresh] = useState(0);
   const [category, setCategory] = useState<string>();
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
-  const [catalogError, setCatalogError] = useState("");
   const [status, setStatus] = useState<string>();
   const [area, setArea] = useState("");
   const [sort, setSort] = useState("newest");
 
-  useEffect(() => {
-    let alive = true;
-    setCatalogError("");
-    api<{ categories: { id: string; name: string }[] }>("/catalog")
-      .then((catalog) => {
-        if (alive) setCategories(catalog.categories);
-      })
-      .catch((failure: Error) => {
-        if (alive) setCatalogError(failure.message);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [refresh]);
+  const { data: catalog, error: catalogError } = useLiveQuery<{
+    categories: { id: string; name: string }[];
+  }>("/catalog");
+  const categories = catalog?.categories || [];
   useEffect(() => {
     if (search === query) return;
     const timer = setTimeout(() => {
@@ -76,35 +62,22 @@ export default function ApproverOverview({
     }, 300);
     return () => clearTimeout(timer);
   }, [search]);
+  const params = new URLSearchParams({
+    overview: "true",
+    page: String(page - 1),
+    size: "10",
+    q: query,
+    sort,
+    area,
+  });
+  if (scope !== "all") params.set(scope === "active" ? "activeOnly" : "completedOnly", "true");
+  if (status) params.set("status", status);
+  if (category) params.set("categoryId", category);
+  const { data, error } = useLiveQuery<Overview>("/complaints?" + params);
   useEffect(() => {
-    let alive = true;
-    setError("");
-    setData(undefined);
-    const params = new URLSearchParams({
-      overview: "true",
-      page: String(page - 1),
-      size: "10",
-      q: query,
-      sort,
-      area,
-    });
-    if (scope !== "all") params.set(scope === "active" ? "activeOnly" : "completedOnly", "true");
-    if (status) params.set("status", status);
-    if (category) params.set("categoryId", category);
-    api<Overview>("/complaints?" + params)
-      .then((result) => {
-        if (!alive) return;
-        if (page > 1 && !result.items.length && result.total <= (page - 1) * 10)
-          setPage(Math.max(1, Math.ceil(result.total / 10)));
-        else setData(result);
-      })
-      .catch((failure: Error) => {
-        if (alive) setError(failure.message);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [page, query, scope, category, status, area, sort, refresh]);
+    if (data && page > 1 && !data.items.length && data.total <= (page - 1) * 10)
+      setPage(Math.max(1, Math.ceil(data.total / 10)));
+  }, [data, page]);
 
   return (
     <div className="approver-overview">
@@ -119,9 +92,6 @@ export default function ApproverOverview({
           </Text>
         </div>
         <div className="overview-actions">
-          <Button icon={<ReloadOutlined />} onClick={() => setRefresh((value) => value + 1)}>
-            {t("โหลดใหม่")}
-          </Button>
           <Button type="primary" onClick={onQueue}>
             {t("เปิดคิวงานอนุมัติ")}
           </Button>
@@ -143,7 +113,7 @@ export default function ApproverOverview({
         <Alert
           type="warning"
           showIcon
-          message={t("โหลดประเภทคำร้องไม่สำเร็จ กรุณากดโหลดใหม่")}
+          message={t("โหลดประเภทคำร้องไม่สำเร็จ ระบบจะลองใหม่อัตโนมัติ")}
           description={t(catalogError)}
         />
       )}
@@ -264,7 +234,7 @@ export default function ApproverOverview({
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               description={t(
-                error ? "โหลดรายการงานไม่สำเร็จ กรุณากดโหลดใหม่" : "ไม่พบงานตามตัวกรอง",
+                error ? "โหลดรายการงานไม่สำเร็จ ระบบจะลองใหม่อัตโนมัติ" : "ไม่พบงานตามตัวกรอง",
               )}
             />
           ) : (

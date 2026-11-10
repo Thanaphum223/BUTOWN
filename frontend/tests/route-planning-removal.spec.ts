@@ -34,7 +34,7 @@ for (const role of ["OFFICER", "LEADER", "FIELD", "ADMIN"]) {
       ).toHaveCount(0);
       await page.getByRole("menuitem", { name: /คิวงาน/ }).click();
       await expect(page.locator(".staff-workspace .queue-panel")).toBeVisible();
-      await expect(page.getByRole("button", { name: /โหลดใหม่/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /โหลดใหม่/ })).toHaveCount(0);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
       );

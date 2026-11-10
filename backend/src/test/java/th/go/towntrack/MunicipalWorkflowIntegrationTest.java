@@ -99,6 +99,140 @@ class MunicipalWorkflowIntegrationTest {
   }
 
   @Test
+  void officerCanRecoverAnUndispatchedCaseWithADisabledHead() throws Exception {
+    UUID id = complaint("TRIAGED");
+    UUID formerHead = users.get("LEADER");
+    db.run("UPDATE app_user SET enabled=false WHERE id=?", formerHead);
+    db.run("UPDATE app_user SET department_id=? WHERE id=?", dept, users.get("ADMIN"));
+    mvc.perform(get("/api/complaints/" + id).with(user(names.get("OFFICER"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.actions[?(@.action=='REASSIGN_LEADER')]").isNotEmpty());
+    mvc.perform(get("/api/complaints?queue=handoff").with(user(names.get("OFFICER"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].id").value(id.toString()));
+    action(id, "OFFICER", "REASSIGN_LEADER", Map.of("leaderId", users.get("ADMIN")))
+        .andExpect(status().isBadRequest());
+    action(
+            id,
+            "OFFICER",
+            "REASSIGN_LEADER",
+            Map.of("leaderId", users.get("ADMIN"), "reason", "Replace unavailable head"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("TRIAGED"));
+    assertEquals(
+        users.get("ADMIN"),
+        db.one("SELECT leader_id FROM complaint WHERE id=?", id).get("leader_id"));
+    var audit =
+        db.one(
+            "SELECT reason,details::text details FROM audit_event WHERE complaint_id=? AND action='REASSIGN_LEADER'",
+            id);
+    assertEquals("Replace unavailable head", audit.get("reason"));
+    assertTrue(audit.get("details").toString().contains(formerHead.toString()));
+    assertTrue(audit.get("details").toString().contains(users.get("ADMIN").toString()));
+    action(id, "ADMIN", "ASSIGN", Map.of("assigneeId", users.get("FIELD")))
+        .andExpect(status().isForbidden());
+    // An administrator must use the LEADER view, rather than bypassing the operational role.
+    db.run("UPDATE app_user SET role='LEADER' WHERE id=?", users.get("ADMIN"));
+    action(id, "ADMIN", "ASSIGN", Map.of("assigneeId", users.get("FIELD")))
+        .andExpect(status().isOk());
+    action(id, "FIELD", "ACCEPT", Map.of()).andExpect(status().isOk());
+  }
+
+  @Test
+  void recoveryCannotTakeOverValidAssignmentsOrPreviouslyDispatchedWork() throws Exception {
+    UUID id = complaint("TRIAGED");
+    action(
+            id,
+            "OFFICER",
+            "REASSIGN_LEADER",
+            Map.of("leaderId", users.get("LEADER"), "reason", "Attempt takeover"))
+        .andExpect(status().isConflict());
+    mvc.perform(get("/api/complaints?queue=handoff").with(user(names.get("OFFICER"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(0));
+    UUID dispatched = assigned();
+    action(dispatched, "FIELD", "DECLINE", Map.of("reason", "Vehicle unavailable"))
+        .andExpect(status().isOk());
+    db.run("UPDATE app_user SET enabled=false WHERE id=?", users.get("LEADER"));
+    action(
+            dispatched,
+            "OFFICER",
+            "REASSIGN_LEADER",
+            Map.of("leaderId", users.get("ADMIN"), "reason", "Already dispatched"))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void missingOrChangedHeadCanBeReplacedButTargetsRemainScoped() throws Exception {
+    UUID id = complaint("TRIAGED");
+    db.run("UPDATE complaint SET leader_id=NULL WHERE id=?", id);
+    action(
+            id,
+            "OFFICER",
+            "REASSIGN_LEADER",
+            Map.of("leaderId", users.get("FIELD"), "reason", "Wrong target role"))
+        .andExpect(status().isNotFound());
+    db.run("UPDATE complaint SET leader_id=? WHERE id=?", users.get("CITIZEN"), id);
+    mvc.perform(get("/api/complaints/" + id).with(user(names.get("OFFICER"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.actions[?(@.action=='REASSIGN_LEADER')]").isNotEmpty());
+    action(
+            id,
+            "OFFICER",
+            "REASSIGN_LEADER",
+            Map.of("leaderId", users.get("ADMIN"), "reason", "Wrong department"))
+        .andExpect(status().isForbidden());
+    action(
+            id,
+            "CITIZEN",
+            "REASSIGN_LEADER",
+            Map.of("leaderId", users.get("LEADER"), "reason", "Wrong actor"))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void activeQueuesOnlyContainTheCurrentRolesActionableStages() throws Exception {
+    UUID fresh = complaint("NEW");
+    UUID triaged = complaint("TRIAGED");
+    UUID resource = complaint("RESOURCE_DRAFT");
+    UUID review = complaint("OFFICER_REVIEW");
+    UUID assigned = complaint("ASSIGNED");
+    UUID pendingApproval = complaint("RESOURCE_APPROVAL");
+    for (UUID caseId : List.of(assigned, pendingApproval, review))
+      db.run(
+          "INSERT INTO work_order(id,complaint_id,assignee_id,assigned_by,due_at) VALUES(?,?,?,?,now()+interval '3 days')",
+          UUID.randomUUID(),
+          caseId,
+          users.get("FIELD"),
+          users.get("LEADER"));
+    for (UUID caseId : List.of(pendingApproval, review))
+      db.run(
+          "INSERT INTO resource_request(id,complaint_id,requested_by,approver_id) VALUES(?,?,?,?)",
+          UUID.randomUUID(),
+          caseId,
+          users.get("FIELD"),
+          users.get("APPROVER"));
+    var expected =
+        Map.of(
+            "OFFICER", Set.of(fresh.toString(), review.toString()),
+            "LEADER", Set.of(triaged.toString(), resource.toString()),
+            "FIELD", Set.of(assigned.toString()),
+            "APPROVER", Set.of(pendingApproval.toString()));
+    for (String role : expected.keySet()) {
+      var result =
+          json.readTree(
+              mvc.perform(get("/api/complaints?activeOnly=true").with(user(names.get(role))))
+                  .andExpect(status().isOk())
+                  .andReturn()
+                  .getResponse()
+                  .getContentAsString());
+      var ids = new HashSet<String>();
+      result.path("items").forEach(item -> ids.add(item.path("id").asText()));
+      assertEquals(expected.get(role), ids, role);
+    }
+  }
+
+  @Test
   void leaderCannotInitiateResourceRequestEvenWhenStoredWorkflowAllowsIt() throws Exception {
     UUID id = complaint("TRIAGED");
     // Old published definitions remain unchanged; current role policy must still enforce FIELD-only

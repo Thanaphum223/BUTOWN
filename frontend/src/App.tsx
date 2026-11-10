@@ -1,4 +1,5 @@
 import GovAuthBadge from "./GovAuthBadge";
+import { useLiveQuery } from "./useLiveQuery";
 import { AuthUnavailableError, sessionExpiredEvent, sessionExpiredMessage } from "./api";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { useI18n } from "./i18n/useI18n";
@@ -63,7 +64,6 @@ import {
   BellOutlined,
   SettingOutlined,
   LogoutOutlined,
-  ReloadOutlined,
   ArrowLeftOutlined,
   UploadOutlined,
   TeamOutlined,
@@ -92,23 +92,7 @@ function StateTag({ value }: { value: string }) {
   );
 }
 function useData<T>(url: string, refresh = 0) {
-  const [data, setData] = useState<T>();
-  const [error, setError] = useState("");
-  useEffect(() => {
-    let alive = true;
-    setError("");
-    api<T>(url)
-      .then((d) => {
-        if (alive) setData(d);
-      })
-      .catch((e) => {
-        if (alive) setError(e.message);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [url, refresh]);
-  return { data, error };
+  return useLiveQuery<T>(url, refresh);
 }
 function ErrorBox({ error }: { error: string }) {
   const { t } = useI18n();
@@ -476,7 +460,6 @@ function TownTrackApp() {
                 refresh={refresh}
                 open={open}
                 onNew={() => setView("new")}
-                reload={() => setRefresh((x) => x + 1)}
               />
             ) : view === "new" ? (
               <NewCase
@@ -559,14 +542,12 @@ function CaseList({
   refresh,
   open,
   onNew,
-  reload,
 }: {
   user: RowData;
   dashboard: boolean;
   refresh: number;
   open: (id: string) => void;
   onNew: () => void;
-  reload: () => void;
 }) {
   const { t } = useI18n();
   const [page, setPage] = useState(1),
@@ -607,9 +588,6 @@ function CaseList({
           </Text>
         </div>
         <Space>
-          <Button icon={<ReloadOutlined />} onClick={reload}>
-            {t("โหลดใหม่")}
-          </Button>
           {user.role === "CITIZEN" && (
             <Button type="primary" icon={<PlusOutlined />} onClick={onNew}>
               {t("แจ้งปัญหา")}

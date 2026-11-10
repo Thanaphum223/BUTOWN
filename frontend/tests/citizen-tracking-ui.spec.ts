@@ -68,6 +68,7 @@ async function citizen(page: Page, followedStatus = "REJECTED") {
     await route.fulfill({ json: data[url.pathname] ?? {} });
   });
   await page.goto("/");
+  return { mine, followed };
 }
 
 test("login and registration omit the emergency shortcut", async ({ page }) => {
@@ -176,4 +177,37 @@ test("a followed new complaint opens read only without reporter upload controls"
   ).toBeVisible();
   await expect(page.locator(".evidence-upload")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /แนบไฟล์|บันทึกการดำเนินการ/ })).toHaveCount(0);
+});
+
+test("tracking refreshes automatically without overlapping slow reads", async ({ page }) => {
+  const { mine } = await citizen(page);
+  await page
+    .getByRole("navigation", { name: "เมนูประชาชน", exact: true })
+    .getByRole("link", { name: /ติดตามสถานะ/ })
+    .click();
+  await expect(page.locator(".tracking-card")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "โหลดใหม่", exact: true })).toHaveCount(0);
+  let pending = 0;
+  let release!: () => void;
+  const delayed = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/citizen/tracking?**", async (route) => {
+    pending++;
+    await delayed;
+    await route.fulfill({
+      json: { items: [{ ...mine, category_name: "ข้อมูลติดตามใหม่", status: "CLOSED" }], total: 1 },
+    });
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect.poll(() => pending).toBe(1);
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event("focus"));
+    window.dispatchEvent(new Event("online"));
+  });
+  await page.waitForTimeout(4500);
+  expect(pending).toBe(1);
+  release();
+  await expect(page.locator(".tracking-card")).toContainText("ข้อมูลติดตามใหม่");
+  await expect.poll(() => pending, { timeout: 10000 }).toBe(2);
 });

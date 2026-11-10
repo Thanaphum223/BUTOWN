@@ -238,6 +238,7 @@ public class ComplaintController {
     String base =
         " FROM complaint c JOIN category k ON k.id=c.category_id WHERE c.municipality_id=? AND "
             + scope;
+    if (activeOnly && !overview) base += " AND " + queues.actionable((String) u.get("role"));
     var stats =
         db.one(
             "SELECT count(*) total,count(*) FILTER(WHERE c.status NOT IN"
@@ -250,10 +251,7 @@ public class ComplaintController {
     if (activeOnly) base += " AND c.status NOT IN ('CLOSED','REJECTED','TERMINATED')";
     if (!queue.isBlank()) {
       if (historyOnly || queue.length() > 40) throw new IllegalArgumentException();
-      var states = queues.statuses((String) u.get("role"), queue);
-      base +=
-          " AND c.status IN (" + String.join(",", Collections.nCopies(states.size(), "?")) + ")";
-      args.addAll(states);
+      base += " AND " + queues.predicate((String) u.get("role"), queue);
     }
     if (!q.isBlank()) {
       base += " AND (c.title ILIKE ? OR c.id::text ILIKE ?)";

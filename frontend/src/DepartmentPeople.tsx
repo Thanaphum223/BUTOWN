@@ -2,7 +2,7 @@ import { useI18n } from "./i18n/useI18n";
 import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
 import { useRef, useState } from "react";
 import { Alert, App, Button, Form, Modal, Select, Space, Table, Typography } from "antd";
-import { ReloadOutlined, UserAddOutlined } from "@ant-design/icons";
+import { UserAddOutlined } from "@ant-design/icons";
 import { post, roleNames } from "./api";
 
 type Department = { id: string; name: string };
@@ -96,9 +96,6 @@ export default function DepartmentPeople({
             "เลือกบัญชีที่เคยเข้าสู่ระบบผ่าน Gov Center เพื่อเพิ่มหัวหน้าหรือผู้ลงพื้นที่ประจำหน่วยงาน",
           )}
         </Typography.Text>
-        <Button icon={<ReloadOutlined />} loading={refreshing} onClick={() => void onRefresh()}>
-          {t("โหลดรายชื่อใหม่")}
-        </Button>
       </Space>
       <Table<Department>
         rowKey="id"
@@ -208,7 +205,7 @@ export default function DepartmentPeople({
           {error && <Alert type="error" showIcon message={t(error)} style={{ marginBottom: 20 }} />}
           <Typography.Paragraph type="secondary">
             {t(
-              "ถ้าไม่พบรายชื่อ ให้ผู้ใช้เข้าสู่ TownTrack ผ่าน Gov Center ก่อน แล้วกด “โหลดรายชื่อใหม่”",
+              "ถ้าไม่พบรายชื่อ ให้ผู้ใช้เข้าสู่ TownTrack ผ่าน Gov Center ก่อน รายชื่อจะอัปเดตอัตโนมัติ",
             )}
           </Typography.Paragraph>
           <Space style={{ display: "flex", justifyContent: "flex-end" }}>

@@ -44,6 +44,14 @@ export async function refreshCsrf() {
   csrf = d.token;
   header = d.headerName;
 }
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
 export async function api<T = any>(url: string, options: RequestInit = {}): Promise<T> {
   const method = (options.method || "GET").toUpperCase();
   if (!["GET", "HEAD"].includes(method) && !csrf) await refreshCsrf();
@@ -76,7 +84,7 @@ export async function api<T = any>(url: string, options: RequestInit = {}): Prom
                 : "ดำเนินการไม่สำเร็จ";
     const detail = await responseErrorDetail(r);
     if (r.status === 503 && isAuthEndpoint(url)) throw new AuthUnavailableError(detail);
-    throw new Error(detail || message);
+    throw new ApiError(r.status, detail || message);
   }
   if (r.status === 204 || r.headers.get("content-length") === "0") return undefined as T;
   const text = await r.text();
@@ -155,6 +163,7 @@ export const statusNames: Record<string, string> = {
 };
 export const actionNames: Record<string, string> = {
   RETURN_ASSIGNMENT: "ส่งคืนงานที่จ่ายผิด",
+  REASSIGN_LEADER: "เลือกหัวหน้าหน่วยงานใหม่",
   REQUEST_TRANSFER: "ส่งต่อหน่วยงานอื่น",
   TRANSFER_DEPARTMENT: "จ่ายงานให้หน่วยงานถัดไป",
   RETURN_TRANSFER: "ส่งกลับแก้ไขคำขอส่งต่อ",
@@ -199,6 +208,7 @@ export const requiredReasonActions = new Set([
   "REJECT",
   "DECLINE",
   "RETURN_ASSIGNMENT",
+  "REASSIGN_LEADER",
   "REQUEST_RESOURCE",
   "RETURN_RESOURCE",
   "RETURN_FIELD",
