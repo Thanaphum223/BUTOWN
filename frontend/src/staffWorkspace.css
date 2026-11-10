@@ -1,0 +1,259 @@
+/* Workspace controls stay readable; filter groups use the full working width. */
+.staff-shell .sidebar-bottom .ant-tag {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+  font-size: 12px;
+}
+.staff-shell .staff-workspace > .queue-quick-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  overflow: visible;
+  padding: 0;
+}
+.staff-shell .staff-workspace > .queue-quick-status .ant-btn {
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: 36px;
+  height: auto;
+  padding: 6px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: normal;
+}
+.staff-shell .staff-workspace > .queue-quick-status .ant-btn > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.staff-shell .staff-workspace > .page-heading {
+  margin-bottom: 12px;
+  align-items: flex-start;
+}
+.staff-shell .staff-workspace > .page-heading h2 {
+  margin: 2px 0 4px !important;
+  font-size: 22px;
+}
+.staff-shell .staff-workspace > .page-heading .ant-typography-secondary {
+  font-size: 13px;
+}
+.staff-shell .staff-workspace > .workspace-stats {
+  gap: 12px;
+  margin: 0 0 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.staff-shell .staff-workspace > .workspace-stats .ant-card-body {
+  padding: 10px 16px;
+}
+.staff-shell .staff-workspace > .workspace-stats .ant-statistic-title {
+  font-size: 12px;
+  margin-bottom: 2px;
+  min-height: 0;
+}
+.staff-shell .staff-workspace > .workspace-stats .ant-statistic-content {
+  font-size: 24px;
+  line-height: 1.3;
+}
+.staff-shell .staff-workspace > .queue-quick-status {
+  margin-bottom: 12px;
+}
+
+/* Only roomy desktop screens use bounded, independent queue/detail scrolling.
+   Mobile, short windows and heavily zoomed pages keep normal document scrolling. */
+@media (min-width: 992px) and (min-height: 680px) {
+  .staff-shell:has(.staff-workspace) {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .staff-shell:has(.staff-workspace) > .ant-layout {
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+  }
+  .staff-shell:has(.staff-workspace) .topbar {
+    min-height: 68px;
+    padding-block: 10px;
+    flex-shrink: 0;
+  }
+  .staff-shell:has(.staff-workspace) > .ant-layout > .gov-auth-badge {
+    padding-block: 6px;
+    font-size: 12px;
+    line-height: 1.45;
+    flex-shrink: 0;
+  }
+  .staff-shell:has(.staff-workspace) > .ant-layout > .gov-auth-badge small {
+    font-size: 11px;
+  }
+  .staff-shell:has(.staff-workspace) .content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    max-width: none;
+    margin: 0;
+    padding: 16px 24px;
+  }
+  .staff-shell:has(.staff-workspace) .footer {
+    flex-shrink: 0;
+    padding: 6px 24px;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .staff-shell .staff-workspace {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+  .staff-shell .staff-workspace:has(> .workspace-stats):not(:has(> .ant-alert)) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 12px 18px;
+  }
+  .staff-shell .staff-workspace:has(> .workspace-stats):not(:has(> .ant-alert)) > .page-heading {
+    grid-column: 1;
+    grid-row: 1;
+    margin: 0;
+  }
+  .staff-shell .staff-workspace:has(> .workspace-stats) > .page-heading .eyebrow,
+  .staff-shell .staff-workspace:has(> .workspace-stats) > .page-heading > .ant-space {
+    display: none;
+  }
+  .staff-shell .staff-workspace:has(> .workspace-stats):not(:has(> .ant-alert)) > .workspace-stats {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+    gap: 8px;
+  }
+  .staff-shell .staff-workspace:has(> .workspace-stats) > .workspace-stats .ant-card-body {
+    padding: 10px;
+  }
+  .staff-shell
+    .staff-workspace:has(> .workspace-stats):not(:has(> .ant-alert))
+    > .queue-quick-status {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin: 0;
+  }
+  .staff-shell .staff-workspace:has(> .workspace-stats):not(:has(> .ant-alert)) > .work-grid {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  .staff-shell .staff-workspace > :not(.work-grid) {
+    flex-shrink: 0;
+  }
+  .staff-shell .staff-workspace .work-grid {
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+    align-items: stretch;
+    padding: 12px;
+    gap: 18px;
+    overflow: hidden;
+  }
+  .staff-shell .staff-workspace .queue-panel {
+    position: static;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .staff-shell .staff-workspace .queue-panel .ant-card-head {
+    flex-shrink: 0;
+    min-height: 36px;
+  }
+  .staff-shell .staff-workspace .queue-panel .ant-card-head-title {
+    font-size: 18px;
+  }
+  .staff-shell .staff-workspace .queue-panel > .ant-card-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    padding-top: 8px;
+    overflow: auto;
+  }
+  .staff-shell .staff-workspace .queue-panel > .ant-card-body > :not(.queue-items) {
+    flex-shrink: 0;
+  }
+  .staff-shell .staff-workspace .queue-panel .control-label {
+    margin-bottom: 6px;
+  }
+  .staff-shell .staff-workspace .queue-filters {
+    margin-block: 8px;
+  }
+  .staff-shell .staff-workspace button.queue-item {
+    padding: 12px;
+    gap: 7px;
+  }
+  .staff-shell .staff-workspace .queue-card-title {
+    font-size: 16px;
+  }
+  .staff-shell .staff-workspace .queue-items {
+    flex: 1;
+    min-height: 140px;
+    max-height: none;
+    grid-auto-rows: max-content;
+    align-content: start;
+    margin: 0 0 8px;
+    overscroll-behavior: contain;
+  }
+  .staff-shell .staff-workspace .workspace-detail {
+    min-height: 0;
+    overflow: auto;
+    padding-left: 18px;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+  .staff-shell .staff-workspace .workspace-welcome {
+    height: 100%;
+    min-height: 0;
+  }
+  .staff-shell .staff-workspace .workspace-welcome .ant-card-body {
+    padding: 24px 16px;
+  }
+  .staff-shell .staff-workspace .workspace-welcome h3 {
+    font-size: 20px;
+  }
+  .staff-shell .staff-workspace .welcome-icon {
+    width: 54px;
+    height: 54px;
+    font-size: 26px;
+    margin-bottom: 12px;
+  }
+  .staff-shell .staff-workspace .welcome-process {
+    margin-top: 16px;
+  }
+}
+@media (max-width: 991px) {
+  .staff-shell .staff-workspace > .queue-quick-status .ant-btn {
+    min-height: 44px;
+    padding: 8px 12px;
+  }
+  .staff-shell .staff-workspace.viewing-work > .queue-quick-status {
+    display: none;
+  }
+  .staff-shell .staff-workspace > .workspace-stats .ant-card-body {
+    padding: 10px;
+  }
+  .staff-shell .staff-workspace > .page-heading {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .staff-shell .staff-workspace > .page-heading > .ant-space {
+    width: auto;
+  }
+}
+
+@media (min-width: 992px) and (max-width: 1199px) {
+  .staff-shell:has(.staff-workspace) .account-name {
+    max-width: 110px;
+  }
+}

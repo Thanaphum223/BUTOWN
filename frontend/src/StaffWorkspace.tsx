@@ -1,3 +1,4 @@
+import "./staffWorkspace.css";
 import { useLiveQuery } from "./useLiveQuery";
 import FieldTaskCard, { type CardMetadata } from "./FieldTaskCard";
 import { useI18n } from "./i18n/useI18n";
@@ -202,6 +203,29 @@ export default function StaffWorkspace({
         </div>
       )}
       {error && <Alert type="error" showIcon message={t(error)} style={{ marginBottom: 20 }} />}
+      <div className="queue-quick-status" aria-label={t("สถานะงานที่ใช้บ่อย")}>
+        {(history
+          ? [
+              { value: undefined, label: t("ทั้งหมด") },
+              { value: "CLOSED", label: t("ปิดเรื่อง") },
+              { value: "REJECTED", label: t("ปฏิเสธ") },
+              { value: "TERMINATED", label: t("ยุติเรื่อง") },
+            ]
+          : [{ value: undefined, label: t("งานทั้งหมด") }, ...(catalog?.queues || [])]
+        ).map((option) => (
+          <Button
+            key={option.value || "all"}
+            type={status === option.value ? "primary" : "default"}
+            aria-pressed={status === option.value}
+            onClick={() => {
+              setStatus(option.value);
+              setPage(1);
+            }}
+          >
+            {t(option.label)}
+          </Button>
+        ))}
+      </div>
       <div className={"work-grid" + (selected ? " has-selection" : "")}>
         <Card
           className="queue-panel"
@@ -314,29 +338,6 @@ export default function StaffWorkspace({
               )}
             </div>
           </details>
-          <div className="queue-quick-status" aria-label={t("สถานะงานที่ใช้บ่อย")}>
-            {(history
-              ? [
-                  { value: undefined, label: t("ทั้งหมด") },
-                  { value: "CLOSED", label: t("ปิดเรื่อง") },
-                  { value: "REJECTED", label: t("ปฏิเสธ") },
-                  { value: "TERMINATED", label: t("ยุติเรื่อง") },
-                ]
-              : [{ value: undefined, label: t("งานทั้งหมด") }, ...(catalog?.queues || [])]
-            ).map((option) => (
-              <Button
-                key={option.value || "all"}
-                type={status === option.value ? "primary" : "default"}
-                aria-pressed={status === option.value}
-                onClick={() => {
-                  setStatus(option.value);
-                  setPage(1);
-                }}
-              >
-                {t(option.label)}
-              </Button>
-            ))}
-          </div>
           <div className="queue-caption">
             <span>{t("เลขเรื่อง / ประเภทปัญหา")}</span>
             <span>{history ? t("เปิดดูประวัติ") : t("เปิดเพื่อตรวจสอบ")}</span>

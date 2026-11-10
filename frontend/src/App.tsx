@@ -422,7 +422,9 @@ function TownTrackApp() {
               )}
               <GovProfile />
               <Avatar className="account-avatar">{user.display_name?.[0]}</Avatar>
-              <span className="account-name">{user.display_name}</span>
+              <span className="account-name" title={user.display_name}>
+                {user.display_name}
+              </span>
               <Button
                 aria-label={t("ออกจากระบบ")}
                 icon={<LogoutOutlined />}
