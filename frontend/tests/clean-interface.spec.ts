@@ -69,7 +69,7 @@ for (const width of [390, 768, 1280])
       const headerLanguage = page.locator(".topbar .language-switcher");
       await expect(headerLanguage).toHaveCount(1);
       await headerLanguage.selectOption(language);
-      await expect(page.locator(".gov-auth-badge")).toBeVisible();
+      await expect(page.locator(".gov-auth-badge")).toHaveCount(0);
       await expect(page.locator(".uat-auth-tools, .uat-auth-host")).toHaveCount(0);
       await page.getByRole("button", { name: /(?:เปิดงาน|Open task) Original title/ }).click();
       await page

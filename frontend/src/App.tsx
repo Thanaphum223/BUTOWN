@@ -1,4 +1,3 @@
-import GovAuthBadge from "./GovAuthBadge";
 import { useLiveQuery } from "./useLiveQuery";
 import { AuthUnavailableError, sessionExpiredEvent, sessionExpiredMessage } from "./api";
 import LanguageSwitcher from "./LanguageSwitcher";
@@ -19,6 +18,7 @@ const Admin = lazy(() => import("./Admin"));
 const Detail = lazy(() => import("./Detail"));
 const CitizenHome = lazy(() => import("./CitizenHome"));
 const StaffWorkspace = lazy(() => import("./StaffWorkspace"));
+const StaffOverview = lazy(() => import("./StaffOverview"));
 const ApproverOverview = lazy(() => import("./ApproverOverview"));
 import { useEffect, useState } from "react";
 import {
@@ -119,6 +119,7 @@ function TownTrackApp() {
     [selected, setSelected] = useState(""),
     [refresh, setRefresh] = useState(0);
   const [selectedPublic, setSelectedPublic] = useState(false);
+  const [workspaceQueue, setWorkspaceQueue] = useState<string>();
   const { message } = AntApp.useApp();
   const [authError, setAuthError] = useState("");
   const [authErrorDetail, setAuthErrorDetail] = useState("");
@@ -152,6 +153,7 @@ function TownTrackApp() {
   useEffect(() => {
     if (!user) return;
     const expired = () => {
+      setWorkspaceQueue(undefined);
       setAuthError(sessionExpiredMessage);
       setAuthErrorDetail("");
       setSelected("");
@@ -173,6 +175,7 @@ function TownTrackApp() {
         }),
       });
       setUser(next);
+      setWorkspaceQueue(undefined);
       setPendingAdminRole(null);
       setView("dashboard");
       setSelected("");
@@ -200,6 +203,7 @@ function TownTrackApp() {
         authError={authError}
         authErrorDetail={authErrorDetail}
         onLogin={() => {
+          setWorkspaceQueue(undefined);
           void load();
           setView("dashboard");
         }}
@@ -297,6 +301,7 @@ function TownTrackApp() {
               selectedKeys={[view === "detail" ? "cases" : view]}
               items={items}
               onClick={({ key }) => {
+                if (key === "cases") setWorkspaceQueue(undefined);
                 setView(key);
                 window.scrollTo({ top: 0 });
               }}
@@ -323,6 +328,7 @@ function TownTrackApp() {
             selectedKeys={[view === "detail" ? "cases" : view]}
             items={items}
             onClick={({ key }) => {
+              if (key === "cases") setWorkspaceQueue(undefined);
               setView(key);
               setMobileMenu(false);
               window.scrollTo({ top: 0 });
@@ -431,6 +437,7 @@ function TownTrackApp() {
                 onClick={async () => {
                   try {
                     await api("/auth/logout", { method: "POST" });
+                    setWorkspaceQueue(undefined);
                     setUser(null);
                   } catch (e) {
                     message.error(t((e as Error).message));
@@ -439,18 +446,39 @@ function TownTrackApp() {
               />
             </Space>
           </Layout.Header>
-          <GovAuthBadge signedIn />
           <Layout.Content className="content">
             {view === "dashboard" && user.role === "CITIZEN" ? (
               <CitizenHome onFollowing={() => setView("following")} />
             ) : view === "dashboard" && user.role === "APPROVER" ? (
-              <ApproverOverview key={user.id} onQueue={() => setView("cases")} onOpen={open} />
-            ) : (view === "dashboard" || view === "cases" || view === "history") &&
-              user.role !== "CITIZEN" ? (
+              <ApproverOverview
+                key={user.id}
+                onQueue={() => {
+                  setWorkspaceQueue(undefined);
+                  setView("cases");
+                }}
+                onOpen={open}
+              />
+            ) : view === "dashboard" && user.role !== "CITIZEN" ? (
+              <StaffOverview
+                key={`${user.id}:${user.role}:${user.department_id}`}
+                user={{ id: user.id, role: user.role }}
+                onQueue={(queue) => {
+                  setWorkspaceQueue(queue);
+                  setView("cases");
+                  window.scrollTo({ top: 0 });
+                }}
+                onHistory={() => {
+                  setView("history");
+                  window.scrollTo({ top: 0 });
+                }}
+                onOpen={open}
+              />
+            ) : (view === "cases" || view === "history") && user.role !== "CITIZEN" ? (
               <StaffWorkspace
-                key={`${user.role}:${user.department_id}:${view === "history"}`}
+                key={`${user.id}:${user.role}:${user.department_id}:${view === "history"}:${workspaceQueue || ""}`}
                 user={user}
-                dashboard={view === "dashboard"}
+                initialQueue={workspaceQueue}
+                dashboard={false}
                 history={view === "history"}
               />
             ) : view === "cases" && user.role === "CITIZEN" ? (

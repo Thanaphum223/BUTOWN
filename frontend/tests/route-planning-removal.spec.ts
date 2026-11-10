@@ -24,7 +24,7 @@ for (const role of ["OFFICER", "LEADER", "FIELD", "ADMIN"]) {
         await route.fulfill({ json: data[path] ?? {} });
       });
       await page.goto("/");
-      await expect(page.locator(".staff-workspace")).toBeVisible();
+      await expect(page.locator(".staff-overview")).toBeVisible();
       if (width < 1024)
         await page.getByRole("button", { name: "เปิดเมนูหลัก", exact: true }).click();
       await expect(

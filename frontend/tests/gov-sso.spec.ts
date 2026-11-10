@@ -116,7 +116,7 @@ test("SSO button registers matching state before redirect without token entry", 
   callback.searchParams.set("service", "towntrack-test");
   callback.searchParams.set("ticket", "unused-one-time-iam-ticket");
   await page.goto(callback.toString());
-  await expect(page.getByText("ไม่พบงานตามตัวกรอง", { exact: true })).toBeVisible();
+  await expect(page.getByText("ไม่มีงานรอดำเนินการในขั้นตอนของคุณ", { exact: true })).toBeVisible();
   await expect(page.getByText("SSO Test User", { exact: true })).toBeVisible();
   expect(seen.callbacks).toEqual([{ code: "gov-after-line-code", state: seen.starts[0].state }]);
   expect(new URL(page.url()).origin).toBe("http://127.0.0.1:5173");
@@ -381,43 +381,71 @@ test("logged-in account explicitly initiates LINK rather than creating a new acc
   await expect(page.getByRole("heading", { name: "IAM login test boundary" })).toBeVisible();
   expect(seen.starts[0].purpose).toBe("LINK");
 });
-test("signed-in user can inspect synchronized Gov Center profile and residence status", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await boundary(page, true);
-  await page.route("**/api/auth/gov-profile", (r) =>
-    r.fulfill({
-      json: {
-        linked: true,
-        profile: { id: "iam-user-1", name: "Gov Profile Name", email: "profile@example.test" },
-        residences: [
-          {
-            residenceId: "home-1",
-            address: "บ้านทดสอบ 12",
-            memberStatus: "PENDING",
-            residenceStatus: "VERIFIED",
-            canUseForOfficialTransaction: false,
+for (const hasResidences of [true, false]) {
+  test(`signed-in user can inspect synchronized Gov Center identity without ${hasResidences ? "linked residences" : "a residence empty state"}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await boundary(page, true);
+    await page.route("**/api/auth/gov-profile", (r) =>
+      r.fulfill({
+        json: {
+          linked: true,
+          profile: {
+            id: "iam-user-1",
+            name: "Gov Profile Name",
+            email: "profile@example.test",
+            last_sso_at: "2026-11-10T03:04:05.000Z",
           },
-        ],
-      },
-    }),
-  );
-  await page.goto("/");
-  await page.getByRole("button", { name: "ข้อมูล Gov Center", exact: true }).click();
-  await expect(page.getByText("Gov Profile Name", { exact: true })).toBeVisible();
-  await expect(page.getByText("profile@example.test", { exact: true })).toBeVisible();
-  await expect(page.getByText("บ้านทดสอบ 12", { exact: true })).toBeVisible();
-  await expect(page.getByText("ยังไม่ผ่านการยืนยันครบถ้วน", { exact: true })).toBeVisible();
-  expect(
-    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-  ).toBeTruthy();
-  await page.screenshot({
-    path: "../work/screenshots/gov-profile-mobile.png",
-    fullPage: true,
-    animations: "disabled",
+          residences: hasResidences
+            ? [
+                {
+                  residenceId: "home-1",
+                  address: "บ้านทดสอบ 12",
+                  memberStatus: "PENDING",
+                  residenceStatus: "VERIFIED",
+                  canUseForOfficialTransaction: false,
+                },
+              ]
+            : [],
+        },
+      }),
+    );
+    await page.goto("/");
+    await page.getByRole("button", { name: "ข้อมูล Gov Center", exact: true }).click();
+    const drawer = page.getByRole("dialog", { name: "ข้อมูล Gov Center", exact: true });
+    await expect(drawer.getByText("Gov Profile Name", { exact: true })).toBeVisible();
+    await expect(drawer.getByText("profile@example.test", { exact: true })).toBeVisible();
+    await expect(drawer.getByText("อัปเดตล่าสุด", { exact: true })).toBeVisible();
+    await expect(drawer.getByText(/10.*พ\.ย\..*2569.*10:04/)).toBeVisible();
+    await expect(
+      drawer.getByRole("heading", { name: "บ้านที่เชื่อมกับบัญชี", exact: true }),
+    ).toHaveCount(0);
+    await expect(drawer.getByText("บ้านทดสอบ 12", { exact: true })).toHaveCount(0);
+    await expect(drawer.getByText("ยังไม่ผ่านการยืนยันครบถ้วน", { exact: true })).toHaveCount(0);
+    await expect(
+      drawer.getByText("ไม่มีข้อมูลบ้านที่เชื่อมไว้ หรือบริการยังไม่ได้รับสิทธิ์อ่านข้อมูลบ้าน", {
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await expect(
+      drawer.getByText(
+        "ข้อมูลอัปเดตเมื่อเข้าสู่ระบบผ่าน Gov Center ครั้งล่าสุด สิทธิ์ทำงานกำหนดโดยผู้ดูแล TownTrack",
+        { exact: true },
+      ),
+    ).toHaveCount(0);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    ).toBeTruthy();
+    if (hasResidences) {
+      await page.screenshot({
+        path: "../work/screenshots/gov-profile-mobile.png",
+        fullPage: true,
+        animations: "disabled",
+      });
+    }
   });
-});
+}
 
 test("LINE sign-in after logout refreshes the session token without a page reload", async ({
   page,

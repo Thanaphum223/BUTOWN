@@ -3393,6 +3393,56 @@ button.queue-item .queue-item-top .ant-tag {
 .gov-auth-badge small {
   display: block;
 }
+
+/* Keep desktop navigation anchored while the working area scrolls. */
+@media (min-width: 992px) {
+  .staff-shell > .sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    z-index: 20;
+  }
+  .staff-shell > .sidebar .ant-layout-sider-children {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+  }
+  .staff-shell > .sidebar .brand,
+  .staff-shell > .sidebar .nav-label,
+  .staff-shell > .sidebar .sidebar-bottom {
+    flex-shrink: 0;
+  }
+  .staff-shell > .sidebar .ant-menu {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .staff-shell > .sidebar .sidebar-bottom {
+    margin-top: auto;
+  }
+  .staff-shell > .ant-layout {
+    margin-inline-start: 232px;
+    min-width: 0;
+  }
+}
+@media (min-width: 992px) and (max-height: 700px) {
+  .staff-shell > .sidebar .brand {
+    padding-block: 14px;
+  }
+  .staff-shell > .sidebar .nav-label {
+    padding-block: 12px;
+  }
+  .staff-shell > .sidebar .sidebar-bottom {
+    padding-block: 12px;
+  }
+  .staff-shell > .sidebar .sidebar-bottom p {
+    display: none;
+  }
+}
 .auth-card .gov-auth-badge {
   margin-bottom: 16px;
   border-radius: 8px;

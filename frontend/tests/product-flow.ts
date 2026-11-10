@@ -68,9 +68,10 @@ export async function confirmLocation(page: Page, address?: string) {
   if (address) await page.getByLabel("สถานที่ / จุดสังเกต", { exact: true }).fill(address);
   await page.getByRole("button", { name: "ถัดไป", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "ยืนยันตำแหน่งจุดเกิดเหตุ" });
-  await expect(dialog).toBeVisible();
+  await waitForSettledDialog(dialog);
   if (address) await expect(dialog).toContainText(address);
   await dialog.getByRole("button", { name: "ยืนยันตำแหน่ง", exact: true }).click();
+  await expect(dialog).toBeHidden();
   await expect(page.getByRole("heading", { name: "รายละเอียดปัญหา", exact: true })).toBeVisible();
 }
 export const photo = (name: string) => ({

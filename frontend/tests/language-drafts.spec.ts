@@ -141,7 +141,7 @@ for (const language of ["th", "en"]) {
   });
 }
 
-test("profile follows header language while preserving original profile and residence data", async ({
+test("profile follows header language while preserving identity and hiding residences", async ({
   page,
 }) => {
   await authBoundary(page, true);
@@ -152,7 +152,12 @@ test("profile follows header language while preserving original profile and resi
     route.fulfill({
       json: {
         linked: true,
-        profile: { id: "profile", name: "สมัครสมาชิก", email: "original@example.test" },
+        profile: {
+          id: "profile",
+          name: "สมัครสมาชิก",
+          email: "original@example.test",
+          last_sso_at: "2026-11-10T03:04:05.000Z",
+        },
         residences: [
           {
             residenceId: "residence",
@@ -169,14 +174,31 @@ test("profile follows header language while preserving original profile and resi
   await page.getByRole("button", { name: "ข้อมูล Gov Center", exact: true }).click();
   const drawer = page.getByRole("dialog");
   await expect(drawer.getByText("สมัครสมาชิก", { exact: true })).toBeVisible();
+  await expect(drawer.getByText("original@example.test", { exact: true })).toBeVisible();
+  await expect(drawer.getByText("อัปเดตล่าสุด", { exact: true })).toBeVisible();
+  await expect(drawer.getByText(/10.*พ\.ย\..*2569.*10:04/)).toBeVisible();
+  await expect(drawer.getByText("บ้านที่เชื่อมกับบัญชี", { exact: true })).toHaveCount(0);
+  await expect(drawer.getByText("บ้านเดิม เลขที่ 12", { exact: true })).toHaveCount(0);
   await expect(drawer.locator(".language-switcher")).toHaveCount(0);
   await drawer.getByRole("button", { name: "ปิด", exact: true }).click();
   await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
   await page.getByRole("button", { name: "Gov Center profile", exact: true }).click();
   await expect(drawer).toContainText("Gov Center profile");
-  await expect(drawer).toContainText("Linked residences");
+  await expect(drawer.getByText("Gov Center name", { exact: true })).toBeVisible();
+  await expect(drawer.getByText("Email", { exact: true })).toBeVisible();
+  await expect(drawer.getByText("Last updated", { exact: true })).toBeVisible();
+  await expect(drawer.getByText("10 Nov 2026, 10:04", { exact: true })).toBeVisible();
+  await expect(drawer.getByText("Linked residences", { exact: true })).toHaveCount(0);
   await expect(drawer.getByText("สมัครสมาชิก", { exact: true })).toBeVisible();
-  await expect(drawer.getByText("บ้านเดิม เลขที่ 12", { exact: true })).toBeVisible();
+  await expect(drawer.getByText("original@example.test", { exact: true })).toBeVisible();
+  await expect(drawer.getByText("บ้านเดิม เลขที่ 12", { exact: true })).toHaveCount(0);
+  await expect(drawer.getByText("Verified", { exact: true })).toHaveCount(0);
+  await expect(
+    drawer.getByText(
+      "Information was updated at your last Gov Center sign-in. Work permissions are managed by TownTrack administrators.",
+      { exact: true },
+    ),
+  ).toHaveCount(0);
   await drawer.getByRole("button", { name: "Close", exact: true }).click();
   await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("th");
   await page.getByRole("button", { name: "ข้อมูล Gov Center", exact: true }).click();

@@ -98,12 +98,11 @@ for (const width of [440, 1280]) {
     await readable(page.locator(".header-identity strong"), header);
     await readable(page.locator(".header-identity small"), header);
     await readable(
-      page.locator(".staff-workspace > .page-heading .ant-typography-secondary"),
+      page.locator(".staff-overview > .page-heading .ant-typography-secondary"),
       page.locator("body"),
     );
-    expect(await paint(page.locator(".staff-workspace > .page-heading .ant-tag"))).toEqual(
-      await paint(page.locator(".staff-workspace > .page-heading .eyebrow")),
-    );
+    await green(page.locator(".overview-summary-cards .ant-statistic-content").first());
+    await readable(page.getByRole("button", { name: "เปิดคิวงาน", exact: true }));
     if (width >= 1024) {
       await green(page.locator(".staff-shell .sidebar"), "background-color");
       await readable(page.locator(".sidebar .ant-menu-item-selected"));

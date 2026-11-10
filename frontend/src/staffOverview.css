@@ -1,0 +1,107 @@
+.staff-overview {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.staff-overview > .page-heading {
+  margin: 0;
+  align-items: flex-start;
+}
+.staff-overview .page-heading h2 {
+  font-size: 24px;
+  margin: 0 0 8px !important;
+}
+.overview-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.overview-summary-cards .ant-card-body {
+  padding: 18px 20px;
+}
+.overview-summary-cards .ant-statistic-content {
+  color: var(--gov-brand-primary);
+  font-size: 32px;
+}
+.overview-summary-cards .ant-btn {
+  padding-inline: 0;
+  margin-top: 8px;
+}
+.overview-sections {
+  display: grid;
+  grid-template-columns: minmax(230px, 1fr) minmax(0, 2fr);
+  gap: 20px;
+  align-items: start;
+}
+.overview-shortcuts .ant-btn {
+  display: flex;
+  justify-content: space-between;
+  height: auto;
+  min-height: 48px;
+  text-align: start;
+  white-space: normal;
+}
+.overview-shortcuts .ant-btn > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.overview-recent .ant-card-body {
+  display: grid;
+  gap: 12px;
+}
+.overview-case {
+  display: grid;
+  position: relative;
+  gap: 7px;
+  padding: 14px 36px 14px 14px;
+  border: 1px solid var(--gov-border-neutral);
+  border-radius: 10px;
+  background: white;
+  text-align: start;
+  color: var(--gov-text-primary);
+  font: inherit;
+  cursor: pointer;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.overview-case:hover {
+  border-color: var(--gov-brand-primary);
+  background: var(--gov-surface-soft);
+}
+.overview-case:focus-visible {
+  outline: 3px solid var(--gov-brand-primary);
+  outline-offset: 3px;
+}
+.overview-case > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+}
+.overview-case > .anticon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  color: var(--gov-brand-primary);
+}
+.overview-case-address {
+  color: var(--gov-text-secondary);
+  font-size: 12px;
+}
+@media (max-width: 767px) {
+  .staff-overview > .page-heading {
+    flex-wrap: wrap;
+  }
+  .overview-sections {
+    grid-template-columns: 1fr;
+  }
+  .overview-summary-cards {
+    gap: 10px;
+  }
+  .overview-summary-cards .ant-card-body {
+    padding: 12px;
+  }
+  .overview-summary-cards .ant-statistic-content {
+    font-size: 28px;
+  }
+}

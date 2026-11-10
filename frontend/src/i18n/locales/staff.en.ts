@@ -1,4 +1,28 @@
 const messages: Record<string, string> = {
+  "ส่งต่อ / จ่ายงานใหม่": "Handover / reassignment",
+  ตรวจคำขอทรัพยากร: "Review resource requests",
+  "ตรวจรายงาน / ปิดเรื่อง": "Review reports / close cases",
+  รอจัดทีม: "Awaiting team assignment",
+  "จัดทำ / แก้ไขข้อเสนอ": "Prepare / revise proposals",
+  "ตรวจ / แก้ไขรายงาน": "Review / revise reports",
+  รอเริ่มงาน: "Awaiting work start",
+  "ปฏิบัติงาน / แก้ไขรายงาน": "Field work / report revision",
+  รอพิจารณาทรัพยากร: "Awaiting resource decision",
+  "รับเรื่อง / จัดทีม": "Intake / team assignment",
+  ทรัพยากร: "Resources",
+  งานลงพื้นที่: "Field work",
+  "สรุปงานที่ถึงขั้นตอนของคุณ และเลือกเข้าคิวเพื่อดำเนินการ":
+    "Review tasks ready for your role, then open the queue to act.",
+  เปิดคิวงาน: "Open work queue",
+  เปิดคิวงานทั้งหมด: "Open all queued tasks",
+  งานที่รอดำเนินการของคุณ: "Tasks awaiting your action",
+  งานในประวัติ: "Work history",
+  ดูประวัติงาน: "View work history",
+  ขั้นตอนที่คุณรับผิดชอบ: "Your workflow stages",
+  เลือกเปิดคิวงานเพื่อดูรายการที่คุณดำเนินการได้: "Open the queue to see tasks you can act on.",
+  "งานล่าสุดที่ถึงขั้นตอนของคุณ แสดงไม่เกิน 5 เรื่อง":
+    "The five most recent tasks ready for your role.",
+  ไม่มีงานรอดำเนินการในขั้นตอนของคุณ: "No tasks are awaiting your action.",
   "ข้อมูลล่าสุดยังอัปเดตไม่ได้ ระบบจะลองใหม่อัตโนมัติ":
     "Unable to refresh the latest data. Retrying automatically.",
   เลือกหัวหน้าหน่วยงานใหม่: "Select a replacement department head",

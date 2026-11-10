@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { switchLanguage } from "./language-control";
+import { confirmLocation } from "./product-flow";
 
 async function fixture(page: Page, role = "OFFICER") {
   await page.route("**/api/**", async (route) => {
@@ -28,6 +29,17 @@ async function fixture(page: Page, role = "OFFICER") {
   await page.route("https://**/*", (route) => route.abort());
   await page.goto("/");
 }
+test("manual location confirmation waits for modal animation before continuing", async ({
+  page,
+}) => {
+  await fixture(page, "CITIZEN");
+  await page.addStyleTag({
+    content: ".ant-modal.ant-zoom-appear { animation-duration: 800ms !important; }",
+  });
+  await page.getByRole("link", { name: /แจ้งปัญหา/ }).click();
+  await confirmLocation(page, "Manual landmark without GPS");
+  await expect(page.getByLabel("หัวข้อปัญหา", { exact: true })).toBeVisible();
+});
 for (const width of [390, 768, 1280])
   for (const language of ["th", "en"]) {
     test(`header role selector is bounded readable and operable ${language} at ${width}`, async ({

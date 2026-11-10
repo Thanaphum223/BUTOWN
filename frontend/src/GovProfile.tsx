@@ -1,18 +1,6 @@
 import { useI18n } from "./i18n/useI18n";
 import { useState } from "react";
-import {
-  Alert,
-  Button,
-  Card,
-  Descriptions,
-  Drawer,
-  Empty,
-  Space,
-  Spin,
-  Tag,
-  Tooltip,
-  Typography,
-} from "antd";
+import { Alert, Button, Descriptions, Drawer, Space, Spin, Tooltip } from "antd";
 import { UserOutlined } from "@ant-design/icons";
 import { api, date } from "./api";
 import GovLogin from "./GovLogin";
@@ -20,13 +8,6 @@ import GovLogin from "./GovLogin";
 type GovProfileData = {
   linked: boolean;
   profile?: { id: string; name?: string; email?: string; last_sso_at?: string };
-  residences: {
-    residenceId: string;
-    address?: string;
-    memberStatus: string;
-    residenceStatus: string;
-    canUseForOfficialTransaction: boolean;
-  }[];
 };
 
 export default function GovProfile() {
@@ -79,55 +60,23 @@ export default function GovProfile() {
           </Space>
         )}
         {data?.linked && (
-          <Space direction="vertical" size="large" style={{ width: "100%" }}>
-            <Descriptions
-              column={1}
-              title={t("ข้อมูลผู้ใช้")}
-              items={[
-                {
-                  key: "name",
-                  label: t("ชื่อจาก Gov Center"),
-                  children: data.profile?.name || t("ไม่ระบุ"),
-                },
-                { key: "email", label: t("อีเมล"), children: data.profile?.email || t("ไม่ระบุ") },
-                {
-                  key: "synced",
-                  label: t("อัปเดตล่าสุด"),
-                  children: data.profile?.last_sso_at ? date(data.profile.last_sso_at) : "—",
-                },
-              ]}
-            />
-            <div>
-              <Typography.Title level={5}>{t("บ้านที่เชื่อมกับบัญชี")}</Typography.Title>
-              {!data.residences.length && (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description={t(
-                    "ไม่มีข้อมูลบ้านที่เชื่อมไว้ หรือบริการยังไม่ได้รับสิทธิ์อ่านข้อมูลบ้าน",
-                  )}
-                />
-              )}
-              <Space direction="vertical" style={{ width: "100%" }}>
-                {data.residences.map((home) => (
-                  <Card key={home.residenceId} size="small">
-                    <Typography.Paragraph>
-                      {home.address || t("ไม่ระบุที่อยู่")}
-                    </Typography.Paragraph>
-                    <Tag color={home.canUseForOfficialTransaction ? "green" : "orange"}>
-                      {home.canUseForOfficialTransaction
-                        ? t("ยืนยันข้อมูลแล้ว")
-                        : t("ยังไม่ผ่านการยืนยันครบถ้วน")}
-                    </Tag>
-                  </Card>
-                ))}
-              </Space>
-            </div>
-            <Typography.Text type="secondary">
-              {t(
-                "ข้อมูลอัปเดตเมื่อเข้าสู่ระบบผ่าน Gov Center ครั้งล่าสุด สิทธิ์ทำงานกำหนดโดยผู้ดูแล TownTrack",
-              )}
-            </Typography.Text>
-          </Space>
+          <Descriptions
+            column={1}
+            title={t("ข้อมูลผู้ใช้")}
+            items={[
+              {
+                key: "name",
+                label: t("ชื่อจาก Gov Center"),
+                children: data.profile?.name || t("ไม่ระบุ"),
+              },
+              { key: "email", label: t("อีเมล"), children: data.profile?.email || t("ไม่ระบุ") },
+              {
+                key: "synced",
+                label: t("อัปเดตล่าสุด"),
+                children: data.profile?.last_sso_at ? date(data.profile.last_sso_at) : "—",
+              },
+            ]}
+          />
         )}
       </Drawer>
     </>

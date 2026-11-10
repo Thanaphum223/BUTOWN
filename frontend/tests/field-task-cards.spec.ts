@@ -64,6 +64,7 @@ for (const failure of [false, true]) {
         return route.fulfill({ json: responses[path] ?? {} });
       });
       await page.goto("/");
+      await page.getByRole("button", { name: "เปิดคิวงาน", exact: true }).click();
       const cards = page.locator(".field-task-card");
       await expect(cards).toHaveCount(1);
       await expect(cards).toContainText("0 โหวต");
@@ -203,6 +204,7 @@ test("slow card metadata completes across unchanged list polling", async ({ page
     return route.fulfill({ json: responses[path] ?? {} });
   });
   await page.goto("/");
+  await page.getByRole("button", { name: "เปิดคิวงาน", exact: true }).click();
   await expect.poll(() => details).toBe(1);
   await page.clock.fastForward(4500);
   const card = page.locator(".field-task-card");

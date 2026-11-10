@@ -31,10 +31,12 @@ export default function StaffWorkspace({
   user,
   dashboard,
   history = false,
+  initialQueue,
 }: {
   user: D;
   dashboard: boolean;
   history?: boolean;
+  initialQueue?: string;
 }) {
   const { t } = useI18n();
   const metadataCache = useRef(new Map<string, CardMetadata>());
@@ -52,7 +54,7 @@ export default function StaffWorkspace({
   }, []);
   const [search, setSearch] = useState(""),
     [query, setQuery] = useState(""),
-    [status, setStatus] = useState<string>(),
+    [status, setStatus] = useState<string | undefined>(history ? undefined : initialQueue),
     [selected, setSelected] = useState(""),
     [page, setPage] = useState(1);
   useEffect(() => {
