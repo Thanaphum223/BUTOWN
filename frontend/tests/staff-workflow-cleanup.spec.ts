@@ -68,7 +68,12 @@ async function openCase(page: Page, role: string) {
   });
   await page.route("https://**/*", (route) => route.abort());
   await page.goto("/");
-  if (role === "APPROVER") await page.getByRole("menuitem", { name: /คิวงาน/ }).click();
+  await page
+    .getByRole("button", {
+      name: role === "APPROVER" ? "เปิดคิวงานอนุมัติ" : "เปิดคิวงาน",
+      exact: true,
+    })
+    .click();
   await expect(page.getByText(/เกินกำหนด|กำหนดเสร็จ|วันนัดหมาย/)).toHaveCount(0);
   await page.getByRole("button", { name: /เปิดงาน งานตรวจระบบ/ }).click();
 }

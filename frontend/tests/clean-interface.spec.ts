@@ -56,6 +56,7 @@ async function workspace(page: Page) {
   });
   await page.route("https://**/*", (route) => route.abort());
   await page.goto("/");
+  await page.getByRole("button", { name: "เปิดคิวงาน", exact: true }).click();
   return writes;
 }
 

@@ -80,6 +80,7 @@ async function workspace(page: Page, role: string, status: string, actions: stri
   });
   await page.route("https://**/*", (route) => route.abort());
   await page.goto("/");
+  await page.getByRole("button", { name: "เปิดคิวงาน", exact: true }).click();
   await page.getByRole("button", { name: /(?:เปิดงาน|Open task) Original title/ }).click();
   return { data, writes };
 }

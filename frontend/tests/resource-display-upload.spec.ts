@@ -128,6 +128,13 @@ async function workspace(
   });
   await page.goto("/");
   if (historical) await page.getByRole("menuitem", { name: /ประวัติงาน/ }).click();
+  else
+    await page
+      .getByRole("button", {
+        name: role === "APPROVER" ? "เปิดคิวงานอนุมัติ" : "เปิดคิวงาน",
+        exact: true,
+      })
+      .click();
   await page.getByRole("button", { name: /เปิดงาน งานเทศบาลทดสอบ/ }).click();
   return payload;
 }

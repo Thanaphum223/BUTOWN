@@ -1,6 +1,6 @@
 import { switchLanguage } from "./language-control";
 import { test, expect, type Page } from "@playwright/test";
-import { photo } from "./product-flow";
+import { photo, waitForSettledDialog } from "./product-flow";
 
 async function workspace(page: Page, role: string, status: string, actions: string[]) {
   const complaint = {
@@ -83,6 +83,7 @@ async function workspace(page: Page, role: string, status: string, actions: stri
   await page.goto("/");
   if (role === "APPROVER")
     await page.getByRole("button", { name: "เปิดคิวงานอนุมัติ", exact: true }).click();
+  else await page.getByRole("button", { name: "เปิดคิวงาน", exact: true }).click();
   await page.getByRole("button", { name: /(?:เปิดงาน|Open task) Original title/ }).click();
   return { data, writes };
 }
@@ -311,11 +312,13 @@ test("publication overlay uses header language and keeps selected evidence and c
     size_bytes: 100,
   });
   await page.reload();
+  await page.getByRole("button", { name: "เปิดคิวงาน", exact: true }).click();
   await page.getByRole("button", { name: /(?:เปิดงาน|Open task) Original title/ }).click();
   await page.locator("summary").filter({ hasText: "ข้อมูลคำร้อง เอกสาร และรายงานทั้งหมด" }).click();
   await switchEnglish(page);
   await page.getByRole("button", { name: "Share a copy", exact: true }).click();
   const dialog = page.getByRole("dialog");
+  await waitForSettledDialog(dialog);
   await dialog.locator('input[type="file"]').setInputFiles(photo("Original cleaned copy.png"));
   await dialog.getByRole("checkbox").check();
   await expect(dialog.locator(".language-switcher")).toHaveCount(0);
