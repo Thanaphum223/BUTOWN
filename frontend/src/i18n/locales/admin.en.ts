@@ -1,4 +1,18 @@
 const messages: Record<string, string> = {
+  แก้ชื่อหน่วยงาน: "Rename department",
+  แก้ชื่อ: "Rename",
+  ลบหน่วยงาน: "Delete department",
+  ยืนยันลบหน่วยงาน: "Confirm department deletion",
+  ลบหน่วยงานแล้ว: "Department deleted",
+  กรุณาระบุชื่อหน่วยงาน: "Enter a department name",
+  "ชื่อหน่วยงานต้องไม่เกิน 200 ตัวอักษร": "Department names must be 200 characters or fewer",
+  "ยืนยันลบหน่วยงาน {{name}} หรือไม่": "Delete department {{name}}?",
+  ประวัติงานเดิมจะยังคงอยู่: "Existing work history will be retained",
+  "บัญชีที่เลือก {{count}} บัญชี": "{{count}} accounts selected",
+  เลือกได้เฉพาะบัญชีที่เปิดใช้งานและไม่ใช่ผู้ดูแลระบบ:
+    "Select enabled accounts that are not administrators",
+  "ไม่สามารถลบกองที่ยังมีข้อมูลใช้งาน กรุณาย้ายบุคลากร ประเภทคำร้อง งาน ทีม และการจับคู่บทบาทออกก่อน":
+    "This department is still in use. Move its staff, active issue categories, work, teams and role mappings before deleting it.",
   "ถ้าไม่พบรายชื่อ ให้ผู้ใช้เข้าสู่ TownTrack ผ่าน Gov Center ก่อน รายชื่อจะอัปเดตอัตโนมัติ":
     "If an account is missing, ask the user to sign in through Gov Center. The list updates automatically.",
   ไม่สามารถดำเนินการได้: "Unable to complete the action",

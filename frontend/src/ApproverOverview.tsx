@@ -83,13 +83,7 @@ export default function ApproverOverview({
     <div className="approver-overview">
       <div className="page-heading">
         <div>
-          <Text className="eyebrow">{t("ศูนย์ประสานงาน · TOWNTRACK")}</Text>
           <Title level={2}>{t("ภาพรวมคำร้องทั้งเทศบาล")}</Title>
-          <Text type="secondary">
-            {t(
-              "ติดตามจำนวนและสถานะคำร้องทุกเรื่องในเทศบาล เปิดคิวงานอนุมัติเพื่อตรวจรายละเอียดและเอกสารตามสิทธิ์ของคุณ",
-            )}
-          </Text>
         </div>
         <div className="overview-actions">
           <Button type="primary" onClick={onQueue}>
@@ -224,9 +218,6 @@ export default function ApproverOverview({
             )}
           </Space>
         </details>
-        <Text type="secondary" className="overview-scope-note">
-          {t("รายการนี้แสดงข้อมูลสรุปเท่านั้น จำนวนด้านบนรวมทุกสถานะและไม่เปลี่ยนตามตัวกรอง")}
-        </Text>
         <div className="overview-summaries" aria-live="polite" aria-busy={!data && !error}>
           {!data && !error ? (
             <Card loading />

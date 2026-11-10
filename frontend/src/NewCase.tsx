@@ -430,7 +430,6 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
           <CheckOutlined />
         </div>
         <Title level={2}>{t("บันทึกคำร้องแล้ว")}</Title>
-        <Text type="secondary">{t("เทศบาลจะตรวจสอบและดำเนินการตามขั้นตอน")}</Text>
         <Card className="receipt-card">
           <Text className="eyebrow">{t("เลขรับเรื่อง")}</Text>
           <Title level={3}>#{receipt.id.slice(0, 8).toUpperCase()}</Title>
@@ -458,9 +457,6 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
     );
   return (
     <div className="report-wizard">
-      <Text className="eyebrow" style={{ display: "block" }}>
-        {t("แจ้งปัญหาในชุมชน")}
-      </Text>
       <ol className="report-stepper" aria-label={t("ขั้นตอนแจ้งปัญหา")}>
         {["จุดเกิดเหตุ", "รายละเอียดปัญหา"].map((label, i) => (
           <li
@@ -722,9 +718,6 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
           <Title level={2}>{t("รายละเอียดปัญหา")}</Title>
           <section aria-label={t("ประเภทปัญหา")}>
             <Title level={2}>{t("พบปัญหาอะไร?")}</Title>
-            <Text type="secondary">
-              {t("เลือกปัญหาในพื้นที่หรือบริการที่เทศบาลรับผิดชอบ หากไม่ตรงหมวดให้เลือกอื่น ๆ")}
-            </Text>
             <label className="control-label" htmlFor="category-query">
               {t("ค้นหาประเภทปัญหา")}
             </label>

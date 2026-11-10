@@ -212,7 +212,6 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
       <CommunityDetail id={detailId} onClose={() => setDetailId(undefined)} />
       <div className="page-heading community-heading">
         <div>
-          <Text className="eyebrow">{t("ชุมชน · TOWNTRACK")}</Text>
           <Title level={2}>
             {municipal ? t("เรื่องแจ้งในเทศบาล") : t("เรื่องแจ้งใกล้จุดที่เลือก")}
           </Title>
@@ -352,12 +351,10 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
         <section className="community-results">
           <div className="ranking-heading">
             <div>
-              <Text className="eyebrow">{t("เสียงจากชุมชน")}</Text>
               <Title level={4}>
                 <TrophyOutlined /> {t("5 ปัญหาที่มีโหวตสูงสุด")}
               </Title>
             </div>
-            <Tag>TOP 5</Tag>
           </div>
           <List
             loading={busy}

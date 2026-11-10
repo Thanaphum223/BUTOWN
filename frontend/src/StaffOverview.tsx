@@ -38,9 +38,6 @@ export default function StaffOverview({
           <Title level={2}>
             {t(user.role === "FIELD" ? "งานลงพื้นที่ของฉัน" : "ภาพรวมการดำเนินงาน")}
           </Title>
-          <Text type="secondary">
-            {t("สรุปงานที่ถึงขั้นตอนของคุณ และเลือกเข้าคิวเพื่อดำเนินการ")}
-          </Text>
         </div>
         <Button type="primary" onClick={() => onQueue()}>
           {t("เปิดคิวงาน")}
@@ -86,7 +83,6 @@ export default function StaffOverview({
           )}
         </Card>
         <Card title={t("รายการคำร้อง")} className="overview-recent" loading={active.loading}>
-          <Text type="secondary">{t("งานล่าสุดที่ถึงขั้นตอนของคุณ แสดงไม่เกิน 5 เรื่อง")}</Text>
           {!active.loading && !active.data?.items?.length && !active.error && (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}

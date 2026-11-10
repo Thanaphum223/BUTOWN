@@ -7,6 +7,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -60,7 +61,9 @@ public class AdminController {
                 + " municipality_id=? AND deleted_at IS NULL ORDER BY created_at",
             u.get("municipality_id")),
         "departments",
-        db.list("SELECT id,name FROM department WHERE municipality_id=?", u.get("municipality_id")),
+        db.list(
+            "SELECT id,name FROM department WHERE municipality_id=? AND deleted_at IS NULL",
+            u.get("municipality_id")),
         "categories",
         db.list(
             "SELECT *,fields::text field_schema FROM category WHERE municipality_id=? ORDER BY"
@@ -93,9 +96,129 @@ public class AdminController {
     return Map.of("id", id);
   }
 
+  @PostMapping("/departments/{id}")
+  @Transactional
+  public void renameDepartment(
+      @PathVariable UUID id, @RequestBody Map<String, Object> b, Authentication a) {
+    var u = lockedAdmin(a);
+    var department =
+        db.one(
+            "SELECT id,name FROM department WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR UPDATE",
+            id,
+            u.get("municipality_id"));
+    String name = Workflow.text(b, "name", 200);
+    db.run(
+        "UPDATE department SET name=? WHERE id=? AND municipality_id=?",
+        name,
+        id,
+        u.get("municipality_id"));
+    workflow.audit(
+        u,
+        null,
+        "DEPARTMENT_RENAME",
+        null,
+        null,
+        "กอง " + id + " " + department.get("name") + " -> " + name);
+  }
+
+  @DeleteMapping("/departments/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Transactional
+  public void deleteDepartment(@PathVariable UUID id, Authentication a) {
+    var u = lockedAdmin(a);
+    var department =
+        db.one(
+            "SELECT id,name,deleted_at FROM department WHERE id=? AND municipality_id=? FOR UPDATE",
+            id,
+            u.get("municipality_id"));
+    if (department.get("deleted_at") != null) return;
+    var dependencies =
+        db.list(
+            "SELECT 'staff' dependency WHERE EXISTS(SELECT 1 FROM app_user WHERE department_id=? AND deleted_at IS NULL)"
+                + " UNION ALL SELECT 'categories' WHERE EXISTS(SELECT 1 FROM category WHERE department_id=? AND active=true)"
+                + " UNION ALL SELECT 'complaints' WHERE EXISTS(SELECT 1 FROM complaint WHERE department_id=? AND status NOT IN ('CLOSED','REJECTED','TERMINATED'))"
+                + " UNION ALL SELECT 'transfers' WHERE EXISTS(SELECT 1 FROM department_transfer WHERE (source_department_id=? OR target_department_id=?) AND state='PENDING')"
+                + " UNION ALL SELECT 'teams' WHERE EXISTS(SELECT 1 FROM field_team WHERE department_id=? AND active=true)"
+                + " UNION ALL SELECT 'govMappings' WHERE EXISTS(SELECT 1 FROM gov_role_mapping WHERE department_id=?)"
+                + " UNION ALL SELECT 'routes' WHERE EXISTS(SELECT 1 FROM route_plan p WHERE department_id=? AND (status IN ('DRAFT','PROPOSED') OR EXISTS(SELECT 1 FROM route_stop s WHERE s.plan_id=p.id AND s.reserved)))",
+            id,
+            id,
+            id,
+            id,
+            id,
+            id,
+            id,
+            id);
+    if (!dependencies.isEmpty())
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT,
+          "ไม่สามารถลบกองที่ยังมีข้อมูลใช้งาน กรุณาย้ายบุคลากร ประเภทคำร้อง งาน ทีม และการจับคู่บทบาทออกก่อน");
+    db.run(
+        "UPDATE department SET deleted_at=clock_timestamp() WHERE id=? AND municipality_id=?",
+        id,
+        u.get("municipality_id"));
+    workflow.audit(
+        u, null, "DEPARTMENT_DELETE", null, null, "ลบกอง " + id + " " + department.get("name"));
+  }
+
+  @PostMapping("/departments/{id}/field-users")
+  @Transactional
+  public void assignFieldUsers(
+      @PathVariable UUID id, @RequestBody Map<String, Object> b, Authentication a) {
+    var u = lockedAdmin(a);
+    db.one(
+        "SELECT id FROM department WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR SHARE",
+        id,
+        u.get("municipality_id"));
+    if (!(b.get("userIds") instanceof List<?> values) || values.isEmpty() || values.size() > 100)
+      throw new IllegalArgumentException();
+    var ids = new LinkedHashSet<UUID>();
+    for (Object value : values) {
+      if (!(value instanceof String) || !ids.add(Db.id(value)))
+        throw new IllegalArgumentException();
+    }
+    var targets = new ArrayList<Map<String, Object>>();
+    for (UUID userId : ids) {
+      var target =
+          db.one(
+              "SELECT id,username,role,department_id,enabled FROM app_user WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR UPDATE",
+              userId,
+              u.get("municipality_id"));
+      if (!Boolean.TRUE.equals(target.get("enabled")) || "ADMIN".equals(target.get("role")))
+        throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST, "เลือกได้เฉพาะบัญชีที่เปิดใช้งานและไม่ใช่ผู้ดูแลระบบ");
+      targets.add(target);
+    }
+    // Validate the entire selection before the first write or session revocation.
+    for (var target : targets) {
+      db.run(
+          "UPDATE app_user SET role=?,department_id=? WHERE id=? AND municipality_id=?",
+          "FIELD",
+          id,
+          target.get("id"),
+          u.get("municipality_id"));
+      workflow.audit(
+          u,
+          null,
+          "USER_ROLE",
+          null,
+          null,
+          "บัญชี "
+              + target.get("username")
+              + " role="
+              + target.get("role")
+              + "->FIELD department="
+              + target.get("department_id")
+              + "->"
+              + id);
+    }
+    for (var target : targets) sessions.revoke(target.get("username").toString());
+  }
+
   @PostMapping("/users")
+  @Transactional
   public Object user(@RequestBody Map<String, Object> b, Authentication a) {
-    var u = admin(a);
+    var u = lockedAdmin(a);
     String role = Workflow.text(b, "role", 20);
     if (!List.of("ADMIN", "OFFICER", "LEADER", "FIELD", "APPROVER", "CITIZEN").contains(role))
       throw new IllegalArgumentException();
@@ -109,7 +232,7 @@ public class AdminController {
       throw new IllegalArgumentException("กรุณาเลือกกองสำหรับหัวหน้าหรือผู้ลงพื้นที่");
     if (dept != null)
       db.one(
-          "SELECT id FROM department WHERE id=? AND municipality_id=?",
+          "SELECT id FROM department WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR SHARE",
           dept,
           u.get("municipality_id"));
     UUID id = UUID.randomUUID();
@@ -149,7 +272,7 @@ public class AdminController {
       throw new IllegalArgumentException("กรุณาเลือกหน่วยงานสำหรับบุคลากร");
     if (department != null)
       db.one(
-          "SELECT id FROM department WHERE id=? AND municipality_id=?",
+          "SELECT id FROM department WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR SHARE",
           department,
           u.get("municipality_id"));
     db.run(
@@ -247,10 +370,10 @@ public class AdminController {
   @PostMapping("/categories")
   @Transactional
   public Object category(@RequestBody Map<String, Object> b, Authentication a) throws Exception {
-    var u = admin(a);
+    var u = lockedAdmin(a);
     UUID dept = Db.id(b.get("departmentId")), wf = Db.id(b.get("workflowId"));
     db.one(
-        "SELECT id FROM department WHERE id=? AND municipality_id=?",
+        "SELECT id FROM department WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR SHARE",
         dept,
         u.get("municipality_id"));
     db.one(

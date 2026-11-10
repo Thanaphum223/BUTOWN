@@ -24,7 +24,11 @@ import AccountDeletion from "./AccountDeletion";
 import GovRoleSettings from "./GovRoleSettings";
 type D = Record<string, any>;
 const { Title, Text } = Typography;
-export default function Admin() {
+export default function Admin({
+  onDepartmentsChange,
+}: {
+  onDepartmentsChange?: (departments: { id: string; name: string }[]) => void;
+}) {
   const [data, setData] = useState<D>(),
     [error, setError] = useState(""),
     [kind, setKind] = useState(""),
@@ -50,7 +54,9 @@ export default function Admin() {
     loadRequest.current = request;
     setRefreshing(true);
     try {
-      setData(await api("/admin", { signal: request.signal }));
+      const next = await api<D>("/admin", { signal: request.signal });
+      setData(next);
+      onDepartmentsChange?.(next.departments);
       setError("");
     } catch (e) {
       if (!request.signal.aborted) setError((e as Error).message);
@@ -113,7 +119,6 @@ export default function Admin() {
     <>
       <div className="page-heading">
         <div>
-          <Text className="eyebrow">ADMINISTRATION</Text>
           <Title level={2}>{t("จัดการระบบ")}</Title>
           <Text type="secondary">{data.municipality.name}</Text>
         </div>
@@ -127,14 +132,6 @@ export default function Admin() {
           {t("แก้ชื่อเทศบาล")}
         </Button>
       </div>
-      <Alert
-        style={{ marginBottom: 20 }}
-        type="info"
-        showIcon
-        message={t(
-          "Workflow ที่เผยแพร่แล้วจะไม่ถูกแก้ทับ เปลี่ยนค่าโดยสร้างเวอร์ชันใหม่ แล้วเลือกใช้ในประเภทปัญหา คำร้องเดิมยังใช้เวอร์ชันเดิม",
-        )}
-      />
       <Card>
         {error && <Alert type="error" showIcon message={t(error)} style={{ marginBottom: 12 }} />}
         <Tabs
@@ -144,11 +141,6 @@ export default function Admin() {
               label: t("บัญชีผู้ใช้"),
               children: (
                 <>
-                  <Text type="secondary">
-                    {t(
-                      "เลือกบัญชีที่สมัครประชาชนไว้แล้ว เพื่อกำหนดบทบาทบุคลากรและหน่วยงาน โดยใช้รหัสผ่านเดิม",
-                    )}
-                  </Text>
                   <Space
                     wrap
                     style={{ width: "100%", justifyContent: "space-between", marginTop: 12 }}

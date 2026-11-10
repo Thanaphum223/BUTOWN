@@ -52,7 +52,7 @@ public class AuthController {
       throw new IllegalArgumentException("กรุณาเลือกหน่วยงาน");
     if (department != null)
       db.one(
-          "SELECT id FROM department WHERE id=? AND municipality_id=?",
+          "SELECT id FROM department WHERE id=? AND municipality_id=? AND deleted_at IS NULL",
           department,
           account.get("municipality_id"));
     var session = request.getSession();

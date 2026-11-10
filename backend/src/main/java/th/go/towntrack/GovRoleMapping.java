@@ -86,7 +86,10 @@ public class GovRoleMapping {
         throw new IllegalArgumentException("รหัสบทบาทซ้ำหรือบทบาทในระบบไม่ถูกต้อง");
       UUID department = Access.departmentRole(rule.role()) ? rule.departmentId() : null;
       if (department != null)
-        db.one("SELECT id FROM department WHERE id=? AND municipality_id=?", department, town);
+        db.one(
+            "SELECT id FROM department WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR SHARE",
+            department,
+            town);
       clean.add(new Mapping(code, rule.role(), department));
     }
     db.run(
@@ -211,6 +214,11 @@ public class GovRoleMapping {
           "กรุณาให้ผู้ดูแลระบุรหัสเทศบาล Gov Center ในหน้าจับคู่บทบาทก่อนให้บุคลากรเข้าสู่ระบบ");
     if (Access.departmentRole(mapping.role()) && mapping.departmentId() == null)
       throw setup("กรุณาให้ผู้ดูแลเลือกกองสำหรับบทบาท Gov Center: " + code);
+    if (mapping.departmentId() != null)
+      db.one(
+          "SELECT id FROM department WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR SHARE",
+          mapping.departmentId(),
+          town);
     return new Initial(mapping.role(), mapping.departmentId());
   }
 

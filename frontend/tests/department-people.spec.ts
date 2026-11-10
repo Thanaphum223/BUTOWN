@@ -1,13 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
 
-async function setup(page: Page) {
+async function setup(page: Page, adminDepartment: string | null = "engineering") {
   const users = [
     {
       id: "admin",
       username: "iam_admin",
       display_name: "ผู้ดูแล",
       role: "ADMIN",
-      department_id: "engineering",
+      department_id: adminDepartment,
       enabled: true,
     },
     {
@@ -51,27 +51,47 @@ async function setup(page: Page) {
       enabled: false,
     },
   ];
+  const departments = [
+    { id: "engineering", name: "กองช่าง" },
+    { id: "health", name: "กองสาธารณสุข" },
+    { id: "empty", name: "หน่วยงานทดสอบ" },
+  ];
   const writes: { path: string; body: any }[] = [];
   let fail = false;
+  let deletionBlocked = false;
   let gate: Promise<void> | undefined;
   await page.route("**/api/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-    if (request.method() === "POST") {
-      const body = request.postDataJSON();
+    if (["POST", "DELETE"].includes(request.method())) {
+      const body = request.method() === "DELETE" ? null : request.postDataJSON();
       writes.push({ path, body });
       if (gate) await gate;
       if (fail)
         return route.fulfill({ status: 503, json: { message: "บันทึกไม่สำเร็จ ลองอีกครั้ง" } });
+      const department = departments.find((d) => path.startsWith(`/api/admin/departments/${d.id}`));
+      if (department) {
+        if (request.method() === "DELETE") {
+          if (deletionBlocked)
+            return route.fulfill({
+              status: 409,
+              json: { message: "ไม่สามารถลบหน่วยงานที่ยังมีข้อมูลใช้งานได้" },
+            });
+          departments.splice(departments.indexOf(department), 1);
+        } else if (path.endsWith("/field-users")) {
+          for (const id of body.userIds)
+            Object.assign(
+              users.find((u) => u.id === id)!,
+              { role: "FIELD", department_id: department.id },
+            );
+        } else department.name = body.name;
+        return route.fulfill({ json: {} });
+      }
       const user = users.find((u) => path === `/api/admin/users/${u.id}/role`);
       if (!user) throw new Error("Unexpected write: " + path);
       Object.assign(user, { role: body.role, department_id: body.departmentId });
       return route.fulfill({ json: {} });
     }
-    const departments = [
-      { id: "engineering", name: "กองช่าง" },
-      { id: "health", name: "กองสาธารณสุข" },
-    ];
     const payload: Record<string, unknown> = {
       "/api/auth/me": users[0],
       "/api/auth/csrf": { token: "test", headerName: "X-CSRF-TOKEN" },
@@ -103,6 +123,9 @@ async function setup(page: Page) {
     fail: (value: boolean) => {
       fail = value;
     },
+    blockDeletion: (value: boolean) => {
+      deletionBlocked = value;
+    },
     hold: () => {
       let release!: () => void;
       gate = new Promise<void>((resolve) => {
@@ -120,10 +143,11 @@ function department(page: Page, name: string) {
   return page.getByRole("row").filter({ has: page.getByRole("cell", { name, exact: true }) });
 }
 async function pick(page: Page, name: string) {
-  await page
+  const input = page
     .getByRole("dialog")
-    .getByRole("combobox", { name: "บัญชีผู้ใช้", exact: true })
-    .fill(name);
+    .getByRole("combobox", { name: "บัญชีผู้ใช้", exact: true });
+  await input.press("ArrowDown");
+  await input.fill(name);
   await page.locator(".ant-select-dropdown:visible").getByText(new RegExp(name)).click();
 }
 
@@ -161,8 +185,14 @@ for (const assignment of [
     await expect(dialog).not.toBeVisible();
     expect(state.writes).toEqual([
       {
-        path: `/api/admin/users/${assignment.id}/role`,
-        body: { role: assignment.role, departmentId: assignment.departmentId },
+        path:
+          assignment.role === "FIELD"
+            ? `/api/admin/departments/${assignment.departmentId}/field-users`
+            : `/api/admin/users/${assignment.id}/role`,
+        body:
+          assignment.role === "FIELD"
+            ? { userIds: [assignment.id] }
+            : { role: assignment.role, departmentId: assignment.departmentId },
       },
     ]);
     await expect(row).toContainText(assignment.name);
@@ -314,4 +344,102 @@ test("administrator switches to municipal reviewers without a department prompt"
     await page.reload();
     await expect(page.locator(".header-identity small")).toContainText(label);
   }
+});
+
+test("multiple field accounts are saved together and added to the roster", async ({ page }) => {
+  const state = await setup(page);
+  await department(page, "กองช่าง")
+    .getByRole("button", { name: "เพิ่มผู้ลงพื้นที่", exact: true })
+    .click();
+  await pick(page, "สมชาย ใจดี");
+  await pick(page, "สมหญิง ใจดี");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.locator(".ant-select-selection-item")).toHaveCount(2);
+  await dialog.getByRole("button", { name: "บันทึก", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  expect(state.writes).toEqual([
+    {
+      path: "/api/admin/departments/engineering/field-users",
+      body: { userIds: ["citizen", "officer"] },
+    },
+  ]);
+  await expect(department(page, "กองช่าง")).toContainText("สมชาย ใจดี");
+  await expect(department(page, "กองช่าง")).toContainText("สมหญิง ใจดี");
+});
+
+test("department rename validates a name and preserves the draft after a failed save", async ({
+  page,
+}) => {
+  const state = await setup(page);
+  await department(page, "กองช่าง")
+    .getByRole("button", { name: "แก้ชื่อหน่วยงาน", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  const name = dialog.getByRole("textbox", { name: "ชื่อหน่วยงาน", exact: true });
+  await expect(name).toHaveValue("กองช่าง");
+  await name.fill("   ");
+  await dialog.getByRole("button", { name: "บันทึก", exact: true }).click();
+  await expect(dialog).toContainText("กรุณาระบุชื่อหน่วยงาน");
+  expect(state.writes).toHaveLength(0);
+  await name.fill("กองช่างและสาธารณูปโภค");
+  state.fail(true);
+  await dialog.getByRole("button", { name: "บันทึก", exact: true }).click();
+  await expect(dialog).toContainText("บันทึกไม่สำเร็จ ลองอีกครั้ง");
+  await expect(name).toHaveValue("กองช่างและสาธารณูปโภค");
+  state.fail(false);
+  await dialog.getByRole("button", { name: "บันทึก", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(department(page, "กองช่างและสาธารณูปโภค")).toBeVisible();
+});
+
+test("department deletion requires confirmation and retains a blocked department", async ({
+  page,
+}) => {
+  const state = await setup(page);
+  const row = department(page, "หน่วยงานทดสอบ");
+  await row.getByRole("button", { name: "ลบหน่วยงาน", exact: true }).click();
+  let dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("หน่วยงานทดสอบ");
+  await dialog.getByRole("button", { name: "ยกเลิก", exact: true }).click();
+  expect(state.writes).toHaveLength(0);
+  await row.getByRole("button", { name: "ลบหน่วยงาน", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  state.blockDeletion(true);
+  await dialog.getByRole("button", { name: "ยืนยันลบหน่วยงาน", exact: true }).click();
+  await expect(dialog).toContainText("ไม่สามารถลบหน่วยงานที่ยังมีข้อมูลใช้งานได้");
+  await expect(row).toBeVisible();
+  state.blockDeletion(false);
+  await dialog.getByRole("button", { name: "ยืนยันลบหน่วยงาน", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(row).toHaveCount(0);
+});
+
+test("renamed departments update the header role choices without reloading", async ({ page }) => {
+  await setup(page, null);
+  await department(page, "กองช่าง")
+    .getByRole("button", { name: "แก้ชื่อหน่วยงาน", exact: true })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("textbox", { name: "ชื่อหน่วยงาน", exact: true })
+    .fill("กองช่างปรับปรุง");
+  await page.getByRole("dialog").getByRole("button", { name: "บันทึก", exact: true }).click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await page
+    .getByRole("combobox", { name: "สลับบทบาทผู้ดูแลระบบ", exact: true })
+    .press("ArrowDown");
+  await page
+    .locator(".ant-select-dropdown:visible")
+    .getByText("ผู้ลงพื้นที่", { exact: true })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("combobox", { name: "เลือกหน่วยงานเพื่อเริ่มบทบาท", exact: true })
+    .press("ArrowDown");
+  await expect(
+    page.locator(".ant-select-dropdown:visible").getByText("กองช่างปรับปรุง", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".ant-select-dropdown:visible").getByText("กองช่าง", { exact: true }),
+  ).toHaveCount(0);
 });

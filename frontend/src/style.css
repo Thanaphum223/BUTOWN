@@ -380,6 +380,12 @@ h3,
   font-size: 18px;
   font-weight: 750;
 }
+.account-controls {
+  margin-inline-start: auto;
+  justify-content: flex-end;
+  min-width: 0;
+  max-width: 100%;
+}
 .account-name {
   font-size: 13px;
   color: white;
@@ -782,9 +788,6 @@ h3,
   outline-color: white;
 }
 @media (max-width: 380px) {
-  .font-size-toggle .font-toggle-label {
-    display: none;
-  }
   .citizen-shell .header-identity {
     gap: var(--gov-space-1);
   }
@@ -1045,13 +1048,6 @@ h3,
 .citizen-shell .submit-bar {
   position: relative;
   z-index: 1;
-}
-.font-large .ant-typography,
-.font-large .ant-form-item-label > label,
-.font-large .ant-input,
-.font-large .ant-select-selection-item,
-.font-large .ant-btn {
-  font-size: 18px;
 }
 @media (min-width: 1500px) {
   .work-grid {
@@ -3267,18 +3263,33 @@ button.queue-item .queue-item-top .ant-tag {
 
 .language-switcher {
   max-width: 100%;
-  min-height: 36px;
-  padding: 4px 8px;
-  border: 1px solid var(--gov-border, #b7c9bf);
-  border-radius: 6px;
-  color: var(--gov-text, #163b2b);
-  background: #fff;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid var(--gov-brand-primary);
+  border-radius: var(--gov-radius-control);
+  color: var(--gov-brand-dark);
+  background: var(--gov-brand-surface);
   font: inherit;
   line-height: 1.4;
 }
+.language-switcher:hover {
+  border-color: var(--gov-brand-dark);
+  background: var(--gov-surface-soft);
+}
 .language-switcher:focus-visible {
-  outline: 3px solid #16734b;
+  outline: 3px solid var(--gov-brand-primary);
   outline-offset: 2px;
+}
+.topbar .language-switcher:focus-visible {
+  outline-color: var(--gov-surface);
+}
+.language-switcher option {
+  color: var(--gov-text-primary);
+  background: var(--gov-surface);
+}
+.language-switcher option:checked {
+  color: var(--gov-brand-dark);
+  background: var(--gov-surface-soft);
 }
 
 @media (max-width: 600px) {
@@ -3381,19 +3392,6 @@ button.queue-item .queue-item-top .ant-tag {
   overflow-wrap: anywhere;
 }
 
-.gov-auth-badge {
-  color: #225b45;
-  background: #edf7f0;
-  padding: 10px 18px;
-  font-size: 12px;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-}
-.gov-auth-badge strong,
-.gov-auth-badge small {
-  display: block;
-}
-
 /* Keep desktop navigation anchored while the working area scrolls. */
 @media (min-width: 992px) {
   .staff-shell > .sidebar {
@@ -3442,10 +3440,6 @@ button.queue-item .queue-item-top .ant-tag {
   .staff-shell > .sidebar .sidebar-bottom p {
     display: none;
   }
-}
-.auth-card .gov-auth-badge {
-  margin-bottom: 16px;
-  border-radius: 8px;
 }
 /* Both flex items and their role labels must fit the header, including long
    municipal role names. A document-overflow check cannot detect a negative left edge. */

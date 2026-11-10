@@ -71,14 +71,12 @@ for (const width of [320, 440, 1280]) {
     );
     await page.goto("/");
     await expect(page.getByText(`สวัสดี, ${name}`, { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "ขยายขนาดตัวอักษร", exact: true }).click();
     await expect(
-      page.getByRole("button", { name: "ย่อขนาดตัวอักษร", exact: true }),
-    ).toHaveAttribute("aria-pressed", "true");
+      page.getByRole("button", { name: /ขยายขนาดตัวอักษร|ย่อขนาดตัวอักษร/ }),
+    ).toHaveCount(0);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
     ).toBeTruthy();
-    await page.getByRole("button", { name: "ย่อขนาดตัวอักษร", exact: true }).click();
     const menu = page.getByRole("navigation", { name: "เมนูประชาชน", exact: true });
     await expect(menu).toBeVisible();
     await readableHover(

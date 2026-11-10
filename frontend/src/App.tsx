@@ -113,7 +113,6 @@ function TownTrackApp() {
   const [pendingAdminRole, setPendingAdminRole] = useState<string | null>(null);
   const [pendingDepartment, setPendingDepartment] = useState<string>();
   const [departmentError, setDepartmentError] = useState(false);
-  const [fontLarge, setFontLarge] = useState(false);
   const [user, setUser] = useState<RowData | null>(),
     [view, setView] = useState("dashboard"),
     [selected, setSelected] = useState(""),
@@ -256,11 +255,6 @@ function TownTrackApp() {
           void switchAdminRole(pendingAdminRole, pendingDepartment)
         }
       >
-        <p>
-          {t(
-            "เลือกหน่วยงานเพื่อแสดงงานและสิทธิ์ที่ตรงกับบทบาท คุณสามารถสลับกลับผู้ดูแลระบบได้ทุกเมื่อ",
-          )}
-        </p>
         {departmentError ? (
           <Alert type="error" message={t("โหลดหน่วยงานไม่สำเร็จ กรุณารีเฟรชหน้า")} />
         ) : (
@@ -275,13 +269,7 @@ function TownTrackApp() {
           />
         )}
       </Modal>
-      <Layout
-        className={
-          "shell " +
-          (user.role === "CITIZEN" ? "citizen-shell" : "staff-shell") +
-          (fontLarge ? " font-large" : "")
-        }
-      >
+      <Layout className={"shell " + (user.role === "CITIZEN" ? "citizen-shell" : "staff-shell")}>
         {user.role !== "CITIZEN" && (
           <Layout.Sider
             breakpoint="lg"
@@ -308,11 +296,6 @@ function TownTrackApp() {
             />
             <div className="sidebar-bottom">
               <Tag color="green">{t(roleNames[user.role])}</Tag>
-              <p>
-                {t("ประสานงานอย่างเป็นระบบ")}
-                <br />
-                {t("ติดตามผลอย่างโปร่งใส")}
-              </p>
             </div>
           </Layout.Sider>
         )}
@@ -415,17 +398,6 @@ function TownTrackApp() {
                   </div>
                 </>
               )}
-              {user.role === "CITIZEN" && (
-                <Button
-                  className="font-size-toggle"
-                  aria-label={fontLarge ? t("ย่อขนาดตัวอักษร") : t("ขยายขนาดตัวอักษร")}
-                  aria-pressed={fontLarge}
-                  onClick={() => setFontLarge((v) => !v)}
-                >
-                  <span aria-hidden="true">{fontLarge ? t("ก−") : t("ก+")}</span>
-                  <span className="font-toggle-label">{fontLarge ? t("ย่อ") : t("ขยาย")}</span>
-                </Button>
-              )}
               <GovProfile />
               <Avatar className="account-avatar">{user.display_name?.[0]}</Avatar>
               <span className="account-name" title={user.display_name}>
@@ -516,7 +488,12 @@ function TownTrackApp() {
             ) : view === "teams" ? (
               <Teams />
             ) : view === "admin" ? (
-              <Admin />
+              <Admin
+                onDepartmentsChange={(departments) => {
+                  setAdminDepartments(departments);
+                  setDepartmentError(false);
+                }}
+              />
             ) : (
               <Password
                 onDone={() => {

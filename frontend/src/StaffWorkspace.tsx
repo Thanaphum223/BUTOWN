@@ -152,7 +152,6 @@ export default function StaffWorkspace({
     >
       <div className="page-heading">
         <div>
-          <Text className="eyebrow">{t("ศูนย์ประสานงาน · TOWNTRACK")}</Text>
           <Title level={2}>
             {history
               ? t("ประวัติงาน")
@@ -162,17 +161,7 @@ export default function StaffWorkspace({
                   ? t("ภาพรวมการดำเนินงาน")
                   : t("รายการคำร้อง")}
           </Title>
-          <Text type="secondary">
-            {history
-              ? t("งานที่ปิดเรื่องหรือยุติแล้วในขอบเขตสิทธิ์ของคุณ ค้นหาและเปิดดูรายละเอียดได้")
-              : user.role === "FIELD"
-                ? t("เลือกงานเพื่อรับงาน ดูตำแหน่ง ถ่ายรูป และส่งรายงาน")
-                : t("แสดงเฉพาะงานที่ถึงขั้นตอนของบทบาทคุณ อัปเดตให้อัตโนมัติ")}
-          </Text>
         </div>
-        <Space>
-          <Tag color="green">{t("พื้นที่ทำงานของคุณ")}</Tag>
-        </Space>
       </div>
       {user.role === "APPROVER" && !history && (
         <Alert
@@ -469,27 +458,11 @@ export default function StaffWorkspace({
               <div className="welcome-icon">
                 <FileTextOutlined />
               </div>
-              <Title level={3}>
-                {history ? t("ประวัติการดำเนินงาน") : t("ทุกเรื่องต้องมีคนดูแล")}
-              </Title>
               <p>
                 {history
                   ? t("เลือกงานเพื่อดูรายละเอียดและประวัติการดำเนินงาน")
                   : t("เลือกคำร้องจากคิวงานเพื่อดูรายละเอียด")}
-                <br />
-                {history
-                  ? t("ดูเอกสาร หลักฐาน และผลการดำเนินงานย้อนหลัง")
-                  : t("ตรวจหลักฐาน และดำเนินการตามขั้นตอน")}
               </p>
-              {!history && (
-                <div className="welcome-process">
-                  <span>{t("รับเรื่อง")}</span>
-                  <i>→</i>
-                  <span>{t("ประสานทีม")}</span>
-                  <i>→</i>
-                  <span>{t("ติดตามผล")}</span>
-                </div>
-              )}
             </Card>
           )}
         </div>

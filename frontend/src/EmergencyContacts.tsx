@@ -125,7 +125,6 @@ export default function EmergencyContacts() {
 
   return (
     <div className="emergency-page">
-      <Text className="eyebrow">{t("หมายเลขช่วยเหลือ · TOWNTRACK")}</Text>
       <Title level={2}>
         <AlertOutlined /> {t("เหตุฉุกเฉิน")}
       </Title>

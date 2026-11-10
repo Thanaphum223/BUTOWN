@@ -94,6 +94,11 @@ public class Access {
   }
 
   public Map<String, Object> target(Object id, Map<String, Object> u, String role, Object dept) {
+    if (departmentRole(role) && dept != null)
+      db.one(
+          "SELECT id FROM department WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR SHARE",
+          dept,
+          u.get("municipality_id"));
     var t =
         db.one(
             "SELECT id,department_id FROM app_user WHERE id=? AND municipality_id=? AND role IN (?,'ADMIN') AND"

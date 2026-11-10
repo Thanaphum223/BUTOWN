@@ -477,18 +477,6 @@ export default function Detail({
         />
       )}
       {!citizen &&
-        user.role === "FIELD" &&
-        data.actions?.some((item: D) => ["START", "REQUEST_RESOURCE"].includes(item.action)) && (
-          <Alert
-            className="operational-guidance"
-            type="info"
-            showIcon
-            message={t(
-              "ขั้นตอนปฏิบัติงาน: เมื่อสำรวจหน้างานจริงแล้ว หากวัสดุ/อุปกรณ์ปกติเพียงพอให้กด 'เริ่มปฏิบัติงานซ่อมแซม' หากเกินขีดความสามารถให้กด 'ส่งประเมินขอใช้ทรัพยากร/งบประมาณเพิ่ม'",
-            )}
-          />
-        )}
-      {!citizen &&
         ["RESOURCE_DRAFT", "RESOURCE_CHECK", "RESOURCE_APPROVAL", "RESOURCE_REVISION"].includes(
           c.status,
         ) &&
@@ -500,25 +488,6 @@ export default function Detail({
             message={t("ระงับการใช้ทรัพยากรที่ขอชั่วคราว (รอผลการพิจารณาอนุมัติ)")}
           />
         )}
-      {user.role === "OFFICER" && c.status === "RESOURCE_CHECK" && (
-        <Alert
-          className="operational-guidance"
-          type="info"
-          message={t(
-            "ตรวจสอบความครบถ้วนทางสารบรรณและเลขที่เอกสารอ้างอิง (ก่อนเสนอผู้มีอำนาจพิจารณา)",
-          )}
-        />
-      )}
-      {user.role === "OFFICER" && ["OFFICER_REVIEW", "RESOLVED"].includes(c.status) && (
-        <Alert
-          className="operational-guidance"
-          type="info"
-          message={t(
-            "ตรวจสอบความสมบูรณ์ของภาพถ่าย Before/After เพื่อเผยแพร่ประชาสัมพันธ์และปิดทะเบียนคุมเรื่องร้องเรียน",
-          )}
-          description={t("รายงานนี้ผ่านการตรวจจากหัวหน้าผู้ลงพื้นที่แล้ว")}
-        />
-      )}
       {user.role === "LEADER" && (
         <Card className="assignment-summary" title={t("การมอบหมาย")}>
           <Descriptions

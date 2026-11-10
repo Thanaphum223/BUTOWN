@@ -41,7 +41,7 @@ public class DepartmentTransfers {
 
   void department(Object id, Map<String, Object> user) {
     db.one(
-        "SELECT id FROM department WHERE id=? AND municipality_id=?",
+        "SELECT id FROM department WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR SHARE",
         id,
         user.get("municipality_id"));
   }

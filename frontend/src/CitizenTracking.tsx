@@ -53,9 +53,6 @@ export default function CitizenTracking({
       <div className="page-heading tracking-heading">
         <div>
           <Typography.Title level={2}>{t("ติดตามสถานะ")}</Typography.Title>
-          <Typography.Text type="secondary">
-            {t("ความคืบหน้าของเรื่องที่แจ้งและเรื่องที่ติดตาม")}
-          </Typography.Text>
         </div>
       </div>
       <Tabs

@@ -89,9 +89,7 @@ test("real auth me 503 denies entry with a truthful authentication error", async
   await page.route("**/api/**", (route) => route.fulfill({ status: 503, json: {} }));
   await page.goto("/");
   await expect(page.getByRole("alert").first()).toContainText(authUnavailable);
-  await expect(
-    page.getByText("แหล่งยืนยันตัวตน: Gov Center · Central Gov Auth RBAC", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("บัญชี Gov Center · TownTrack", { exact: true })).toBeVisible();
   await expect(page.locator(".staff-shell")).toHaveCount(0);
 });
 test("document 503 stays generic instead of claiming a Gov outage", async ({ page }) => {

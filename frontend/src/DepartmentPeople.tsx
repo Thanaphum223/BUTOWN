@@ -2,8 +2,9 @@ import { useI18n } from "./i18n/useI18n";
 import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
 import { useRef, useState } from "react";
 import { Alert, App, Button, Form, Modal, Select, Space, Table, Typography } from "antd";
-import { UserAddOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EditOutlined, UserAddOutlined } from "@ant-design/icons";
 import { post, roleNames } from "./api";
+import DepartmentEditor from "./DepartmentEditor";
 
 type Department = { id: string; name: string };
 type Person = {
@@ -28,12 +29,16 @@ export default function DepartmentPeople({
   onRefresh: () => Promise<void>;
 }) {
   const [assignment, setAssignment] = useState<Assignment>();
+  const [editing, setEditing] = useState<{ department: Department; mode: "rename" | "delete" }>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const submitting = useRef(false);
-  const [form] = Form.useForm<{ userId: string }>();
+  const [form] = Form.useForm<{ userId?: string; userIds?: string[] }>();
   const selectedId = Form.useWatch("userId", form);
-  const selected = users.find((user) => user.id === selectedId);
+  const selectedIds = Form.useWatch("userIds", form) || [];
+  const selected = users.filter((user) =>
+    assignment?.role === "FIELD" ? selectedIds.includes(user.id) : user.id === selectedId,
+  );
   const { t } = useI18n();
   const { message } = App.useApp();
   useLocalizedFormErrors(form);
@@ -50,9 +55,10 @@ export default function DepartmentPeople({
     setAssignment({ department, role });
     void onRefresh();
   }
-  async function save({ userId }: { userId: string }) {
+  async function save({ userId, userIds }: { userId?: string; userIds?: string[] }) {
     if (submitting.current || !assignment) return;
-    if (!candidates.some((user) => user.id === userId)) {
+    const ids = assignment.role === "FIELD" ? userIds || [] : userId ? [userId] : [];
+    if (!ids.length || ids.some((id) => !candidates.some((user) => user.id === id))) {
       setError("บัญชีนี้ไม่อยู่ในรายชื่อที่เลือกได้ กรุณาเลือกบัญชีใหม่");
       return;
     }
@@ -60,10 +66,14 @@ export default function DepartmentPeople({
     setBusy(true);
     setError("");
     try {
-      await post(`/admin/users/${userId}/role`, {
-        role: assignment.role,
-        departmentId: assignment.department.id,
-      });
+      if (assignment.role === "FIELD") {
+        await post(`/admin/departments/${assignment.department.id}/field-users`, { userIds: ids });
+      } else {
+        await post(`/admin/users/${userId}/role`, {
+          role: assignment.role,
+          departmentId: assignment.department.id,
+        });
+      }
       await onRefresh();
       setAssignment(undefined);
       message.success(t("บันทึกแล้ว ให้ผู้ใช้เข้าสู่ระบบใหม่เพื่อเริ่มใช้บทบาทนี้"));
@@ -90,17 +100,11 @@ export default function DepartmentPeople({
   }
   return (
     <>
-      <Space wrap style={{ display: "flex", margin: "12px 0" }}>
-        <Typography.Text type="secondary">
-          {t(
-            "เลือกบัญชีที่เคยเข้าสู่ระบบผ่าน Gov Center เพื่อเพิ่มหัวหน้าหรือผู้ลงพื้นที่ประจำหน่วยงาน",
-          )}
-        </Typography.Text>
-      </Space>
       <Table<Department>
         rowKey="id"
         dataSource={departments}
-        scroll={{ x: 850 }}
+        scroll={{ x: 950 }}
+        style={{ marginTop: 16 }}
         columns={[
           { title: t("ชื่อหน่วยงาน"), dataIndex: "name", width: 180 },
           {
@@ -124,6 +128,21 @@ export default function DepartmentPeople({
                   onClick={() => open(department, "FIELD")}
                 >
                   {t("เพิ่มผู้ลงพื้นที่")}
+                </Button>
+                <Button
+                  icon={<EditOutlined aria-hidden="true" />}
+                  aria-label={t("แก้ชื่อหน่วยงาน")}
+                  onClick={() => setEditing({ department, mode: "rename" })}
+                >
+                  {t("แก้ชื่อ")}
+                </Button>
+                <Button
+                  danger
+                  icon={<DeleteOutlined aria-hidden="true" />}
+                  aria-label={t("ลบหน่วยงาน")}
+                  onClick={() => setEditing({ department, mode: "delete" })}
+                >
+                  {t("ลบ")}
                 </Button>
               </Space>
             ),
@@ -154,12 +173,13 @@ export default function DepartmentPeople({
         </Space>
         <Form form={form} layout="vertical" onFinish={save}>
           <Form.Item
-            name="userId"
+            name={assignment?.role === "FIELD" ? "userIds" : "userId"}
             label={t("บัญชีผู้ใช้")}
             rules={[{ required: true, message: t("กรุณาเลือกบัญชีผู้ใช้") }]}
           >
             <Select
               aria-label={t("บัญชีผู้ใช้")}
+              mode={assignment?.role === "FIELD" ? "multiple" : undefined}
               showSearch
               disabled={busy}
               loading={refreshing}
@@ -176,19 +196,27 @@ export default function DepartmentPeople({
               }))}
             />
           </Form.Item>
-          {selected && assignment && (
+          {selected.length > 0 && assignment && (
             <Alert
               type="warning"
               showIcon
               style={{ marginBottom: 20 }}
-              message={t("บทบาทปัจจุบัน: {{role}}", { role: t(roleNames[selected.role]) })}
+              message={
+                selected.length === 1
+                  ? t("บทบาทปัจจุบัน: {{role}}", { role: t(roleNames[selected[0].role]) })
+                  : t("บัญชีที่เลือก {{count}} บัญชี", { count: selected.length })
+              }
               description={
                 <>
-                  <div>
-                    {t("หน่วยงานปัจจุบัน:")}{" "}
-                    {departments.find((department) => department.id === selected.department_id)
-                      ?.name || t("ไม่ได้สังกัดหน่วยงาน")}
-                  </div>
+                  {selected.map((person) => (
+                    <div key={person.id}>
+                      {selected.length > 1 &&
+                        `${person.display_name} · ${t(roleNames[person.role])} · `}
+                      {t("หน่วยงานปัจจุบัน:")}{" "}
+                      {departments.find((department) => department.id === person.department_id)
+                        ?.name || t("ไม่ได้สังกัดหน่วยงาน")}
+                    </div>
+                  ))}
                   <div>
                     {t(
                       "บันทึกแล้วบัญชีนี้จะใช้บทบาท{{role}} ประจำ{{department}}แทนบทบาทเดิม ผู้ใช้ต้องเข้าสู่ระบบใหม่",
@@ -203,11 +231,6 @@ export default function DepartmentPeople({
             />
           )}
           {error && <Alert type="error" showIcon message={t(error)} style={{ marginBottom: 20 }} />}
-          <Typography.Paragraph type="secondary">
-            {t(
-              "ถ้าไม่พบรายชื่อ ให้ผู้ใช้เข้าสู่ TownTrack ผ่าน Gov Center ก่อน รายชื่อจะอัปเดตอัตโนมัติ",
-            )}
-          </Typography.Paragraph>
           <Space style={{ display: "flex", justifyContent: "flex-end" }}>
             <Button disabled={busy} onClick={() => setAssignment(undefined)}>
               {t("ยกเลิก")}
@@ -224,6 +247,14 @@ export default function DepartmentPeople({
           </Space>
         </Form>
       </Modal>
+      {editing && (
+        <DepartmentEditor
+          key={`${editing.department.id}-${editing.mode}`}
+          {...editing}
+          onClose={() => setEditing(undefined)}
+          onRefresh={onRefresh}
+        />
+      )}
     </>
   );
 }

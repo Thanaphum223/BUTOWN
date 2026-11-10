@@ -48,7 +48,8 @@ public class ComplaintController {
         queues.options((String) u.get("role")),
         "departments",
         db.list(
-            "SELECT id,name FROM department WHERE municipality_id=?", u.get("municipality_id")));
+            "SELECT id,name FROM department WHERE municipality_id=? AND deleted_at IS NULL",
+            u.get("municipality_id")));
   }
 
   record NewComplaint(
@@ -118,11 +119,18 @@ public class ComplaintController {
   Map<String, Object> createRecord(NewComplaint b, Authentication a) throws Exception {
     var u = access.user(a);
     access.role(u, "CITIZEN");
+    // Match administration's municipality -> department lock order through insertion.
+    db.one("SELECT id FROM municipality WHERE id=? FOR KEY SHARE", u.get("municipality_id"));
     var cat =
         db.one(
             "SELECT * FROM category WHERE id=? AND municipality_id=? AND active=true",
             b.categoryId(),
             u.get("municipality_id"));
+    if (cat.get("department_id") != null)
+      db.one(
+          "SELECT id FROM department WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR SHARE",
+          cat.get("department_id"),
+          u.get("municipality_id"));
     var answers = b.answers() == null ? Map.<String, String>of() : b.answers();
     var fields = json.readTree(cat.get("fields").toString());
     Set<String> keys = new HashSet<>();
@@ -460,7 +468,7 @@ public class ComplaintController {
     }
     if (department != null)
       db.one(
-          "SELECT id FROM department WHERE id=? AND municipality_id=?",
+          "SELECT id FROM department WHERE id=? AND municipality_id=? AND deleted_at IS NULL",
           department,
           u.get("municipality_id"));
     return db.list(

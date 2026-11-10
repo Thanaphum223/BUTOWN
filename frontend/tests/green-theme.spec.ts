@@ -98,7 +98,7 @@ for (const width of [440, 1280]) {
     await readable(page.locator(".header-identity strong"), header);
     await readable(page.locator(".header-identity small"), header);
     await readable(
-      page.locator(".staff-overview > .page-heading .ant-typography-secondary"),
+      page.locator(".overview-shortcuts .ant-typography-secondary"),
       page.locator("body"),
     );
     await green(page.locator(".overview-summary-cards .ant-statistic-content").first());
