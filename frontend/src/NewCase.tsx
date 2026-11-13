@@ -799,13 +799,6 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
           <Form.Item
             label={t("เบอร์ติดต่อ (ไม่บังคับ)")}
             name="contactPhone"
-            extra={
-              <span className="citizen-phone-help">
-                {t(
-                  "ไม่บังคับกรอกสำหรับการแจ้งซ่อมสาธารณูปโภคทั่วไป ระบบอ้างอิงตัวตนผ่านบัญชี Gov Center (LINE หรืออีเมล) ทั้งนี้ หากเป็นเรื่องร้องเรียนเหตุเดือดร้อนรำคาญหรือข้อพิพาททางปกครอง โปรดระบุหมายเลขโทรศัพท์เพื่อให้เจ้าหน้าที่ติดต่อกลับ",
-                )}
-              </span>
-            }
             rules={[{ max: 30, pattern: /^[0-9+() -]*$/ }]}
           >
             <Input placeholder={t("เช่น 0812345678")} inputMode="tel" autoComplete="tel" />

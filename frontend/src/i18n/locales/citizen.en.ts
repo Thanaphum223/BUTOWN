@@ -266,8 +266,6 @@ const messages: Record<string, string> = {
   ไฟล์ต้องไม่ว่าง: "The file must not be empty",
   "ไฟล์แนบรวมทั้งหมดต่อคำร้องต้องไม่เกิน 1 GB (1,000 MB)":
     "Attachments must total no more than 1 GB (1,000 MB) per report",
-  "ไม่บังคับกรอกสำหรับการแจ้งซ่อมสาธารณูปโภคทั่วไป ระบบอ้างอิงตัวตนผ่านบัญชี Gov Center (LINE หรืออีเมล) ทั้งนี้ หากเป็นเรื่องร้องเรียนเหตุเดือดร้อนรำคาญหรือข้อพิพาททางปกครอง โปรดระบุหมายเลขโทรศัพท์เพื่อให้เจ้าหน้าที่ติดต่อกลับ":
-    "Optional for general public utility repair reports. Your identity is linked through your Gov Center account (LINE or email). For nuisance complaints or administrative disputes, please provide a phone number so staff can contact you.",
   "พบ {{count}} เคสใกล้เคียง": "Found {{count}} nearby reports",
   "พบ {{count}} ประเภทปัญหา": "Found {{count}} problem categories",
   "ทั้งหมด {{count}} ประเภทปัญหา": "Total problem categories: {{count}}",

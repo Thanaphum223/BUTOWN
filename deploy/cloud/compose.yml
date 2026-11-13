@@ -66,6 +66,7 @@ services:
     restart: unless-stopped
     environment:
       CLAMD_CONF_MaxThreads: '1'
+      CLAMD_CONF_ConcurrentDatabaseReload: 'no'
       CLAMD_CONF_StreamMaxLength: 1024M
       CLAMD_CONF_MaxFileSize: 1024M
       CLAMD_CONF_MaxScanSize: 2048M
