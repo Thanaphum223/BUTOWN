@@ -103,7 +103,8 @@ test("full approved resource workflow across all municipal and field roles close
     ).toBeVisible();
   }
   async function perform(label: string, fill?: (dialog: any) => Promise<void>) {
-    await page.getByRole("button", { name: label, exact: true }).click();
+    const buttonLabel = label.startsWith("ไม่อนุมัติงบประมาณเฉพาะกิจ") ? "ไม่อนุมัติ" : label;
+    await page.getByRole("button", { name: buttonLabel, exact: true }).click();
     const dialog = page.getByRole("dialog", { name: label, exact: true });
     await waitForSettledDialog(dialog);
     if (label === "รับเรื่องและส่งหน่วยงาน") {
@@ -333,7 +334,8 @@ test("resource refusal by approver terminates a real complaint", async ({ page, 
     ).toBeVisible();
   }
   async function perform(label: string, fill?: (dialog: any) => Promise<void>) {
-    await page.getByRole("button", { name: label, exact: true }).click();
+    const buttonLabel = label.startsWith("ไม่อนุมัติงบประมาณเฉพาะกิจ") ? "ไม่อนุมัติ" : label;
+    await page.getByRole("button", { name: buttonLabel, exact: true }).click();
     const dialog = page.getByRole("dialog", { name: label, exact: true });
     await waitForSettledDialog(dialog);
     if (label === "รับเรื่องและส่งหน่วยงาน") {

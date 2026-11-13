@@ -1068,7 +1068,7 @@ export default function Detail({
                       danger={["REJECT", "DENY", "DECLINE"].includes(r.action)}
                       onClick={() => choose(r.action)}
                     >
-                      {actionButton(r.action)}
+                      {r.action === "DENY" ? t("ไม่อนุมัติ") : actionButton(r.action)}
                     </Button>
                   ))}
                 </Space>
@@ -1124,7 +1124,7 @@ export default function Detail({
                 danger={["REJECT", "DENY", "DECLINE"].includes(r.action)}
                 onClick={() => choose(r.action)}
               >
-                {actionButton(r.action)}
+                {r.action === "DENY" ? t("ไม่อนุมัติ") : actionButton(r.action)}
               </Button>
             ))}
           </Space>

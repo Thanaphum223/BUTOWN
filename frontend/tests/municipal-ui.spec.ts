@@ -133,7 +133,7 @@ test("denial preset fills once and preserves manual edits and existing DENY payl
 }) => {
   const { writes } = await workspace(page, "APPROVER", "RESOURCE_APPROVAL", ["DENY"]);
   await switchEnglish(page);
-  await page.getByRole("button", { name: /^Deny special budget/ }).click();
+  await page.getByRole("button", { name: "Denied", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: /^Confirm / }).click();
   await expect(dialog.getByText("Provide a complete reason", { exact: true })).toBeVisible();
@@ -199,7 +199,8 @@ for (const width of [390, 768, 1280]) {
       await switchLanguage(page, language);
       await page
         .getByRole("button", {
-          name: language === "th" ? /^ไม่อนุมัติงบประมาณเฉพาะกิจ/ : /^Deny special budget/,
+          name: language === "th" ? "ไม่อนุมัติ" : "Denied",
+          exact: true,
         })
         .click();
       const dialog = page.getByRole("dialog");
