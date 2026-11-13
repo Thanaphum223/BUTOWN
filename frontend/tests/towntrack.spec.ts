@@ -204,16 +204,14 @@ test("full approved resource workflow across all municipal and field roles close
     .getByText("ผู้อนุมัติ", { exact: true })
     .click();
   await page.getByRole("button", { name: "เปิดคิวงานอนุมัติ", exact: true }).click();
-  await expect(
-    page.getByRole("alert").filter({ hasText: "งานอนุมัติทั้งหมดในเทศบาล" }),
-  ).toBeVisible();
+  await expect(page.getByText("งานอนุมัติทั้งหมดในเทศบาล", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "รอพิจารณาทรัพยากร", exact: true }).click();
   await page.getByRole("searchbox", { name: "ค้นหาเลขเรื่อง / หัวข้อ" }).fill(title);
   await page.getByRole("button", { name: new RegExp("เปิดงาน " + title) }).click();
   await expect(page.getByRole("alert").filter({ hasText: "บัญชีทดสอบ APPROVER" })).toBeVisible();
   await expect(page.getByRole("button", { name: "อนุมัติ", exact: true })).toHaveCount(0);
   await switchUser("approver");
-  await expect(page.getByText(/งานที่ส่งถึงบัญชี.*บัญชีทดสอบ APPROVER/)).toBeVisible();
+  await expect(page.getByText(/งานที่ส่งถึงบัญชี.*บัญชีทดสอบ APPROVER/)).toHaveCount(0);
   expect((await (await page.request.get("/api/auth/me")).json()).department_id).toBeNull();
   await page.getByRole("button", { name: /ดูเอกสาร/ }).click();
   const proposalPdf = page.getByRole("dialog", { name: "approved-proposal.pdf", exact: true });

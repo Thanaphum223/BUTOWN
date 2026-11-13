@@ -328,3 +328,14 @@ test("publication overlay uses header language and keeps selected evidence and c
   await expect(dialog.getByRole("checkbox")).toBeChecked();
   expect(writes).toEqual([]);
 });
+
+test("approver queue omits the account explanation banner and retains assigned work", async ({
+  page,
+}) => {
+  await workspace(page, "APPROVER", "RESOURCE_APPROVAL", ["APPROVE", "DENY"]);
+  await expect(page.locator(".staff-workspace")).not.toContainText("งานที่ส่งถึงบัญชี");
+  await expect(page.locator(".staff-workspace")).not.toContainText(
+    "แสดงเฉพาะงานที่ระบุคุณเป็นผู้อนุมัติ",
+  );
+  await expect(page.getByRole("button", { name: "อนุมัติ", exact: true })).toBeVisible();
+});

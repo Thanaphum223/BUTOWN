@@ -163,23 +163,6 @@ export default function StaffWorkspace({
           </Title>
         </div>
       </div>
-      {user.role === "APPROVER" && !history && (
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 20 }}
-          message={
-            user.account_role === "ADMIN"
-              ? t("งานอนุมัติทั้งหมดในเทศบาล")
-              : t("งานที่ส่งถึงบัญชี “") + user.display_name + "”"
-          }
-          description={
-            user.account_role === "ADMIN"
-              ? t("ผู้ดูแลดูงานของผู้อนุมัติทุกคนได้ และอนุมัติได้เฉพาะงานที่ส่งถึงบัญชีของตน")
-              : t("แสดงเฉพาะงานที่ระบุคุณเป็นผู้อนุมัติ")
-          }
-        />
-      )}
       {dashboard && !history && !selected && (
         <div className="workspace-stats">
           {[
