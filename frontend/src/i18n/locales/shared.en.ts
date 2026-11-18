@@ -75,9 +75,13 @@ const messages: Record<string, string> = {
   บันทึกรหัสผ่านใหม่: "Save new password",
   ประกาศคุ้มครองข้อมูลส่วนบุคคล: "Privacy notice",
   ลองใหม่: "Retry",
-  "การรับทราบประกาศนี้แยกจากการอนุญาต GPS คุณยังปักหมุดเองได้หากไม่อนุญาตตำแหน่ง":
-    "Acknowledging this notice is separate from allowing GPS access. You can place a pin manually if location access is denied.",
-  รับทราบประกาศ: "Acknowledge notice",
+  "หากไม่ยินยอม คุณยังใช้งานระบบได้ แต่ระบบจะไม่ขอและไม่ใช้ตำแหน่ง GPS ของคุณ ต้องปักหมุดหรือกรอกที่อยู่เอง และเปลี่ยนใจภายหลังได้":
+    "If you decline, you can still use the system, but it will not ask for or use your GPS location. You will need to drop a pin or enter the address yourself, and you can change your mind later.",
+  ยินยอม: "Accept",
+  ไม่ยินยอม: "Decline",
+  ทบทวนความยินยอม: "Review consent",
+  "คุณไม่ยินยอมตามประกาศคุ้มครองข้อมูลส่วนบุคคล จึงใช้ GPS ไม่ได้ ปักหมุดหรือกรอกที่อยู่เองได้":
+    "You declined the privacy notice, so GPS is off. You can drop a pin or enter the address yourself.",
   กรุณาเข้าสู่ระบบ: "Please sign in",
   "ไม่มีสิทธิ์ดำเนินการ หรือเซสชันหมดอายุ":
     "You do not have permission, or your session has expired.",

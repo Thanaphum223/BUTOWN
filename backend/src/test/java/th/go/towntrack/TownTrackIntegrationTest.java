@@ -843,7 +843,8 @@ class TownTrackIntegrationTest {
                   "CITIZEN"))
           .andExpect(status().isOk());
     mvc.perform(as(get("/api/privacy"), "CITIZEN"))
-        .andExpect(jsonPath("$.acknowledged").value(true));
+        .andExpect(jsonPath("$.acknowledged").value(true))
+        .andExpect(jsonPath("$.consented").value(true));
     mvc.perform(
             as(
                 post("/api/users/pdpa-consent")
@@ -852,6 +853,32 @@ class TownTrackIntegrationTest {
                     .content("{\"version\":\"old\"}"),
                 "CITIZEN"))
         .andExpect(status().isConflict());
+  }
+
+  @Test
+  void decliningPrivacyNoticeIsRecordedAndCanBeChanged() throws Exception {
+    mvc.perform(
+            as(
+                post("/api/users/pdpa-consent")
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"version\":\"local-test-v1\",\"consent\":false}"),
+                "CITIZEN"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.consented").value(false));
+    mvc.perform(as(get("/api/privacy"), "CITIZEN"))
+        .andExpect(jsonPath("$.acknowledged").value(true))
+        .andExpect(jsonPath("$.consented").value(false));
+    mvc.perform(
+            as(
+                post("/api/users/pdpa-consent")
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"version\":\"local-test-v1\",\"consent\":true}"),
+                "CITIZEN"))
+        .andExpect(status().isOk());
+    mvc.perform(as(get("/api/privacy"), "CITIZEN"))
+        .andExpect(jsonPath("$.consented").value(true));
   }
 
   @Test

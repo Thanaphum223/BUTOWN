@@ -30,30 +30,39 @@ public class PrivacyController {
   @GetMapping("/privacy")
   public Object notice(Authentication a) {
     var u = access.user(a);
+    var decision =
+        db.list(
+            "SELECT consented FROM privacy_acknowledgement WHERE user_id=? AND notice_version=?",
+            u.get("id"),
+            version);
     return Map.of(
         "version",
         version,
         "text",
         notice,
         "acknowledged",
-        !db.list(
-                "SELECT user_id FROM privacy_acknowledgement WHERE user_id=? AND notice_version=?",
-                u.get("id"),
-                version)
-            .isEmpty());
+        !decision.isEmpty(),
+        "consented",
+        !decision.isEmpty() && Boolean.TRUE.equals(decision.get(0).get("consented")));
   }
 
   @PostMapping("/users/pdpa-consent")
-  public Object acknowledge(@RequestBody Map<String, String> body, Authentication a) {
+  public Object acknowledge(@RequestBody Map<String, Object> body, Authentication a) {
     var u = access.user(a);
     if (!version.equals(body.get("version")))
       throw new ResponseStatusException(
           HttpStatus.CONFLICT, "ประกาศเปลี่ยนแล้ว กรุณาอ่านฉบับล่าสุด");
+    // Older clients send only the version, which means they accepted the notice.
+    Object consent = body.getOrDefault("consent", true);
+    if (!(consent instanceof Boolean consented)) throw new IllegalArgumentException();
     db.run(
-        "INSERT INTO privacy_acknowledgement(user_id,notice_version) VALUES(?,?) ON CONFLICT DO NOTHING",
+        "INSERT INTO privacy_acknowledgement(user_id,notice_version,consented) VALUES(?,?,?)"
+            + " ON CONFLICT(user_id,notice_version) DO UPDATE SET consented=EXCLUDED.consented,"
+            + " acknowledged_at=now()",
         u.get("id"),
-        version);
-    return Map.of("ok", true);
+        version,
+        consented);
+    return Map.of("ok", true, "consented", consented);
   }
 
   @GetMapping("/municipal-center")

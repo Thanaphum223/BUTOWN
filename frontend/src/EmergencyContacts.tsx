@@ -134,7 +134,19 @@ export default function EmergencyContacts() {
         </Title>
         <p>{t("ภายใน 50 กม. จากจุดที่เลือก เรียงตามระยะทางเส้นตรงจากใกล้ไปไกล")}</p>
         {geo.error && (
-          <Alert type="info" showIcon message={t(geo.error)} style={{ marginBottom: 12 }} />
+          <Alert
+            type="info"
+            showIcon
+            message={t(geo.error)}
+            style={{ marginBottom: 12 }}
+            action={
+              geo.declined && (
+                <Button size="small" onClick={geo.reviewConsent}>
+                  {t("ทบทวนความยินยอม")}
+                </Button>
+              )
+            }
+          />
         )}
         <details className="emergency-manual-point">
           <summary>{t("เลือกจุดค้นหาบนแผนที่เอง")}</summary>

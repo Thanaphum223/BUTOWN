@@ -55,7 +55,7 @@ for (const denied of [false, true]) {
       });
       await expect(notice).toBeVisible();
       expect(await page.evaluate(() => (window as any).gpsCalls)).toBe(0);
-      await notice.getByRole("button", { name: "รับทราบประกาศ", exact: true }).click();
+      await notice.getByRole("button", { name: "ยินยอม", exact: true }).click();
       await expect(notice).not.toBeVisible();
       await expect.poll(() => page.evaluate(() => (window as any).gpsCalls)).toBe(1);
       await expect(page.getByRole("dialog")).not.toBeVisible();
@@ -67,3 +67,57 @@ for (const denied of [false, true]) {
     },
   );
 }
+
+test("declining the privacy notice keeps GPS off until the user accepts", async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as any).gpsCalls = 0;
+    Object.defineProperty(navigator, "geolocation", {
+      value: {
+        getCurrentPosition(ok: any) {
+          (window as any).gpsCalls++;
+          setTimeout(() => ok({ coords: { latitude: 13.75, longitude: 100.5 } }), 0);
+        },
+      },
+    });
+  });
+  // Keep the decision in the browser so the shared demo account keeps its real consent.
+  let decision: boolean | undefined;
+  await page.route("**/api/users/pdpa-consent", async (route) => {
+    decision = route.request().postDataJSON().consent;
+    await route.fulfill({ json: { ok: true, consented: decision } });
+  });
+  await page.route("**/api/privacy", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      json: {
+        ...(await response.json()),
+        acknowledged: decision !== undefined,
+        consented: decision === true,
+      },
+    });
+  });
+  await waitForLoginSlot();
+  const csrf = await (await page.request.get("/api/auth/csrf")).json();
+  const response = await page.request.post("/api/test/session", {
+    headers: { [csrf.headerName]: csrf.token },
+    form: { username: "citizen", password: accountPassword("citizen") },
+  });
+  expect(response.ok()).toBeTruthy();
+  await page.goto("/");
+  const notice = page.getByRole("dialog", { name: "ประกาศคุ้มครองข้อมูลส่วนบุคคล" });
+  await notice.getByRole("button", { name: "ไม่ยินยอม", exact: true }).click();
+  await expect(notice).not.toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "เรื่องแจ้งในเทศบาล", exact: true }),
+  ).toBeVisible();
+  await openReport(page);
+  await page.getByRole("button", { name: "ตำแหน่งของฉัน" }).click();
+  await expect(notice).toBeVisible();
+  expect(await page.evaluate(() => (window as any).gpsCalls)).toBe(0);
+  await notice.getByRole("button", { name: "ยินยอม", exact: true }).click();
+  await expect(notice).not.toBeVisible();
+  expect(decision).toBe(true);
+  await page.getByRole("button", { name: "ตำแหน่งของฉัน" }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).gpsCalls)).toBe(1);
+});

@@ -16,7 +16,7 @@ export async function signIn(page: Page, role = "citizen", password = accountPas
   });
   expect(response.ok()).toBeTruthy();
   await page.goto("/");
-  const consent = page.getByRole("button", { name: "รับทราบประกาศ", exact: true });
+  const consent = page.getByRole("button", { name: "ยินยอม", exact: true });
   if (role === "citizen") {
     const home = page.getByRole("heading", { name: "เรื่องแจ้งในเทศบาล", exact: true });
     await expect(consent.or(home)).toBeVisible();

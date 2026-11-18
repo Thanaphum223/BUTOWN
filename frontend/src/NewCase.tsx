@@ -644,6 +644,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
             icon={<EnvironmentOutlined />}
             loading={geo.busy}
             onClick={async () => {
+              if (geo.declined) return geo.reviewConsent();
               const p = await geo.request();
               if (p) {
                 manual.current = false;
@@ -653,7 +654,20 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
           >
             {t("ตำแหน่งของฉัน")}
           </Button>
-          {geo.error && <Alert type="info" message={t(geo.error)} style={{ marginTop: 12 }} />}
+          {geo.error && (
+            <Alert
+              type="info"
+              message={t(geo.error)}
+              style={{ marginTop: 12 }}
+              action={
+                geo.declined && (
+                  <Button size="small" onClick={geo.reviewConsent}>
+                    {t("ทบทวนความยินยอม")}
+                  </Button>
+                )
+              }
+            />
+          )}
           <Text className="map-help">
             {t("แตะบนแผนที่เพื่อย้ายหมุดให้ตรงจุดเกิดเหตุ หรือกรอกที่อยู่เอง")}
           </Text>
