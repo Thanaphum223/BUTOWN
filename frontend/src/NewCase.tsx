@@ -449,7 +449,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
       <div role="status" aria-live="polite" style={{ marginTop: 16 }}>
         <Text strong>
           {category ? t("เคสประเภทเดียวกัน") : t("เคสใกล้เคียง")}
-          {category ? t("ในรัศมี 300 เมตร") : t("ในรัศมี 100 เมตร")}
+          {t("ในรัศมี 100 เมตร")}
         </Text>
         <p>
           {!position
@@ -461,7 +461,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
                 : nearby.length
                   ? t("พบ {{count}} เคสใกล้เคียง", { count: nearby.length })
                   : category
-                    ? t("ไม่พบเคสประเภทเดียวกันในรัศมี 300 เมตร")
+                    ? t("ไม่พบเคสประเภทเดียวกันในรัศมี 100 เมตร")
                     : t("ไม่พบเคสใกล้เคียงในรัศมี 100 เมตร")}
         </p>
       </div>

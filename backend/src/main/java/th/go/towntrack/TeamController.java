@@ -30,20 +30,28 @@ public class TeamController {
         u.get("id"));
   }
 
-  @PostMapping
-  @Transactional
-  public Object create(@RequestBody Map<String, Object> b, Authentication a) {
-    var u = access.user(a);
-    access.role(u, "LEADER");
+  record Members(String name, UUID representative, Set<UUID> ids) {}
+
+  /** Same rules for create and edit: 1–50 FIELD members of the leader's department. */
+  Members members(Map<String, Object> b, Map<String, Object> u) {
     String name = Workflow.text(b, "name", 200);
     if (!(b.get("memberIds") instanceof List<?> members)
         || members.isEmpty()
         || members.size() > 50) throw new IllegalArgumentException();
     UUID representative = Db.id(b.get("representativeId"));
-    Set<UUID> ids = new HashSet<>();
+    Set<UUID> ids = new LinkedHashSet<>();
     for (Object id : members)
       ids.add((UUID) access.target(id, u, "FIELD", u.get("department_id")).get("id"));
     if (!ids.contains(representative)) throw new IllegalArgumentException();
+    return new Members(name, representative, ids);
+  }
+
+  @PostMapping
+  @Transactional
+  public Object create(@RequestBody Map<String, Object> b, Authentication a) {
+    var u = access.user(a);
+    access.role(u, "LEADER");
+    var m = members(b, u);
     UUID id = UUID.randomUUID();
     db.run(
         "INSERT INTO field_team(id,municipality_id,department_id,leader_id,representative_id,name)"
@@ -52,9 +60,34 @@ public class TeamController {
         u.get("municipality_id"),
         u.get("department_id"),
         u.get("id"),
-        representative,
-        name);
-    for (UUID member : ids) db.run("INSERT INTO team_member VALUES(?,?)", id, member);
+        m.representative(),
+        m.name());
+    for (UUID member : m.ids()) db.run("INSERT INTO team_member VALUES(?,?)", id, member);
+    return Map.of("id", id);
+  }
+
+  // Jobs already assigned keep their own member snapshot (work_member), so edits apply only to
+  // future assignments.
+  @PutMapping("/{id}")
+  @Transactional
+  public Object update(
+      @PathVariable UUID id, @RequestBody Map<String, Object> b, Authentication a) {
+    var u = access.user(a);
+    access.role(u, "LEADER");
+    db.one(
+        "SELECT id FROM field_team WHERE id=? AND leader_id=? AND municipality_id=? AND"
+            + " active=true",
+        id,
+        u.get("id"),
+        u.get("municipality_id"));
+    var m = members(b, u);
+    db.run(
+        "UPDATE field_team SET name=?,representative_id=? WHERE id=?",
+        m.name(),
+        m.representative(),
+        id);
+    db.run("DELETE FROM team_member WHERE team_id=?", id);
+    for (UUID member : m.ids()) db.run("INSERT INTO team_member VALUES(?,?)", id, member);
     return Map.of("id", id);
   }
 

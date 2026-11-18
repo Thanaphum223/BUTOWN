@@ -1615,15 +1615,12 @@ class TownTrackIntegrationTest {
   }
 
   @Test
-  void sameCategoryNearbyReachesFurtherThanAnyCategory() throws Exception {
+  void sameCategoryNearbyFindsReportsWithin100Metres() throws Exception {
     UUID id = create();
-    // About 200 m north of the report: outside the any-category radius, inside the same-category
-    // one.
-    String point = "latitude=13.7518&longitude=100.5";
-    mvc.perform(as(get("/api/nearby?" + point), "CITIZEN"))
+    // About 50 m north of the report: inside the radius, so it is offered as a likely duplicate.
+    mvc.perform(
+            as(get("/api/nearby?latitude=13.7504&longitude=100.5&categoryId=" + cat), "CITIZEN"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(0));
-    mvc.perform(as(get("/api/nearby?" + point + "&categoryId=" + cat), "CITIZEN"))
         .andExpect(jsonPath("$[0].id").value(id.toString()));
     mvc.perform(
             as(
@@ -1632,10 +1629,12 @@ class TownTrackIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
                         json.writeValueAsString(
-                            Map.of("categoryId", cat, "latitude", 13.7518, "longitude", 100.5))),
+                            Map.of("categoryId", cat, "latitude", 13.7504, "longitude", 100.5))),
                 "CITIZEN"))
         .andExpect(status().isOk());
-    mvc.perform(as(get("/api/nearby?latitude=13.755&longitude=100.5&categoryId=" + cat), "CITIZEN"))
+    // About 200 m away: outside the radius even for the same category.
+    mvc.perform(
+            as(get("/api/nearby?latitude=13.7518&longitude=100.5&categoryId=" + cat), "CITIZEN"))
         .andExpect(jsonPath("$.length()").value(0));
   }
 
@@ -1838,6 +1837,97 @@ class TownTrackIntegrationTest {
                             version(id)))))
         .andExpect(status().isOk());
     assertEquals("READY", state(id));
+  }
+
+  @Test
+  void leaderEditsTeamMembersAndRepresentativeForFutureAssignments() throws Exception {
+    UUID member = UUID.randomUUID();
+    db.run(
+        "INSERT INTO"
+            + " app_user(id,municipality_id,department_id,username,password_hash,display_name,role)"
+            + " VALUES(?,?,?,'editMember','x','Edit member','FIELD')",
+        member,
+        town,
+        dept);
+    var created =
+        mvc.perform(
+                as(
+                    post("/api/teams")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                            json.writeValueAsString(
+                                Map.of(
+                                    "name",
+                                    "Before",
+                                    "representativeId",
+                                    users.get("FIELD"),
+                                    "memberIds",
+                                    List.of(users.get("FIELD"))))),
+                    "LEADER"))
+            .andExpect(status().isOk())
+            .andReturn();
+    UUID team =
+        UUID.fromString(
+            json.readTree(created.getResponse().getContentAsString()).get("id").asText());
+    mvc.perform(
+            as(
+                put("/api/teams/" + team)
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        json.writeValueAsString(
+                            Map.of(
+                                "name",
+                                "After",
+                                "representativeId",
+                                member,
+                                "memberIds",
+                                List.of(users.get("FIELD"), member)))),
+                "LEADER"))
+        .andExpect(status().isOk());
+    assertEquals("After", db.one("SELECT name FROM field_team WHERE id=?", team).get("name"));
+    assertEquals(
+        member,
+        db.one("SELECT representative_id FROM field_team WHERE id=?", team)
+            .get("representative_id"));
+    assertEquals(2, db.list("SELECT user_id FROM team_member WHERE team_id=?", team).size());
+    // The representative must be one of the members; nothing changes when it is not.
+    mvc.perform(
+            as(
+                put("/api/teams/" + team)
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        json.writeValueAsString(
+                            Map.of(
+                                "name",
+                                "Broken",
+                                "representativeId",
+                                member,
+                                "memberIds",
+                                List.of(users.get("FIELD"))))),
+                "LEADER"))
+        .andExpect(status().is4xxClientError());
+    assertEquals(2, db.list("SELECT user_id FROM team_member WHERE team_id=?", team).size());
+    mvc.perform(as(post("/api/teams/" + team + "/retire").with(csrf()), "LEADER"))
+        .andExpect(status().isOk());
+    mvc.perform(
+            as(
+                put("/api/teams/" + team)
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        json.writeValueAsString(
+                            Map.of(
+                                "name",
+                                "Retired",
+                                "representativeId",
+                                member,
+                                "memberIds",
+                                List.of(member)))),
+                "LEADER"))
+        .andExpect(status().is4xxClientError());
   }
 
   @Test

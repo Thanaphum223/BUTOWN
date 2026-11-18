@@ -644,9 +644,9 @@ public class ComplaintController {
     return Map.of("ok", true);
   }
 
-  // Any category: only reports at the same spot. Same category: a wider area is still likely the
-  // same problem, so citizens can follow it instead of filing a duplicate.
-  static final int NEARBY_ANY_METERS = 100, NEARBY_SAME_CATEGORY_METERS = 300;
+  // Reports this close (of the chosen category, once picked) are likely the same problem, so
+  // citizens can follow or vote instead of filing a duplicate.
+  static final int NEARBY_METERS = 100;
 
   @GetMapping("/nearby")
   public Object nearby(
@@ -681,7 +681,7 @@ public class ComplaintController {
         categoryId,
         longitude,
         latitude,
-        categoryId == null ? NEARBY_ANY_METERS : NEARBY_SAME_CATEGORY_METERS);
+        NEARBY_METERS);
   }
 
   record Follow(
@@ -702,7 +702,7 @@ public class ComplaintController {
         b.categoryId(),
         b.longitude(),
         b.latitude(),
-        NEARBY_SAME_CATEGORY_METERS);
+        NEARBY_METERS);
     db.run("INSERT INTO follower VALUES(?,?) ON CONFLICT DO NOTHING", id, u.get("id"));
     return Map.of("ok", true);
   }

@@ -1,10 +1,30 @@
 name: Verify TownTrack
-on: [push, pull_request]
+# Actions minutes cost money on a private repo, so run only where it matters:
+# pushes to main (the deploy gate) and pull requests into main. Docs-only changes
+# and commits whose message contains [skip ci] do not run. Run the full browser
+# suite on demand with "Run workflow" and full_suite checked.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "**/*.md"]
+  pull_request:
+    branches: [main]
+    paths-ignore: ["docs/**", "**/*.md"]
+  workflow_dispatch:
+    inputs:
+      full_suite:
+        description: Run every browser test instead of the cloud smoke gate
+        type: boolean
+        default: false
 permissions:
   contents: read
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   verify:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     services:
       postgres:
         image: postgis/postgis:17-3.5
@@ -64,12 +84,15 @@ jobs:
             if curl -fsS http://127.0.0.1:8080/actuator/health && curl -fsS http://127.0.0.1:5173/; then break; fi
             sleep 2
           done
-      - run: npm test -- --max-failures=1
+      # The cloud smoke spec is the release gate (docs/CLOUD_TEST_DEPLOYMENT.md);
+      # run the full suite locally before pushing, or on demand via full_suite.
+      - run: npm test -- --max-failures=1 ${{ inputs.full_suite && ' ' || 'tests/cloud-smoke.spec.ts' }}
         working-directory: frontend
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: failure()
         with:
           name: test-results
+          retention-days: 3
           path: |
             backend/target/surefire-reports
             work/playwright-report

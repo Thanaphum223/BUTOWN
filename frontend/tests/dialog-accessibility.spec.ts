@@ -191,14 +191,10 @@ for (const language of ["th", "en"]) {
       exact: true,
     });
     await teamName.fill("Original team draft");
-    await dialog
-      .getByLabel(language === "th" ? "สมาชิกทีม" : "Team members", { exact: true })
-      .click();
-    await page.getByText("Original member", { exact: true }).click();
-    await page.keyboard.press("Escape");
+    await dialog.getByRole("checkbox", { name: "Original member" }).check();
     await expect(dialog.locator(".language-switcher")).toHaveCount(0);
     await expect(teamName).toHaveValue("Original team draft");
-    await expect(dialog.locator(".ant-select-selection-item")).toContainText("Original member");
+    await expect(dialog.locator(".member-chip")).toContainText("Original member");
   });
 }
 

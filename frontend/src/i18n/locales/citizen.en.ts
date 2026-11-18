@@ -44,8 +44,7 @@ const messages: Record<string, string> = {
     "Select the incident location to find nearby reports automatically",
   "กำลังค้นหาเคสใกล้เคียง…": "Finding nearby reports…",
   "ไม่พบเคสใกล้เคียงในรัศมี 100 เมตร": "No nearby reports within 100 metres",
-  "ในรัศมี 300 เมตร": " within 300 metres",
-  "ไม่พบเคสประเภทเดียวกันในรัศมี 300 เมตร": "No reports of this type within 300 metres",
+  "ไม่พบเคสประเภทเดียวกันในรัศมี 100 เมตร": "No reports of this type within 100 metres",
   อาจเป็นเรื่องเดียวกัน: "Possibly the same issue",
   อาจเป็นเรื่องเดียวกับที่มีคนแจ้งแล้ว: "This may already have been reported",
   "มีเรื่องประเภทเดียวกันใกล้จุดนี้ ถ้าเป็นปัญหาเดียวกัน กดติดตามหรือโหวตแทนการแจ้งซ้ำได้":

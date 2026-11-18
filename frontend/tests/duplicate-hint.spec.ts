@@ -41,7 +41,7 @@ test("choosing a category suggests an existing same-category report nearby", asy
     if (path === "/api/nearby") {
       const categoryId = url.searchParams.get("categoryId");
       nearbyQueries.push(categoryId);
-      // Only the same-category search reaches the report, as with the wider server radius.
+      // Only the same-category search reaches the report, as the server filters by category within 100 m.
       return route.fulfill({ json: categoryId === category ? [item()] : [] });
     }
     const payload: Record<string, unknown> = {
@@ -61,7 +61,7 @@ test("choosing a category suggests an existing same-category report nearby", asy
   });
   await page.goto("/");
   await openReport(page);
-  await page.getByLabel("ค้นหาชื่อสถานที่ หรือพิกัด", { exact: true }).fill("13.7518, 100.5");
+  await page.getByLabel("ค้นหาชื่อสถานที่ หรือพิกัด", { exact: true }).fill("13.7504, 100.5");
   await page.getByRole("button", { name: "ค้นหา", exact: true }).click();
   await expect(page.getByText("ไม่พบเคสใกล้เคียงในรัศมี 100 เมตร", { exact: true })).toBeVisible();
   await confirmLocation(page, "ซอยทดสอบ");
@@ -76,5 +76,5 @@ test("choosing a category suggests an existing same-category report nearby", asy
 
   await hint.getByRole("button", { name: "ติดตาม", exact: true }).click();
   await expect.poll(() => follows.length).toBe(1);
-  expect(follows[0]).toMatchObject({ categoryId: category, latitude: 13.7518, longitude: 100.5 });
+  expect(follows[0]).toMatchObject({ categoryId: category, latitude: 13.7504, longitude: 100.5 });
 });
