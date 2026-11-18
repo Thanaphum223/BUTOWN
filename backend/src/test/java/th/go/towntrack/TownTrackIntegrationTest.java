@@ -877,8 +877,7 @@ class TownTrackIntegrationTest {
                     .content("{\"version\":\"local-test-v1\",\"consent\":true}"),
                 "CITIZEN"))
         .andExpect(status().isOk());
-    mvc.perform(as(get("/api/privacy"), "CITIZEN"))
-        .andExpect(jsonPath("$.consented").value(true));
+    mvc.perform(as(get("/api/privacy"), "CITIZEN")).andExpect(jsonPath("$.consented").value(true));
   }
 
   @Test
