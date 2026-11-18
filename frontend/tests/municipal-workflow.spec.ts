@@ -499,6 +499,10 @@ test("a failed refresh after submission preserves the draft and retries only the
     .getByRole("button", { name: "ส่งเอกสารประเมินทรัพยากร/ของบจากหน้างาน", exact: true })
     .click();
   const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("ชื่อรายการที่ขอ 1", { exact: true }).fill("ท่อระบายน้ำ");
+  await dialog.getByLabel("จำนวนรายการ 1", { exact: true }).fill("2");
+  await dialog.getByLabel("หน่วยรายการ 1", { exact: true }).fill("ท่อน");
+  await page.screenshot({ path: "../work/screenshots/field-request-items.png" });
   await dialog
     .getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true })
     .fill("ต้องใช้อุปกรณ์เพิ่ม");

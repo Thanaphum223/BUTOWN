@@ -68,6 +68,18 @@ public class Workflow {
     return s.trim();
   }
 
+  /** Optional number within [min, max]; absent means null. */
+  static Double number(Map<String, Object> b, String key, double min, double max) {
+    Object x = b.get(key);
+    if (x == null) return null;
+    if (!(x instanceof Number n) || !Double.isFinite(n.doubleValue()))
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "กรุณาระบุ " + key + " ให้ถูกต้อง");
+    double v = n.doubleValue();
+    if (v < min || v > max)
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "กรุณาระบุ " + key + " ให้ถูกต้อง");
+    return v;
+  }
+
   public Map<String, Object> active(UUID id) {
     return db.one(
         "SELECT * FROM work_order WHERE complaint_id=? AND status NOT IN"
@@ -145,9 +157,10 @@ public class Workflow {
       var evidence =
           db.one(
               "SELECT count(*) FILTER(WHERE evidence_stage='BEFORE') before_count,count(*)"
-                  + " FILTER(WHERE evidence_stage='AFTER') after_count FROM attachment WHERE"
-                  + " report_id=? AND content_type LIKE 'image/%'",
-              reportId);
+                  + " FILTER(WHERE evidence_stage='AFTER' AND report_id=?) after_count FROM"
+                  + " attachment WHERE (report_id=? OR work_order_id=?) AND content_type LIKE"
+                  + " 'image/%'",
+              reportId, reportId, latest.get("work_order_id"));
       if (((Number) evidence.get("before_count")).longValue() == 0
           || ((Number) evidence.get("after_count")).longValue() == 0)
         throw new ResponseStatusException(
@@ -229,6 +242,18 @@ public class Workflow {
       case "ASSIGN" -> {
         UUID teamId = b.get("teamId") == null ? null : Db.id(b.get("teamId"));
         Object assignee = b.get("assigneeId");
+        var memberIds = new LinkedHashSet<UUID>();
+        if (b.get("memberIds") != null) {
+          if (!(b.get("memberIds") instanceof List<?> list) || teamId != null)
+            throw new IllegalArgumentException();
+          for (Object member : list) memberIds.add(Db.id(member));
+          if (memberIds.size() < 2 || memberIds.size() > 50)
+            throw new IllegalArgumentException("กรุณาเลือกสมาชิกทีม 2–50 คน");
+          if (assignee == null || !memberIds.contains(Db.id(assignee)))
+            throw new IllegalArgumentException("กรุณาเลือกผู้แทนทีมจากสมาชิกที่เลือก");
+          // Validate every member before writing so one invalid person changes nothing.
+          for (UUID member : memberIds) access.target(member, u, "FIELD", c.get("department_id"));
+        }
         if (teamId != null) {
           var team =
               db.one(
@@ -274,6 +299,8 @@ public class Workflow {
                   + " WHERE team_id=?",
               workId,
               teamId);
+        for (UUID member : memberIds)
+          db.run("INSERT INTO work_member(work_order_id,user_id) VALUES(?,?)", workId, member);
         notifyUser(target.get("id"), id, "มีงานลงพื้นที่รอรับงาน");
       }
       case "ACCEPT", "DECLINE", "START", "REQUEST_RESOURCE", "REPORT" -> {
@@ -299,17 +326,48 @@ public class Workflow {
                 "UPDATE work_order SET status='DECLINED',reason=? WHERE id=?", reason, w.get("id"));
             notifyUser(c.get("leader_id"), id, "ทีมปฏิเสธงาน กรุณามอบหมายใหม่");
           }
-          case "START" ->
-              db.run("UPDATE work_order SET status='IN_PROGRESS' WHERE id=?", w.get("id"));
+          case "START" -> {
+            db.run(
+                "UPDATE attachment SET work_order_id=? WHERE complaint_id=? AND"
+                    + " evidence_stage='BEFORE' AND content_type LIKE 'image/%' AND report_id IS"
+                    + " NULL AND resource_id IS NULL AND work_order_id IS NULL AND uploaded_by IN"
+                    + " (SELECT assignee_id FROM work_order WHERE id=? UNION SELECT user_id FROM"
+                    + " work_member WHERE work_order_id=?)",
+                w.get("id"), id, w.get("id"), w.get("id"));
+            if (db.list(
+                    "SELECT id FROM attachment WHERE work_order_id=? AND evidence_stage='BEFORE'",
+                    w.get("id"))
+                .isEmpty())
+              throw new ResponseStatusException(
+                  HttpStatus.BAD_REQUEST, "กรุณาถ่ายรูปหน้างานก่อนเริ่มปฏิบัติงาน");
+            Double lat = number(b, "latitude", -90, 90), lng = number(b, "longitude", -180, 180);
+            if ((lat == null) != (lng == null))
+              throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "กรุณาระบุพิกัดให้ครบ");
+            Double accuracy = number(b, "accuracy", 0, 100000);
+            db.run(
+                "UPDATE work_order SET status='IN_PROGRESS',start_latitude=?::numeric,start_longitude=?::numeric,"
+                    + "start_accuracy_m=?::numeric,start_distance_m=(SELECT"
+                    + " round(ST_Distance(c.location,ST_SetSRID(ST_MakePoint(?::float8,?::float8),4326)::geography)::numeric,1)"
+                    + " FROM complaint c WHERE c.id=?) WHERE id=?",
+                lat,
+                lng,
+                lat == null ? null : accuracy,
+                lng,
+                lat,
+                id,
+                w.get("id"));
+          }
           case "REQUEST_RESOURCE" -> {
             db.run(
-                "INSERT INTO resource_request(id,complaint_id,work_order_id,requested_by,necessity)"
-                    + " VALUES(?,?,?,?,?)",
+                "INSERT INTO"
+                    + " resource_request(id,complaint_id,work_order_id,requested_by,necessity,requested_items)"
+                    + " VALUES(?,?,?,?,?,?::jsonb)",
                 UUID.randomUUID(),
                 id,
                 w.get("id"),
                 u.get("id"),
-                reason);
+                reason,
+                json.valueToTree(requestedItems(b)).toString());
             notifyUser(c.get("leader_id"), id, "ทีมขอใช้ทรัพยากร กรุณาจัดทำข้อเสนอ");
           }
           case "REPORT" -> {
@@ -325,7 +383,7 @@ public class Workflow {
                     .intValue();
             if (db.list(
                     "SELECT id FROM attachment WHERE complaint_id=? AND uploaded_by=? AND report_id"
-                        + " IS NULL AND resource_id IS NULL",
+                        + " IS NULL AND resource_id IS NULL AND work_order_id IS NULL",
                     id,
                     u.get("id"))
                 .isEmpty())
@@ -334,10 +392,11 @@ public class Workflow {
             var stages =
                 db.one(
                     "SELECT count(*) FILTER(WHERE evidence_stage='BEFORE') b,count(*) FILTER(WHERE"
-                        + " evidence_stage='AFTER') a FROM attachment WHERE complaint_id=? AND"
-                        + " uploaded_by=? AND report_id IS NULL AND resource_id IS NULL AND"
-                        + " content_type LIKE 'image/%'",
-                    id, u.get("id"));
+                        + " evidence_stage='AFTER' AND work_order_id IS NULL) a FROM attachment"
+                        + " WHERE complaint_id=? AND content_type LIKE 'image/%' AND ((uploaded_by=?"
+                        + " AND report_id IS NULL AND resource_id IS NULL AND work_order_id IS NULL)"
+                        + " OR work_order_id=?)",
+                    id, u.get("id"), w.get("id"));
             if (((Number) stages.get("b")).longValue() == 0
                 || ((Number) stages.get("a")).longValue() == 0)
               throw new ResponseStatusException(
@@ -354,7 +413,7 @@ public class Workflow {
                 u.get("id"));
             db.run(
                 "UPDATE attachment SET report_id=? WHERE complaint_id=? AND uploaded_by=? AND"
-                    + " report_id IS NULL AND resource_id IS NULL",
+                    + " report_id IS NULL AND resource_id IS NULL AND work_order_id IS NULL",
                 report,
                 id,
                 u.get("id"));
@@ -577,6 +636,39 @@ public class Workflow {
               "UPDATE work_order SET status='COMPLETE' WHERE complaint_id=? AND status NOT IN"
                   + " ('DECLINED','CANCELLED')",
               id);
+      case "WITHDRAW_RESOURCE_REQUEST" -> {
+        if (!u.get("id").equals(active(id).get("assignee_id"))) Access.deny();
+        db.run(
+            "UPDATE resource_request SET status='WITHDRAWN',version=version+1 WHERE id=?",
+            resource(id).get("id"));
+        notifyUser(c.get("leader_id"), id, "ผู้ลงพื้นที่ถอนคำขอใช้ทรัพยากร");
+      }
+      case "WITHDRAW_PROPOSAL" -> {
+        db.run(
+            "UPDATE resource_request SET status='REVISION',version=version+1 WHERE id=?",
+            resource(id).get("id"));
+        notifyUser(c.get("officer_id"), id, "หัวหน้าถอนข้อเสนอทรัพยากรกลับไปแก้ไข");
+      }
+      case "WITHDRAW_APPROVAL" -> {
+        var r = resource(id);
+        db.run(
+            "DELETE FROM approval_assignment WHERE resource_id=? AND decision IS NULL",
+            r.get("id"));
+        db.run(
+            "UPDATE resource_request SET status='CHECK',approver_id=NULL,version=version+1 WHERE"
+                + " id=?",
+            r.get("id"));
+        notifyUser(r.get("approver_id"), id, "เจ้าหน้าที่ถอนคำขอทรัพยากรกลับไปตรวจใหม่");
+      }
+      case "UNDO_START" -> {
+        var w = active(id);
+        if (!u.get("id").equals(w.get("assignee_id"))) Access.deny();
+        db.run(
+            "UPDATE work_order SET status='ACCEPTED',start_latitude=NULL,start_longitude=NULL,"
+                + "start_accuracy_m=NULL,start_distance_m=NULL WHERE id=?",
+            w.get("id"));
+        notifyUser(c.get("leader_id"), id, "ผู้ลงพื้นที่ยกเลิกการเริ่มปฏิบัติงาน");
+      }
       case "REJECT" -> {}
       default ->
           throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ไม่รองรับการดำเนินการนี้");
@@ -598,6 +690,38 @@ public class Workflow {
     notifyUser(c.get("officer_id"), id, "คำร้องมีการดำเนินการ: " + action);
     notifyUser(c.get("leader_id"), id, "คำร้องมีการดำเนินการ: " + action);
     return Map.of("id", id, "status", to, "version", expected + 1);
+  }
+
+  static List<Map<String, Object>> requestedItems(Map<String, Object> b) {
+    if (!(b.get("items") instanceof List<?> items) || items.isEmpty() || items.size() > 50)
+      throw new IllegalArgumentException("กรุณาระบุรายการที่ขอ 1–50 รายการ");
+    var result = new ArrayList<Map<String, Object>>();
+    for (Object entry : items) {
+      if (!(entry instanceof Map<?, ?> item)
+          || !(item.get("name") instanceof String name)
+          || name.isBlank()
+          || name.trim().length() > 200
+          || !(item.get("unit") instanceof String unit)
+          || unit.isBlank()
+          || unit.trim().length() > 50)
+        throw new IllegalArgumentException("กรุณาระบุชื่อรายการ จำนวน และหน่วยให้ครบ");
+      java.math.BigDecimal quantity;
+      try {
+        quantity = new java.math.BigDecimal(String.valueOf(item.get("quantity")));
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException("กรุณาระบุจำนวนเป็นตัวเลข");
+      }
+      if (quantity.signum() <= 0
+          || quantity.scale() > 2
+          || quantity.compareTo(new java.math.BigDecimal("1000000000")) > 0)
+        throw new IllegalArgumentException("จำนวนต้องมากกว่า 0 และมีทศนิยมไม่เกินสองตำแหน่ง");
+      var clean = new LinkedHashMap<String, Object>();
+      clean.put("name", name.trim());
+      clean.put("quantity", quantity);
+      clean.put("unit", unit.trim());
+      result.add(clean);
+    }
+    return result;
   }
 
   Map<String, Object> latestReport(UUID id) {

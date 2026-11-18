@@ -3,6 +3,7 @@ import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
 import { useI18n } from "./i18n/useI18n";
 import { govTokens } from "./govTheme";
 import AttachmentList from "./AttachmentList";
+import AssignmentPicker from "./AssignmentPicker";
 import ResourceReview from "./ResourceReview";
 import CitizenOutcome from "./CitizenOutcome";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
@@ -24,6 +25,7 @@ import {
   InputNumber,
   List,
   Modal,
+  Radio,
   Row,
   Select,
   Space,
@@ -46,14 +48,77 @@ import {
   progressLabel,
 } from "./api";
 import LocationMap from "./LocationMap";
+import { useGeo } from "./GeoContext";
 import { ATTACHMENT_ACCEPT, ATTACHMENT_HELP, attachmentError } from "./attachments";
 type D = Record<string, any>;
 const { Title, Text, Paragraph } = Typography;
 const denialPresets = [
-  "เกินวงเงินซ่อมบำรุงปกติ เห็นควรยุติใบงานเฉพาะกิจนี้เพื่อบรรจุเข้าแผนพัฒนาท้องถิ่น/ตั้งงบประมาณประจำปี",
-  "อยู่นอกเหนืออำนาจงบประมาณของเทศบาล ให้ยุติใบงานและทำหนังสือประสานหน่วยงานเจ้าของพื้นที่ (กฟภ./กปภ./กรมทางหลวง)",
-  "ไม่คุ้มค่าทางวิศวกรรม ให้ยุติการใช้งบประมาณพิเศษและให้กองช่างซ่อมแซมบรรเทาความเดือดร้อนชั่วคราวตามวัสดุคงคลัง",
+  {
+    topic: "เกินวงเงินซ่อมบำรุงปกติ",
+    reason:
+      "เกินวงเงินซ่อมบำรุงปกติ เห็นควรยุติใบงานเฉพาะกิจนี้เพื่อบรรจุเข้าแผนพัฒนาท้องถิ่น/ตั้งงบประมาณประจำปี",
+  },
+  {
+    topic: "นอกอำนาจงบประมาณของเทศบาล",
+    reason:
+      "อยู่นอกเหนืออำนาจงบประมาณของเทศบาล ให้ยุติใบงานและทำหนังสือประสานหน่วยงานเจ้าของพื้นที่ (กฟภ./กปภ./กรมทางหลวง)",
+  },
+  {
+    topic: "ไม่คุ้มค่าทางวิศวกรรม",
+    reason:
+      "ไม่คุ้มค่าทางวิศวกรรม ให้ยุติการใช้งบประมาณพิเศษและให้กองช่างซ่อมแซมบรรเทาความเดือดร้อนชั่วคราวตามวัสดุคงคลัง",
+  },
 ];
+const secondaryActions = [
+  "REJECT",
+  "DENY",
+  "DECLINE",
+  "RETURN_RESOURCE",
+  "RETURN_FIELD",
+  "RETURN_LEADER",
+  "WITHDRAW_RESOURCE_REQUEST",
+  "WITHDRAW_PROPOSAL",
+  "WITHDRAW_APPROVAL",
+  "UNDO_START",
+];
+const activeWorkOrder = (data?: D) =>
+  (data?.workOrders || [])
+    .filter((w: D) => !w.handed_off && !["DECLINED", "CANCELLED", "COMPLETE"].includes(w.status))
+    .at(-1);
+// Site photos for the current job: just taken before START, or already stamped by START.
+const startPhotosOf = (data: D | undefined, userId: string) => {
+  const work = activeWorkOrder(data);
+  return (data?.files || []).filter(
+    (f: D) =>
+      f.evidence_stage === "BEFORE" &&
+      !f.report_id &&
+      !f.resource_id &&
+      ((work && f.work_order_id === work.id) || (!f.work_order_id && f.uploaded_by === userId)),
+  );
+};
+// Leaders compare where work started with the reported point; GPS is recorded, never required.
+const FAR_FROM_REPORT_M = 300;
+function StartDistance({ work }: { work?: D }) {
+  const { t } = useI18n();
+  if (!work || !["IN_PROGRESS", "COMPLETE"].includes(work.status)) return null;
+  if (work.start_distance_m == null)
+    return (
+      <Tag color="default" className="start-distance">
+        {work.start_latitude == null
+          ? t("ไม่มีพิกัดตอนเริ่มงาน")
+          : t("จุดแจ้งไม่มีพิกัดให้เทียบระยะ")}
+      </Tag>
+    );
+  const meters = Math.round(Number(work.start_distance_m));
+  const far = meters > FAR_FROM_REPORT_M;
+  return (
+    <Tag color={far ? "warning" : "success"} className="start-distance">
+      {far
+        ? t("เริ่มงานห่างจากจุดแจ้ง {{meters}} ม.", { meters: meters.toLocaleString() })
+        : t("เริ่มงานใกล้จุดแจ้ง ({{meters}} ม.)", { meters: meters.toLocaleString() })}
+    </Tag>
+  );
+}
 const terminationNotice =
   "คำร้องนี้สิ้นสุดใน TownTrack การเข้าแผนงบประมาณหรือทำหนังสือประสานหน่วยงานภายนอกเป็นแนวทางที่ผู้รับผิดชอบต้องดำเนินการต่อเอง ปุ่มนี้ไม่สร้างแผนงบประมาณหรือส่งงานภายนอกอัตโนมัติ";
 const terminalSubtitle =
@@ -83,7 +148,10 @@ export default function Detail({
           ACCEPT: "กดรับงานและลงพื้นที่สำรวจ",
           DECLINE: "กดปฏิเสธงาน",
           REQUEST_RESOURCE: "ส่งเอกสารประเมินทรัพยากร/ของบจากหน้างาน",
-          START: "เริ่มปฏิบัติงานซ่อมแซม (ใช้วัสดุ/อุปกรณ์ปกติ)",
+          START:
+            data?.complaint?.status === "READY"
+              ? "เริ่มปฏิบัติงานซ่อมแซม (ใช้ทรัพยากรที่ได้รับอนุมัติ)"
+              : "เริ่มปฏิบัติงานซ่อมแซม (ใช้วัสดุ/อุปกรณ์ปกติ)",
           APPROVE: "อนุมัติ",
           DENY: "ไม่อนุมัติงบประมาณเฉพาะกิจ (ยุติใบงานซ่อมด่วนเพื่อนำเข้าแผนฯ / ประสานหน่วยงานภายนอก)",
           SEND_APPROVAL: "เอกสารครบถ้วนตามระเบียบสารบรรณ - ส่งต่อผู้มีอำนาจ",
@@ -94,6 +162,7 @@ export default function Detail({
         key,
     );
   const [action, setAction] = useState(""),
+    [denialTopic, setDenialTopic] = useState<string>(),
     [teams, setTeams] = useState<D[]>([]),
     [people, setPeople] = useState<D[]>([]),
     [busy, setBusy] = useState(false);
@@ -106,6 +175,7 @@ export default function Detail({
   const draftKey = `${user.id}:${id}`;
   const [draft, setDraft] = useState<FieldDraft>({ values: {}, files: [] });
   const [online, setOnline] = useState(navigator.onLine);
+  useEffect(() => setDenialTopic(undefined), [action]);
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
     window.addEventListener("online", update);
@@ -140,6 +210,9 @@ export default function Detail({
     refreshConfirmation.current?.();
   }, [language]);
   const [evidenceStage, setEvidenceStage] = useState("BEFORE");
+  const geo = useGeo();
+  // undefined: locating, null: unavailable.
+  const [startPoint, setStartPoint] = useState<[number, number] | null>();
   const { message, modal } = App.useApp();
   const submitting = useRef(false);
   const {
@@ -161,6 +234,11 @@ export default function Detail({
     setPeople([]);
     setTeams([]);
     setAction(a);
+    if (a === "REQUEST_RESOURCE") form.setFieldsValue({ items: [{ name: "", unit: "" }] });
+    if (a === "START") {
+      setStartPoint(undefined);
+      void geo.request().then((p) => setStartPoint(p ?? null));
+    }
     if (["REQUEST_TRANSFER", "TRANSFER_DEPARTMENT"].includes(a)) {
       try {
         const catalog = await api<D>("/catalog");
@@ -181,12 +259,21 @@ export default function Detail({
         JSON.parse(resource.revisions || "[]"),
       );
       const previous = revisions.at(-1);
+      const requested: D[] = JSON.parse(
+        (data?.resources || []).filter((r: D) => r.status !== "WITHDRAWN").at(-1)
+          ?.requested_items || "[]",
+      );
       form.setFieldsValue({
         proposal: previous?.proposal,
         durationDays: previous?.duration_days,
         lineItems: previous?.line_items?.length
           ? previous.line_items
-          : [{ name: "", amount: null }],
+          : requested.length
+            ? requested.map((item) => ({
+                name: `${item.name} ${item.quantity} ${item.unit}`,
+                amount: null,
+              }))
+            : [{ name: "", amount: null }],
       });
       try {
         const catalog = await api<D>("/catalog");
@@ -251,8 +338,13 @@ export default function Detail({
       return;
     }
     const pendingFiles = (data?.files || []).filter(
-      (f: D) => f.uploaded_by === user.id && !f.report_id && !f.resource_id,
+      (f: D) => f.uploaded_by === user.id && !f.report_id && !f.resource_id && !f.work_order_id,
     );
+    const startPhotos = startPhotosOf(data, user.id);
+    if (action === "START" && !startPhotos.length) {
+      message.error(t("กรุณาถ่ายรูปหน้างานก่อนเริ่มปฏิบัติงาน"));
+      return;
+    }
     if (
       action === "PROPOSE" &&
       (!pendingFiles.length ||
@@ -270,10 +362,11 @@ export default function Detail({
     if (
       action === "REPORT" &&
       (draft.files.length > 0 ||
-        !["BEFORE", "AFTER"].every((stage) =>
-          pendingFiles.some(
-            (f: D) => f.evidence_stage === stage && f.content_type?.startsWith("image/"),
-          ),
+        !(startPhotos.some((f: D) => f.work_order_id) ? ["AFTER"] : ["BEFORE", "AFTER"]).every(
+          (stage) =>
+            pendingFiles.some(
+              (f: D) => f.evidence_stage === stage && f.content_type?.startsWith("image/"),
+            ),
         ))
     ) {
       message.error(t("กรุณาส่งภาพก่อนทำและหลังทำให้ครบ และส่งไฟล์ร่างที่ค้างก่อนยืนยันรายงาน"));
@@ -322,6 +415,9 @@ export default function Detail({
         body: JSON.stringify({
           ...v,
           ...(action === "PROPOSE" ? { amount: resourceTotal } : {}),
+          ...(action === "START" && startPoint
+            ? { latitude: startPoint[0], longitude: startPoint[1] }
+            : {}),
           action,
           version: data!.complaint.version,
         }),
@@ -355,8 +451,10 @@ export default function Detail({
     );
   if (!data) return <Spin />;
   const pendingEvidence = (data.files || []).filter(
-    (f: D) => f.uploaded_by === user.id && !f.report_id && !f.resource_id,
+    (f: D) => f.uploaded_by === user.id && !f.report_id && !f.resource_id && !f.work_order_id,
   );
+  const startPhotos = startPhotosOf(data, user.id);
+  const startedWithPhoto = startPhotos.some((f: D) => f.work_order_id);
   const pendingBytes = (data.files || []).reduce(
     (total: number, f: D) => total + Number(f.size_bytes),
     0,
@@ -382,6 +480,10 @@ export default function Detail({
     />
   );
   const c = data.complaint;
+  // Citizens see their own files in the gallery, so only list files it does not show.
+  const citizenExtraFiles = (data.files || []).filter(
+    (f: D) => !(data.media || []).some((m: D) => m.id === f.id),
+  );
   const returnReasons = Array.from(
     new Set<string>(
       [
@@ -652,11 +754,19 @@ export default function Detail({
           "TRANSFER_PENDING",
         ].includes(c.status) && (
           <Card className="report-review-card" title={t("รายงานล่าสุดและหลักฐานประกอบ")}>
+            <StartDistance
+              work={(data.workOrders || []).find(
+                (w: D) => w.id === data.reports.at(-1).work_order_id,
+              )}
+            />
             <Paragraph>{data.reports.at(-1).content}</Paragraph>
             <EvidenceGallery
+              paired
               media={(data.files || []).filter(
                 (file: D) =>
-                  file.report_id === data.reports.at(-1).id &&
+                  (file.report_id === data.reports.at(-1).id ||
+                    (file.work_order_id &&
+                      file.work_order_id === data.reports.at(-1).work_order_id)) &&
                   (file.content_type?.startsWith("image/") ||
                     file.content_type?.startsWith("video/")),
               )}
@@ -925,6 +1035,7 @@ export default function Detail({
                                   )[r.status] || r.status}{" "}
                                   {r.reason && "• " + r.reason}
                                 </Text>
+                                <StartDistance work={r} />
                                 <Text type="secondary">{date(r.created_at)}</Text>
                               </Space>
                             </List.Item>
@@ -1006,42 +1117,45 @@ export default function Detail({
                   }
                 />
               )}
-              <AttachmentList
-                files={data.files}
-                extraActions={(f: D) =>
-                  !data.readOnlyHistory &&
-                  ["OFFICER", "ADMIN"].includes(user.role) &&
-                  (f.content_type?.startsWith("image/") || f.content_type?.startsWith("video/")) ? (
-                    f.public_copy_of ? (
-                      <Button
-                        disabled={!f.public_approved}
-                        onClick={async () => {
-                          try {
-                            await api(`/complaints/${id}/shared-media/${f.id}`, {
-                              method: "DELETE",
-                            });
-                            await load();
-                          } catch (e) {
-                            message.error(t((e as Error).message));
-                          }
-                        }}
-                      >
-                        {f.public_approved ? t("หยุดเผยแพร่") : t("ไม่เผยแพร่แล้ว")}
-                      </Button>
-                    ) : (
-                      <Button
-                        onClick={() => {
-                          setPublishSource(f);
-                          setPublishFile(undefined);
-                          setConfirmedClean(false);
-                        }}
-                      >
-                        {t("เผยแพร่สำเนา")}
-                      </Button>
-                    )
-                  ) : null
-                }
-              />
+              {(!citizen || citizenExtraFiles.length > 0) && (
+                <AttachmentList
+                  files={citizen ? citizenExtraFiles : data.files}
+                  extraActions={(f: D) =>
+                    !data.readOnlyHistory &&
+                    ["OFFICER", "ADMIN"].includes(user.role) &&
+                    (f.content_type?.startsWith("image/") ||
+                      f.content_type?.startsWith("video/")) ? (
+                      f.public_copy_of ? (
+                        <Button
+                          disabled={!f.public_approved}
+                          onClick={async () => {
+                            try {
+                              await api(`/complaints/${id}/shared-media/${f.id}`, {
+                                method: "DELETE",
+                              });
+                              await load();
+                            } catch (e) {
+                              message.error(t((e as Error).message));
+                            }
+                          }}
+                        >
+                          {f.public_approved ? t("หยุดเผยแพร่") : t("ไม่เผยแพร่แล้ว")}
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={() => {
+                            setPublishSource(f);
+                            setPublishFile(undefined);
+                            setConfirmedClean(false);
+                          }}
+                        >
+                          {t("เผยแพร่สำเนา")}
+                        </Button>
+                      )
+                    ) : null
+                  }
+                />
+              )}
             </Card>
           </Col>
           <Col xs={24} xl={embedded ? 24 : 8}>
@@ -1053,18 +1167,7 @@ export default function Detail({
                       block
                       key={r.action}
                       disabled={!!error}
-                      type={
-                        [
-                          "REJECT",
-                          "DENY",
-                          "DECLINE",
-                          "RETURN_RESOURCE",
-                          "RETURN_FIELD",
-                          "RETURN_LEADER",
-                        ].includes(r.action)
-                          ? "default"
-                          : "primary"
-                      }
+                      type={secondaryActions.includes(r.action) ? "default" : "primary"}
                       danger={["REJECT", "DENY", "DECLINE"].includes(r.action)}
                       onClick={() => choose(r.action)}
                     >
@@ -1109,18 +1212,7 @@ export default function Detail({
               <Button
                 key={r.action}
                 disabled={!!error}
-                type={
-                  [
-                    "REJECT",
-                    "DENY",
-                    "DECLINE",
-                    "RETURN_RESOURCE",
-                    "RETURN_FIELD",
-                    "RETURN_LEADER",
-                  ].includes(r.action)
-                    ? "default"
-                    : "primary"
-                }
+                type={secondaryActions.includes(r.action) ? "default" : "primary"}
                 danger={["REJECT", "DENY", "DECLINE"].includes(r.action)}
                 onClick={() => choose(r.action)}
               >
@@ -1290,15 +1382,23 @@ export default function Detail({
                   "เหตุผลตัวอย่าง: โปรดตรวจทานข้อเท็จจริง อำนาจหน้าที่ และแนวทางต่อก่อนยืนยัน ข้อความนี้ไม่ใช่ข้อกฎหมายที่ใช้ได้ทุกกรณี",
                 )}
               />
-              {denialPresets.map((preset) => (
-                <Button
-                  key={preset}
-                  block
-                  onClick={() => form.setFieldsValue({ reason: t(preset) })}
-                >
-                  {t(preset)}
-                </Button>
-              ))}
+              <Radio.Group
+                aria-label={t("หัวข้อเหตุผลที่ไม่อนุมัติ")}
+                value={denialTopic}
+                onChange={(e) => {
+                  const preset = denialPresets.find((p) => p.topic === e.target.value);
+                  setDenialTopic(e.target.value);
+                  if (preset) form.setFieldsValue({ reason: t(preset.reason) });
+                }}
+              >
+                <Space direction="vertical">
+                  {denialPresets.map((preset) => (
+                    <Radio key={preset.topic} value={preset.topic}>
+                      {t(preset.topic)}
+                    </Radio>
+                  ))}
+                </Space>
+              </Radio.Group>
               <Alert type="info" message={t(terminationNotice)} />
               <Alert
                 style={{ marginBottom: 16 }}
@@ -1373,39 +1473,16 @@ export default function Detail({
               </Form.Item>
             </>
           )}
-          {action === "ASSIGN" && (
-            <>
-              <Form.Item
-                name="teamId"
-                label={t("เลือกทีม (หรือเลือกผู้ลงพื้นที่รายบุคคลด้านล่าง)")}
-              >
-                <Select
-                  allowClear
-                  options={teams.map((t) => ({
-                    value: t.id,
-                    label: t.name + " • " + t.representative_name,
-                  }))}
-                />
-              </Form.Item>
-            </>
-          )}
-          {["TRIAGE", "REASSIGN_LEADER", "ASSIGN", "SEND_APPROVAL"].includes(action) && (
+          {action === "ASSIGN" && <AssignmentPicker form={form} teams={teams} people={people} />}
+          {["TRIAGE", "REASSIGN_LEADER", "SEND_APPROVAL"].includes(action) && (
             <Form.Item
               label={
                 ["TRIAGE", "REASSIGN_LEADER"].includes(action)
                   ? t("หัวหน้าหน่วยงาน")
-                  : action === "ASSIGN"
-                    ? t("ผู้ลงพื้นที่")
-                    : t("ผู้อนุมัติตามลำดับ (เลือก ") + data.approvalStages + t(" คน)")
+                  : t("ผู้อนุมัติตามลำดับ (เลือก ") + data.approvalStages + t(" คน)")
               }
-              name={
-                ["TRIAGE", "REASSIGN_LEADER"].includes(action)
-                  ? "leaderId"
-                  : action === "ASSIGN"
-                    ? "assigneeId"
-                    : "approverIds"
-              }
-              rules={[{ required: action !== "ASSIGN" }]}
+              name={["TRIAGE", "REASSIGN_LEADER"].includes(action) ? "leaderId" : "approverIds"}
+              rules={[{ required: true }]}
             >
               <Select
                 allowClear
@@ -1573,24 +1650,37 @@ export default function Detail({
                 {[
                   { stage: "BEFORE", label: t("1. ภาพก่อนทำ") },
                   { stage: "AFTER", label: t("2. ภาพหลังทำ") },
-                ].map((item) => (
-                  <section key={item.stage}>
-                    <h4>
-                      {item.label} <span className="required-mark">*</span>
-                    </h4>
-                    <EvidenceUpload
-                      complaintId={id}
-                      stage={item.stage}
-                      photos
-                      used={pendingBytes}
-                      disabled={uploadBusy}
-                      onUploaded={load}
-                      onBusy={setUploadBusy}
-                      onFailed={saveFailedFile}
-                    />
-                    {evidenceList(item.stage)}
-                  </section>
-                ))}
+                ].map((item) =>
+                  item.stage === "BEFORE" && startedWithPhoto ? (
+                    <section key={item.stage}>
+                      <h4>{item.label}</h4>
+                      <Alert
+                        type="success"
+                        showIcon
+                        message={t("ถ่ายไว้ตอนเริ่มปฏิบัติงานแล้ว {{count}} รูป", {
+                          count: startPhotos.length,
+                        })}
+                      />
+                    </section>
+                  ) : (
+                    <section key={item.stage}>
+                      <h4>
+                        {item.label} <span className="required-mark">*</span>
+                      </h4>
+                      <EvidenceUpload
+                        complaintId={id}
+                        stage={item.stage}
+                        photos
+                        used={pendingBytes}
+                        disabled={uploadBusy}
+                        onUploaded={load}
+                        onBusy={setUploadBusy}
+                        onFailed={saveFailedFile}
+                      />
+                      {evidenceList(item.stage)}
+                    </section>
+                  ),
+                )}
                 <section className="additional-evidence">
                   <h4>{t("3. วิดีโอหรือเอกสารประกอบเพิ่มเติม (ไม่บังคับ)")}</h4>
                   <EvidenceUpload
@@ -1609,6 +1699,132 @@ export default function Detail({
                 {t(ATTACHMENT_HELP)}
               </Text>
             </>
+          )}
+          {action === "START" && (
+            <div className="start-photo">
+              <Alert
+                className="start-location"
+                type={startPoint === null ? "warning" : "info"}
+                showIcon
+                icon={<EnvironmentOutlined />}
+                message={
+                  startPoint === undefined
+                    ? t("กำลังระบุพิกัดหน้างาน...")
+                    : startPoint === null
+                      ? t("ระบุพิกัดไม่ได้ ระบบจะบันทึกว่าไม่มีพิกัดตอนเริ่มงาน")
+                      : t("บันทึกพิกัดหน้างานแล้ว ระบบจะเทียบระยะกับจุดที่แจ้ง")
+                }
+              />
+              <Alert
+                type="info"
+                showIcon
+                message={t(
+                  "ถ่ายรูปหน้างานก่อนเริ่มปฏิบัติงาน ระบบบันทึกเวลาและผู้ถ่ายไว้เป็นหลักฐาน",
+                )}
+              />
+              <EvidenceUpload
+                complaintId={id}
+                stage="BEFORE"
+                photos
+                used={pendingBytes}
+                disabled={uploadBusy}
+                onUploaded={load}
+                onBusy={setUploadBusy}
+              />
+              <List
+                size="small"
+                locale={{ emptyText: t("ยังไม่ได้ถ่ายรูปหน้างาน") }}
+                dataSource={startPhotos}
+                renderItem={(file: D) => (
+                  <List.Item>
+                    <a href={"/api/files/" + file.id} target="_blank" rel="noreferrer">
+                      {file.original_name}
+                    </a>
+                    <Tag color="green">{t("แนบแล้ว")}</Tag>
+                  </List.Item>
+                )}
+              />
+            </div>
+          )}
+          {action === "REQUEST_RESOURCE" && (
+            <Form.List
+              name="items"
+              rules={[
+                {
+                  validator: async (_, items) => {
+                    if (!items?.length) throw new Error(t("เพิ่มรายการที่ขออย่างน้อย 1 รายการ"));
+                    if (items.length > 50) throw new Error(t("เพิ่มได้ไม่เกิน 50 รายการ"));
+                  },
+                },
+              ]}
+            >
+              {(fields, { add, remove }, { errors }) => (
+                <>
+                  <div className="resource-items">
+                    {fields.map((field, index) => (
+                      <div className="resource-item-row requested-item-row" key={field.key}>
+                        <Form.Item
+                          label={t("รายการที่ ") + (index + 1)}
+                          name={[field.name, "name"]}
+                          rules={[{ required: true, whitespace: true, max: 200 }]}
+                        >
+                          <Input
+                            aria-label={t("ชื่อรายการที่ขอ ") + (index + 1)}
+                            placeholder={t("ชื่อรายการ เช่น ทราย ปูนซีเมนต์")}
+                            maxLength={200}
+                          />
+                        </Form.Item>
+                        <Form.Item
+                          label={t("จำนวน")}
+                          name={[field.name, "quantity"]}
+                          rules={[{ required: true, type: "number", min: 0.01, max: 1000000000 }]}
+                        >
+                          <InputNumber
+                            aria-label={t("จำนวนรายการ ") + (index + 1)}
+                            min={0.01}
+                            max={1000000000}
+                            precision={2}
+                            inputMode="decimal"
+                            style={{ width: "100%" }}
+                          />
+                        </Form.Item>
+                        <Form.Item
+                          label={t("หน่วย")}
+                          name={[field.name, "unit"]}
+                          rules={[{ required: true, whitespace: true, max: 50 }]}
+                        >
+                          <Input
+                            aria-label={t("หน่วยรายการ ") + (index + 1)}
+                            placeholder={t("เช่น ถุง ท่อน เมตร")}
+                            maxLength={50}
+                          />
+                        </Form.Item>
+                        {index > 0 && (
+                          <Button
+                            className="resource-remove"
+                            icon={<DeleteOutlined />}
+                            danger
+                            aria-label={t("ลบรายการ ") + (index + 1)}
+                            onClick={() => remove(field.name)}
+                          >
+                            {t("ลบ")}
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <Form.ErrorList errors={errors} />
+                  <Button
+                    icon={<PlusOutlined />}
+                    disabled={fields.length >= 50}
+                    onClick={() => add({ name: "", unit: "" })}
+                    style={{ marginBottom: 16 }}
+                  >
+                    {t("เพิ่มรายการที่ขอ")}
+                  </Button>
+                </>
+              )}
+            </Form.List>
           )}
           {!["ACCEPT", "START", "PROPOSE", "REPORT"].includes(action) && (
             <Form.Item

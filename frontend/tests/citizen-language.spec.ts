@@ -44,7 +44,7 @@ for (const width of [390, 768, 1280]) {
     await page.getByLabel("ชื่อ–นามสกุล (ไม่บังคับ)", { exact: true }).fill("ชื่อผู้แจ้งต้นฉบับ");
     await expect(page.getByLabel("เบอร์ติดต่อ (ไม่บังคับ)", { exact: true })).toBeEmpty();
     await page.getByLabel("เบอร์ติดต่อ (ไม่บังคับ)", { exact: true }).fill("0812345678");
-    await page.locator('input[type="file"]').setInputFiles(photo("หลักฐานต้นฉบับ.png"));
+    await page.locator('input[type="file"][multiple]').setInputFiles(photo("หลักฐานต้นฉบับ.png"));
     const requests: { body: string; key: string | undefined }[] = [];
     page.on("request", (request) => {
       if (new URL(request.url()).pathname === "/api/complaints" && request.method() === "POST")

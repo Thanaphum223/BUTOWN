@@ -18,6 +18,7 @@ import {
   Upload,
 } from "antd";
 import {
+  CameraOutlined,
   EnvironmentOutlined,
   UploadOutlined,
   CheckOutlined,
@@ -93,7 +94,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
   const nearbyVersion = useRef(0);
   const [nearbyRevision, setNearbyRevision] = useState(0);
   const nearbyUrl =
-    position && step === 0
+    position && (step === 0 || (step === 1 && category))
       ? `/nearby?latitude=${position[0]}&longitude=${position[1]}${category ? `&categoryId=${category.id}` : ""}`
       : undefined;
   const nearbyContext = useRef(nearbyUrl);
@@ -110,6 +111,26 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
   const pendingFiles = useRef<File[]>([]);
   const [attachmentMissing, setAttachmentMissing] = useState(false);
   const { message } = App.useApp();
+  const [previews, setPreviews] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const urls: Record<string, string> = {};
+    for (const f of files)
+      urls[(f as File & { uid?: string }).uid || f.name] = URL.createObjectURL(f);
+    setPreviews(urls);
+    return () => Object.values(urls).forEach((url) => URL.revokeObjectURL(url));
+  }, [files]);
+  const addAttachment = (file: File) => {
+    const used = pendingFiles.current.reduce((total, f) => total + f.size, 0);
+    const problem = attachmentError(file, used);
+    if (problem) {
+      message.error(t(problem));
+      return Upload.LIST_IGNORE;
+    }
+    setAttachmentMissing(false);
+    pendingFiles.current = [...pendingFiles.current, file];
+    setFiles(pendingFiles.current);
+    return false;
+  };
   const manual = useRef(false);
   const filteredCategories = categories.filter((c) =>
     c.name.toLocaleLowerCase("th").includes(categorySearch.toLocaleLowerCase("th")),
@@ -423,6 +444,58 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
       setBusy(false);
     }
   }
+  const nearbyList = (
+    <>
+      <div role="status" aria-live="polite" style={{ marginTop: 16 }}>
+        <Text strong>
+          {category ? t("เคสประเภทเดียวกัน") : t("เคสใกล้เคียง")}
+          {category ? t("ในรัศมี 300 เมตร") : t("ในรัศมี 100 เมตร")}
+        </Text>
+        <p>
+          {!position
+            ? t("เลือกจุดเกิดเหตุเพื่อค้นหาเคสใกล้เคียงอัตโนมัติ")
+            : nearbyBusy
+              ? t("กำลังค้นหาเคสใกล้เคียง…")
+              : nearbyError
+                ? t(nearbyError)
+                : nearby.length
+                  ? t("พบ {{count}} เคสใกล้เคียง", { count: nearby.length })
+                  : category
+                    ? t("ไม่พบเคสประเภทเดียวกันในรัศมี 300 เมตร")
+                    : t("ไม่พบเคสใกล้เคียงในรัศมี 100 เมตร")}
+        </p>
+      </div>
+      {nearbyActionError && <Alert type="error" showIcon message={t(nearbyActionError)} />}
+      <List
+        className="nearby-issues"
+        dataSource={nearby}
+        locale={{ emptyText: <span /> }}
+        renderItem={(r) => (
+          <List.Item key={r.id}>
+            <Card className="nearby-issue" size="small">
+              <div className="nearby-issue-heading">
+                <Text strong>{r.category_name}</Text>
+                <Tag color={r.status === "NEW" ? "orange" : "blue"}>
+                  {t(statusNames[r.status] || r.status)}
+                </Tag>
+              </div>
+              <Text type="secondary">#{r.id.slice(0, 8).toUpperCase()}</Text>
+              {r.mock && <Tag>{t("MOCK · ข้อมูลจำลอง")}</Tag>}
+              <CommunityActions
+                item={r as any}
+                disabled={nearbyBusy || !!nearbyAction}
+                voting={nearbyAction?.id === r.id && nearbyAction?.type === "vote"}
+                following={nearbyAction?.id === r.id && nearbyAction?.type === "follow"}
+                onDetails={() => setNearbyDetail(r.id)}
+                onVote={() => void updateNearby(r, "vote")}
+                onFollow={() => void updateNearby(r, "follow")}
+              />
+            </Card>
+          </List.Item>
+        )}
+      />
+    </>
+  );
   if (receipt)
     return (
       <div className="report-wizard report-receipt">
@@ -666,52 +739,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
               />
             </Space>
           </details>
-          <div role="status" aria-live="polite" style={{ marginTop: 16 }}>
-            <Text strong>
-              {category ? t("เคสประเภทเดียวกัน") : t("เคสใกล้เคียง")}
-              {t("ในรัศมี 100 เมตร")}
-            </Text>
-            <p>
-              {!position
-                ? t("เลือกจุดเกิดเหตุเพื่อค้นหาเคสใกล้เคียงอัตโนมัติ")
-                : nearbyBusy
-                  ? t("กำลังค้นหาเคสใกล้เคียง…")
-                  : nearbyError
-                    ? t(nearbyError)
-                    : nearby.length
-                      ? t("พบ {{count}} เคสใกล้เคียง", { count: nearby.length })
-                      : t("ไม่พบเคสใกล้เคียงในรัศมี 100 เมตร")}
-            </p>
-          </div>
-          {nearbyActionError && <Alert type="error" showIcon message={t(nearbyActionError)} />}
-          <List
-            className="nearby-issues"
-            dataSource={nearby}
-            locale={{ emptyText: <span /> }}
-            renderItem={(r) => (
-              <List.Item key={r.id}>
-                <Card className="nearby-issue" size="small">
-                  <div className="nearby-issue-heading">
-                    <Text strong>{r.category_name}</Text>
-                    <Tag color={r.status === "NEW" ? "orange" : "blue"}>
-                      {t(statusNames[r.status] || r.status)}
-                    </Tag>
-                  </div>
-                  <Text type="secondary">#{r.id.slice(0, 8).toUpperCase()}</Text>
-                  {r.mock && <Tag>{t("MOCK · ข้อมูลจำลอง")}</Tag>}
-                  <CommunityActions
-                    item={r as any}
-                    disabled={nearbyBusy || !!nearbyAction}
-                    voting={nearbyAction?.id === r.id && nearbyAction?.type === "vote"}
-                    following={nearbyAction?.id === r.id && nearbyAction?.type === "follow"}
-                    onDetails={() => setNearbyDetail(r.id)}
-                    onVote={() => void updateNearby(r, "vote")}
-                    onFollow={() => void updateNearby(r, "follow")}
-                  />
-                </Card>
-              </List.Item>
-            )}
-          />
+          {step === 0 && nearbyList}
           <CommunityDetail id={nearbyDetail} onClose={() => setNearbyDetail(undefined)} />
         </div>
         <div hidden={step !== 1}>
@@ -783,27 +811,24 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
               style={{ marginBottom: 20 }}
             />
           </section>
+          {step === 1 && category && (nearbyBusy || nearby.length > 0) && (
+            <section className="duplicate-hint" aria-label={t("อาจเป็นเรื่องเดียวกัน")}>
+              <Alert
+                type="warning"
+                showIcon
+                message={t("อาจเป็นเรื่องเดียวกับที่มีคนแจ้งแล้ว")}
+                description={t(
+                  "มีเรื่องประเภทเดียวกันใกล้จุดนี้ ถ้าเป็นปัญหาเดียวกัน กดติดตามหรือโหวตแทนการแจ้งซ้ำได้",
+                )}
+              />
+              {nearbyList}
+            </section>
+          )}
 
           <div className="report-context">
             <strong>{category?.name}</strong>
             <p>{address}</p>
           </div>
-          <Title level={5}>{t("ข้อมูลติดต่อผู้แจ้ง")}</Title>
-          <Form.Item
-            label={t("ชื่อ–นามสกุล (ไม่บังคับ)")}
-            name="contactName"
-            rules={[{ max: 200 }]}
-          >
-            <Input placeholder={t("เช่น สมชาย ใจดี")} autoComplete="name" />
-          </Form.Item>
-          <Form.Item
-            label={t("เบอร์ติดต่อ (ไม่บังคับ)")}
-            name="contactPhone"
-            rules={[{ max: 30, pattern: /^[0-9+() -]*$/ }]}
-          >
-            <Input placeholder={t("เช่น 0812345678")} inputMode="tel" autoComplete="tel" />
-          </Form.Item>
-          <ReporterEmail />
           <Form.Item
             label={t("หัวข้อปัญหา")}
             name="title"
@@ -835,26 +860,30 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
             help={attachmentMissing ? t("กรุณาแนบหลักฐานอย่างน้อย 1 ไฟล์") : undefined}
           >
             <Upload
+              accept="image/jpeg,image/png"
+              capture="environment"
+              showUploadList={false}
+              beforeUpload={addAttachment}
+            >
+              <Button icon={<CameraOutlined />}>{t("ถ่ายรูปด้วยกล้อง")}</Button>
+            </Upload>
+            <Upload
               multiple
               accept={ATTACHMENT_ACCEPT}
-              fileList={files.map((f) => ({
-                uid: (f as File & { uid?: string }).uid || f.name,
-                name: f.name,
-                size: f.size,
-                status: "done" as const,
-              }))}
-              beforeUpload={(file) => {
-                const used = pendingFiles.current.reduce((total, f) => total + f.size, 0);
-                const problem = attachmentError(file, used);
-                if (problem) {
-                  message.error(t(problem));
-                  return Upload.LIST_IGNORE;
-                }
-                setAttachmentMissing(false);
-                pendingFiles.current = [...pendingFiles.current, file];
-                setFiles(pendingFiles.current);
-                return false;
-              }}
+              listType="picture"
+              fileList={files.map((f) => {
+                const uid = (f as File & { uid?: string }).uid || f.name;
+                return {
+                  uid,
+                  name: f.name,
+                  size: f.size,
+                  type: f.type,
+                  status: "done" as const,
+                  url: previews[uid],
+                  thumbUrl: f.type.startsWith("image/") ? previews[uid] : undefined,
+                };
+              })}
+              beforeUpload={addAttachment}
               onRemove={(file) => {
                 pendingFiles.current = pendingFiles.current.filter(
                   (f) => (f as File & { uid?: string }).uid !== file.uid,
@@ -875,6 +904,22 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
               {(files.reduce((total, f) => total + f.size, 0) / 1_000_000).toFixed(1)} / 1,000 MB
             </p>
           </Form.Item>
+          <Title level={5}>{t("ข้อมูลติดต่อผู้แจ้ง")}</Title>
+          <Form.Item
+            label={t("ชื่อ–นามสกุล (ไม่บังคับ)")}
+            name="contactName"
+            rules={[{ max: 200 }]}
+          >
+            <Input placeholder={t("เช่น สมชาย ใจดี")} autoComplete="name" />
+          </Form.Item>
+          <Form.Item
+            label={t("เบอร์ติดต่อ (ไม่บังคับ)")}
+            name="contactPhone"
+            rules={[{ max: 30, pattern: /^[0-9+() -]*$/ }]}
+          >
+            <Input placeholder={t("เช่น 0812345678")} inputMode="tel" autoComplete="tel" />
+          </Form.Item>
+          <ReporterEmail />
         </div>
         <div className="wizard-actions">
           {step > 0 && (

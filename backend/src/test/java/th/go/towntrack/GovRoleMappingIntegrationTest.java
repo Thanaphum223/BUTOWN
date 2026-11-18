@@ -204,6 +204,9 @@ class GovRoleMappingIntegrationTest {
     access.put("roleCode", "INSPECTOR_V2");
     var original = identities.sync(town, data, null);
     assertEquals("OFFICER", original.get("role"));
+    assertEquals(
+        "INSPECTOR_V2",
+        db.one("SELECT gov_role FROM app_user WHERE id=?", original.get("id")).get("gov_role"));
     mvc.perform(
             post("/api/admin/users/" + original.get("id") + "/role")
                 .with(user(adminName).roles("ADMIN"))

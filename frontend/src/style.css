@@ -1409,14 +1409,29 @@ h3,
     font-size: 25px;
   }
   .report-categories {
-    gap: 10px;
+    gap: 8px;
+    margin: 14px 0;
   }
   .report-categories button {
     font-size: 13px;
-    padding: 16px 10px;
+    min-height: 56px;
+    padding: 10px;
+    gap: 8px;
   }
   .report-categories button[aria-pressed="true"] {
-    padding: 15px 9px;
+    padding: 9px;
+  }
+  .report-categories button > span {
+    font-size: 20px;
+  }
+  .report-wizard .ant-form-item {
+    margin-bottom: 14px;
+  }
+  .report-wizard .ant-form-item-label {
+    padding-bottom: 4px;
+  }
+  .wizard-actions {
+    margin-top: 16px;
   }
 }
 
@@ -1904,6 +1919,20 @@ h3,
   gap: 12px;
   margin: 12px 0 20px;
 }
+.evidence-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.evidence-pair h4 {
+  margin: 0;
+  font-size: 14px;
+}
+.evidence-pair .evidence-gallery {
+  grid-template-columns: minmax(0, 1fr);
+  margin: 8px 0 12px;
+}
 .evidence-gallery figure {
   min-width: 0;
   margin: 0;
@@ -2163,6 +2192,9 @@ h3,
 .resource-item-row .ant-form-item {
   margin-bottom: 0;
   min-width: 0;
+}
+.requested-item-row {
+  grid-template-columns: minmax(0, 1fr) 120px 120px auto;
 }
 .resource-remove {
   margin-top: 30px;
@@ -2447,6 +2479,9 @@ button.queue-item .queue-item-top .ant-tag {
 }
 .staff-shell .header-identity small {
   font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .staff-shell .municipal-mark {
   width: 42px;
@@ -3387,6 +3422,18 @@ button.queue-item .queue-item-top .ant-tag {
   white-space: normal;
   overflow-wrap: anywhere;
 }
+/* Every role name shares one grid cell so the header keeps the tallest height for any selection. */
+.role-label-stack {
+  display: grid;
+}
+.role-label-stack > span {
+  grid-area: 1 / 1;
+}
+.role-label-stack > [aria-hidden="true"] {
+  visibility: hidden;
+  height: 0;
+  overflow: hidden;
+}
 .admin-role-options .ant-select-item-option-content {
   white-space: normal;
   overflow-wrap: anywhere;
@@ -3604,4 +3651,72 @@ button.queue-item .queue-item-top .ant-tag {
   .staff-shell .workspace-stats {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Assignment choices are tappable rows instead of a long dropdown. */
+.assignment-picker {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.assignment-picker h5.ant-typography {
+  margin: 4px 0 8px;
+}
+.assignment-options.ant-radio-group,
+.assignment-options.ant-checkbox-group {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.assignment-options .ant-radio-wrapper,
+.assignment-options .ant-checkbox-wrapper {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--gov-border-neutral);
+  border-radius: var(--gov-radius-control);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.assignment-options .ant-radio-wrapper-checked,
+.assignment-options .ant-checkbox-wrapper-checked {
+  border-color: var(--gov-brand-primary);
+  background: var(--gov-brand-surface);
+}
+.assignment-members {
+  display: block;
+  font-size: 13px;
+}
+
+/* Button hierarchy: primary = solid, secondary = outlined, cancel/back in dialogs = ghost. */
+.ant-modal-footer .ant-btn:not(.ant-btn-primary):not(.ant-btn-dangerous),
+.ant-modal-confirm-btns .ant-btn:not(.ant-btn-primary):not(.ant-btn-dangerous),
+.ant-popconfirm-buttons .ant-btn:not(.ant-btn-primary):not(.ant-btn-dangerous) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--gov-brand-primary);
+}
+.ant-modal-footer .ant-btn:not(.ant-btn-primary):not(.ant-btn-dangerous):not(:disabled):hover,
+.ant-modal-confirm-btns .ant-btn:not(.ant-btn-primary):not(.ant-btn-dangerous):not(:disabled):hover,
+.ant-popconfirm-buttons
+  .ant-btn:not(.ant-btn-primary):not(.ant-btn-dangerous):not(:disabled):hover {
+  background: var(--gov-surface-soft);
+  border-color: transparent;
+  color: var(--gov-brand-dark);
+}
+.assignment-ranks {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-bottom: 8px;
+}
+.assignment-rank {
+  margin-inline-start: 6px;
+}
+.start-location {
+  margin-bottom: 12px;
+}
+.start-distance {
+  align-self: flex-start;
+  margin-bottom: 8px;
 }

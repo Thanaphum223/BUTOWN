@@ -157,10 +157,21 @@ public class GovRoleMapping {
         || id != null && !config.serviceId().isEmpty() && id.equals(config.serviceId());
   }
 
-  Initial initial(UUID town, JsonNode user) {
-    var config = settings(town);
+  record Codes(Set<String> codes, boolean missingMunicipality) {}
+
+  /** The single Gov role code granted to TownTrack, or null when absent or ambiguous. */
+  String rank(UUID town, JsonNode user) {
+    try {
+      var codes = codes(user, settings(town)).codes();
+      return codes.size() == 1 ? codes.iterator().next() : null;
+    } catch (RuntimeException e) {
+      return null;
+    }
+  }
+
+  Codes codes(JsonNode user, Settings config) {
     var members = user.path("memberships");
-    if (members.isMissingNode() || members.isNull()) return new Initial("CITIZEN", null);
+    if (members.isMissingNode() || members.isNull()) return new Codes(Set.of(), false);
     if (!members.isArray() || members.size() > 100) throw GovIdentityService.bad();
     var codes = new HashSet<String>();
     boolean missingMunicipality = false;
@@ -192,6 +203,14 @@ public class GovRoleMapping {
         }
       }
     }
+    return new Codes(codes, missingMunicipality);
+  }
+
+  Initial initial(UUID town, JsonNode user) {
+    var config = settings(town);
+    var found = codes(user, config);
+    var codes = found.codes();
+    boolean missingMunicipality = found.missingMunicipality();
     if (codes.isEmpty()) return new Initial("CITIZEN", null);
     if (codes.size() > 1)
       throw setup("พบบทบาท Gov Center หลายบทบาทที่ขัดกัน กรุณาให้ผู้ดูแลตรวจการจับคู่บทบาท");

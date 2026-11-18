@@ -76,7 +76,9 @@ class RoutePlanningRemovalIntegrationTest {
 
   ResultActions action(UUID id, String role, String action, Map<String, ?> values)
       throws Exception {
-    Map<String, Object> body = new LinkedHashMap<>(values);
+    if (action.equals("START"))
+      mvc.perform(WorkflowTestData.startPhoto(id).with(user(names.get(role))).with(csrf()));
+    Map<String, Object> body = WorkflowTestData.withDefaults(action, values);
     body.put("action", action);
     body.put("version", db.one("SELECT version FROM complaint WHERE id=?", id).get("version"));
     return mvc.perform(

@@ -2,7 +2,13 @@ import { switchLanguage } from "./language-control";
 import { test, expect, type Page } from "@playwright/test";
 import { photo, waitForSettledDialog } from "./product-flow";
 
-async function workspace(page: Page, role: string, status: string, actions: string[]) {
+async function workspace(
+  page: Page,
+  role: string,
+  status: string,
+  actions: string[],
+  extra: Record<string, unknown> = {},
+) {
   const complaint = {
     id: "operational-case",
     title: "Original title",
@@ -76,6 +82,7 @@ async function workspace(page: Page, role: string, status: string, actions: stri
       "/api/complaints/operational-case": data,
       "/api/teams": [],
       "/api/people": [],
+      ...extra,
     };
     return route.fulfill({ json: responses[path] ?? {} });
   });
@@ -87,6 +94,131 @@ async function workspace(page: Page, role: string, status: string, actions: stri
   await page.getByRole("button", { name: /(?:เปิดงาน|Open task) Original title/ }).click();
   return { data, writes };
 }
+test("approved resources change the field start label", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { writes } = await workspace(page, "FIELD", "READY", ["START"]);
+  await expect(
+    page.getByRole("button", {
+      name: "เริ่มปฏิบัติงานซ่อมแซม (ใช้วัสดุ/อุปกรณ์ปกติ)",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", {
+      name: "เริ่มปฏิบัติงานซ่อมแซม (ใช้ทรัพยากรที่ได้รับอนุมัติ)",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /^ยืนยัน/ })
+    .click();
+  await expect(page.getByText("กรุณาถ่ายรูปหน้างานก่อนเริ่มปฏิบัติงาน")).toBeVisible();
+  expect(writes).toHaveLength(0);
+  const startDialog = page.getByRole("dialog");
+  await startDialog.locator("input[type=file][capture]").setInputFiles(photo("start.png"));
+  await expect(startDialog.getByRole("link", { name: "start.png", exact: true })).toBeVisible();
+  await page.screenshot({ path: "../work/screenshots/start-photo-390.png" });
+  await startDialog.getByRole("button", { name: /^ยืนยัน/ }).click();
+  await expect.poll(() => writes.length).toBe(1);
+  expect(writes[0].body.action).toBe("START");
+});
+
+test("leader picks a team or one field worker from tappable lists", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { writes } = await workspace(page, "LEADER", "TRIAGED", ["ASSIGN"], {
+    "/api/teams": [
+      {
+        id: "team-a",
+        name: "ทีมถนน A",
+        representative_name: "สมชาย",
+        members: JSON.stringify([
+          { id: "u1", name: "สมชาย" },
+          { id: "u2", name: "สมหญิง" },
+        ]),
+      },
+    ],
+    "/api/people": [
+      { id: "u1", display_name: "สมชาย" },
+      { id: "u3", display_name: "วิชัย" },
+    ],
+  });
+  await page.getByRole("button", { name: "มอบหมายทีม", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("combobox")).toHaveCount(0);
+  await expect(dialog.getByText(/สมชาย · สมชาย, สมหญิง/)).toBeVisible();
+  await dialog.getByLabel("ค้นหาทีมหรือผู้ลงพื้นที่", { exact: true }).fill("วิชัย");
+  await expect(dialog.getByRole("radio", { name: /ทีมถนน A/ })).toHaveCount(0);
+  await dialog.getByRole("checkbox", { name: "วิชัย", exact: true }).check();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: "../work/screenshots/assign-picker-390.png" });
+  await dialog.getByRole("button", { name: /^ยืนยัน/ }).click();
+  await expect.poll(() => writes.length).toBe(1);
+  expect(writes[0].body).toMatchObject({ action: "ASSIGN", assigneeId: "u3" });
+  expect(writes[0].body.teamId).toBeUndefined();
+  expect(writes[0].body.memberIds).toBeUndefined();
+});
+
+test("field worker can undo a start with a reason as a secondary action", async ({ page }) => {
+  const { writes } = await workspace(page, "FIELD", "IN_PROGRESS", ["REPORT", "UNDO_START"]);
+  const undo = page.getByRole("button", { name: "ยกเลิกการเริ่มปฏิบัติงาน", exact: true });
+  await expect(undo).not.toHaveClass(/ant-btn-primary/);
+  await undo.click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: /^ยืนยัน/ }).click();
+  await expect(dialog.getByText("กรุณาระบุเหตุผลให้ครบถ้วน", { exact: true })).toBeVisible();
+  expect(writes).toHaveLength(0);
+  await dialog.getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true }).fill("กดเริ่มผิดงาน");
+  await dialog.getByRole("button", { name: /^ยืนยัน/ }).click();
+  await expect.poll(() => writes.length).toBe(1);
+  expect(writes[0].body).toEqual({ action: "UNDO_START", version: 7, reason: "กดเริ่มผิดงาน" });
+});
+
+test("leader proposal starts from the items the field worker requested", async ({ page }) => {
+  const { data } = await workspace(page, "LEADER", "RESOURCE_DRAFT", ["PROPOSE"]);
+  data.resources = [
+    {
+      id: "request-1",
+      status: "DRAFT",
+      necessity: "ทางเท้าแตกหลายจุด",
+      requester_name: "ผู้ลงพื้นที่",
+      created_at: "2026-11-05T00:00:00Z",
+      revisions: "[]",
+      requested_items: JSON.stringify([{ name: "ปูนซ่อมทางเท้า", quantity: 3, unit: "ถุง" }]),
+    },
+  ];
+  await expect(page.getByText("ปูนซ่อมทางเท้า", { exact: true })).toBeVisible({ timeout: 10000 });
+  await page.getByRole("button", { name: "ส่งข้อเสนอทรัพยากร", exact: true }).click();
+  await expect(page.getByRole("dialog").getByLabel("ชื่อรายการ 1", { exact: true })).toHaveValue(
+    "ปูนซ่อมทางเท้า 3 ถุง",
+  );
+});
+
+test("leader ticks several field workers and names the representative", async ({ page }) => {
+  const { writes } = await workspace(page, "LEADER", "TRIAGED", ["ASSIGN"], {
+    "/api/people": [
+      { id: "u1", display_name: "สมชาย" },
+      { id: "u3", display_name: "วิชัย" },
+    ],
+  });
+  await page.getByRole("button", { name: "มอบหมายทีม", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("checkbox", { name: "สมชาย", exact: true }).check();
+  await dialog.getByRole("checkbox", { name: "วิชัย", exact: true }).check();
+  await dialog
+    .locator("section")
+    .filter({ hasText: "ผู้แทนทีม (ผู้รับงานหลัก)" })
+    .getByRole("radio", { name: "วิชัย", exact: true })
+    .check();
+  await dialog.getByRole("button", { name: /^ยืนยัน/ }).click();
+  await expect.poll(() => writes.length).toBe(1);
+  expect(writes[0].body).toMatchObject({
+    action: "ASSIGN",
+    assigneeId: "u3",
+    memberIds: ["u1", "u3"],
+  });
+});
+
 async function switchEnglish(page: Page) {
   await switchLanguage(page, "en");
 }
@@ -119,6 +251,10 @@ test("decline requires a reason and preserves DECLINE/version/idempotency; ACCEP
     await page.getByRole("button", { name, exact: true }).click();
     dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("textbox")).toHaveCount(0);
+    if (name.startsWith("เริ่มปฏิบัติงาน")) {
+      await dialog.locator("input[type=file][capture]").setInputFiles(photo("start.png"));
+      await expect(dialog.getByRole("link", { name: "start.png", exact: true })).toBeVisible();
+    }
     await dialog.getByRole("button", { name: /^ยืนยัน/ }).click();
     await expect(dialog).toHaveCount(0);
   }
@@ -138,7 +274,9 @@ test("denial preset fills once and preserves manual edits and existing DENY payl
   await dialog.getByRole("button", { name: /^Confirm / }).click();
   await expect(dialog.getByText("Provide a complete reason", { exact: true })).toBeVisible();
   expect(writes).toHaveLength(0);
-  await dialog.getByRole("button", { name: /^Exceeds the normal maintenance budget/ }).click();
+  await dialog
+    .getByRole("radio", { name: "Exceeds normal maintenance budget", exact: true })
+    .check();
   const reason = dialog.getByRole("textbox");
   await expect(reason).toHaveValue(/Exceeds the normal maintenance budget/);
   await reason.fill("รายละเอียด edited by approver");
@@ -205,13 +343,16 @@ for (const width of [390, 768, 1280]) {
         .click();
       const dialog = page.getByRole("dialog");
       await dialog
-        .getByRole("button", {
-          name:
-            language === "th"
-              ? /^เกินวงเงินซ่อมบำรุงปกติ/
-              : /^Exceeds the normal maintenance budget/,
+        .getByRole("radio", {
+          name: language === "th" ? "เกินวงเงินซ่อมบำรุงปกติ" : "Exceeds normal maintenance budget",
+          exact: true,
         })
-        .click();
+        .check();
+      await expect(dialog.getByRole("textbox")).toHaveValue(
+        language === "th"
+          ? /^เกินวงเงินซ่อมบำรุงปกติ เห็นควร/
+          : /^Exceeds the normal maintenance budget\./,
+      );
       await dialog.getByRole("textbox").fill("Original reason edited at mobile width");
       await expect(dialog.locator(".language-switcher")).toHaveCount(0);
       await expect(dialog.getByRole("textbox")).toHaveValue(
@@ -338,4 +479,81 @@ test("approver queue omits the account explanation banner and retains assigned w
     "แสดงเฉพาะงานที่ระบุคุณเป็นผู้อนุมัติ",
   );
   await expect(page.getByRole("button", { name: "อนุมัติ", exact: true })).toBeVisible();
+});
+
+test("field start sends the site location when GPS is allowed", async ({ page }) => {
+  await page.context().grantPermissions(["geolocation"]);
+  await page.context().setGeolocation({ latitude: 13.76, longitude: 100.5 });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { writes } = await workspace(page, "FIELD", "ACCEPTED", ["START"]);
+  await page.getByRole("button", { name: /^เริ่มปฏิบัติงาน/ }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("บันทึกพิกัดหน้างานแล้ว ระบบจะเทียบระยะกับจุดที่แจ้ง");
+  await dialog.locator("input[type=file][capture]").setInputFiles(photo("start.png"));
+  await expect(dialog.getByRole("link", { name: "start.png", exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: /^ยืนยัน/ }).click();
+  await expect.poll(() => writes.length).toBe(1);
+  expect(writes[0].body).toMatchObject({ action: "START", latitude: 13.76, longitude: 100.5 });
+});
+
+test("leader filters field workers by Gov rank", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await workspace(page, "LEADER", "TRIAGED", ["ASSIGN"], {
+    "/api/people": [
+      { id: "u1", display_name: "สมชาย", gov_role: "FOREMAN" },
+      { id: "u2", display_name: "สมหญิง", gov_role: "TECHNICIAN" },
+      { id: "u3", display_name: "วิชัย" },
+    ],
+  });
+  await page.getByRole("button", { name: "มอบหมายทีม", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  const people = dialog.getByRole("checkbox");
+  await expect(people).toHaveCount(3);
+  await dialog.getByText("TECHNICIAN", { exact: true }).first().click();
+  await expect(people).toHaveCount(1);
+  await expect(dialog.getByRole("checkbox", { name: /สมหญิง/ })).toBeVisible();
+  await dialog.getByText("ไม่ระบุยศ", { exact: true }).click();
+  await expect(dialog.getByRole("checkbox", { name: "วิชัย", exact: true })).toBeVisible();
+  await dialog.getByText("ทุกยศ", { exact: true }).click();
+  await expect(people).toHaveCount(3);
+  await page.screenshot({ path: "../work/screenshots/assign-rank-390.png" });
+});
+
+test("leader review pairs before and after photos and flags a far start", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { data } = await workspace(page, "LEADER", "LEADER_REVIEW", [], {});
+  data.workOrders.push({
+    id: "w1",
+    assignee_name: "วิชัย",
+    status: "COMPLETE",
+    start_latitude: 13.76,
+    start_distance_m: 1250,
+    created_at: "2026-11-05T00:00:00Z",
+  });
+  data.reports.push({ id: "r1", work_order_id: "w1", content: "ซ่อมเสร็จ" });
+  data.files.push(
+    {
+      id: "f1",
+      original_name: "before.png",
+      content_type: "image/png",
+      evidence_stage: "BEFORE",
+      work_order_id: "w1",
+    },
+    {
+      id: "f2",
+      original_name: "after.png",
+      content_type: "image/png",
+      evidence_stage: "AFTER",
+      report_id: "r1",
+    },
+  );
+  await page.reload();
+  await page.getByRole("button", { name: "เปิดคิวงาน", exact: true }).click();
+  await page.getByRole("button", { name: /(?:เปิดงาน|Open task) Original title/ }).click();
+  const card = page.locator(".report-review-card");
+  await expect(card).toContainText("เริ่มงานห่างจากจุดแจ้ง 1,250 ม.");
+  const pair = card.getByLabel("เทียบภาพก่อนและหลังแก้ไข");
+  await expect(pair.getByRole("heading", { name: "ก่อนแก้ไข (1)" })).toBeVisible();
+  await expect(pair.getByRole("heading", { name: "หลังแก้ไข (1)" })).toBeVisible();
+  await page.screenshot({ path: "../work/screenshots/review-pair-390.png", fullPage: true });
 });

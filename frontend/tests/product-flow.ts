@@ -16,30 +16,25 @@ export async function signIn(page: Page, role = "citizen", password = accountPas
   });
   expect(response.ok()).toBeTruthy();
   await page.goto("/");
+  const consent = page.getByRole("button", { name: "รับทราบประกาศ", exact: true });
   if (role === "citizen") {
-    const consent = page.getByRole("button", {
-      name: "รับทราบประกาศ",
-      exact: true,
-    });
-    const home = page.getByRole("heading", {
-      name: "เรื่องแจ้งในเทศบาล",
-      exact: true,
-    });
+    const home = page.getByRole("heading", { name: "เรื่องแจ้งในเทศบาล", exact: true });
     await expect(consent.or(home)).toBeVisible();
     if (await consent.isVisible()) await consent.click();
     await expect(home).toBeVisible();
   } else {
-    await expect(
-      page.getByRole("heading", {
-        name:
-          role === "field"
-            ? "งานลงพื้นที่ของฉัน"
-            : role === "approver"
-              ? "ภาพรวมคำร้องทั้งเทศบาล"
-              : "ภาพรวมการดำเนินงาน",
-        exact: true,
-      }),
-    ).toBeVisible();
+    const heading = page.getByRole("heading", {
+      name:
+        role === "field"
+          ? "งานลงพื้นที่ของฉัน"
+          : role === "approver"
+            ? "ภาพรวมคำร้องทั้งเทศบาล"
+            : "ภาพรวมการดำเนินงาน",
+      exact: true,
+    });
+    await expect(consent.or(heading)).toBeVisible();
+    if (await consent.isVisible()) await consent.click();
+    await expect(heading).toBeVisible();
   }
 }
 export async function signOut(page: Page) {
@@ -111,7 +106,9 @@ export async function fillReport(page: Page, title: string, description: string)
   await page.getByRole("button", { name: /ถนนและทางเท้า/ }).click();
   await page.getByLabel("หัวข้อปัญหา", { exact: true }).fill(title);
   await page.getByLabel("รายละเอียด", { exact: true }).fill(description);
-  await page.locator("input[type=file]").setInputFiles(pdfEvidence("initial-evidence.pdf"));
+  await page
+    .locator("input[type=file][multiple]")
+    .setInputFiles(pdfEvidence("initial-evidence.pdf"));
 }
 export async function submitReport(page: Page) {
   const saved = page.waitForResponse(

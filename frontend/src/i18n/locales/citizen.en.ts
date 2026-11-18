@@ -44,6 +44,12 @@ const messages: Record<string, string> = {
     "Select the incident location to find nearby reports automatically",
   "กำลังค้นหาเคสใกล้เคียง…": "Finding nearby reports…",
   "ไม่พบเคสใกล้เคียงในรัศมี 100 เมตร": "No nearby reports within 100 metres",
+  "ในรัศมี 300 เมตร": " within 300 metres",
+  "ไม่พบเคสประเภทเดียวกันในรัศมี 300 เมตร": "No reports of this type within 300 metres",
+  อาจเป็นเรื่องเดียวกัน: "Possibly the same issue",
+  อาจเป็นเรื่องเดียวกับที่มีคนแจ้งแล้ว: "This may already have been reported",
+  "มีเรื่องประเภทเดียวกันใกล้จุดนี้ ถ้าเป็นปัญหาเดียวกัน กดติดตามหรือโหวตแทนการแจ้งซ้ำได้":
+    "There are reports of the same type near this spot. If it is the same problem, follow or vote instead of filing again.",
   "MOCK · ข้อมูลจำลอง": "MOCK · Simulated data",
   รายละเอียดปัญหา: "Problem details",
   ประเภทปัญหา: "Problem category",
@@ -202,6 +208,7 @@ const messages: Record<string, string> = {
   "ใช้ภาพถ่าย PNG หรือ JPEG สำหรับหลักฐานก่อนและหลังทำ":
     "Use PNG or JPEG photos for before and after evidence",
   ถ่ายรูป: "Take photo: ",
+  ถ่ายรูปด้วยกล้อง: "Take a photo",
   ก่อนทำ: "Before work",
   หลังทำ: "After work",
   "เลือกเอกสาร PDF": "Choose PDF document",

@@ -128,56 +128,6 @@ export default function EmergencyContacts() {
       <Title level={2}>
         <AlertOutlined /> {t("เหตุฉุกเฉิน")}
       </Title>
-      <Title level={3}>{t("สายด่วนฉุกเฉิน")}</Title>
-      <div className="emergency-hotlines">
-        {hotlines.map((line) => (
-          <Card key={line.number} size="small">
-            <a
-              className="emergency-call"
-              href={`tel:${line.number}`}
-              aria-label={t("โทร {{number}} {{title}}", {
-                number: line.number,
-                title: t(line.title),
-              })}
-            >
-              <PhoneOutlined />
-              <strong>{line.number}</strong>
-            </a>
-            <Title level={5}>{t(line.title)}</Title>
-            <Text type="secondary">{t(line.detail)}</Text>
-            <div>
-              <a href={line.source} target="_blank" rel="noopener noreferrer">
-                {t("ข้อมูลจากหน่วยงานรัฐ")}
-              </a>
-            </div>
-          </Card>
-        ))}
-      </div>
-      <details className="emergency-utilities">
-        <summary>{t("ไฟฟ้าและประปา")}</summary>
-        <div className="emergency-hotlines">
-          {utilities.map((line) => (
-            <Card size="small" key={line.number}>
-              <a
-                href={`tel:${line.number}`}
-                className="emergency-call"
-                aria-label={t("โทร {{number}} {{title}}", {
-                  number: line.number,
-                  title: t(line.title),
-                })}
-              >
-                <PhoneOutlined />
-                <strong>{line.number}</strong>
-              </a>
-              <Title level={5}>{t(line.title)}</Title>
-              <Text type="secondary">{t(line.detail)}</Text>
-            </Card>
-          ))}
-        </div>
-        <a href={sources.government} target="_blank" rel="noopener noreferrer">
-          {t("แหล่งข้อมูลหมายเลขสาธารณูปโภค")}
-        </a>
-      </details>
       <section aria-label={t("สถานที่สำคัญใกล้ฉัน")} className="emergency-nearby">
         <Title level={3}>
           <EnvironmentOutlined /> {t("สถานที่สำคัญใกล้ฉัน")}
@@ -297,6 +247,56 @@ export default function EmergencyContacts() {
           )}
         </p>
       </section>
+      <Title level={3}>{t("สายด่วนฉุกเฉิน")}</Title>
+      <div className="emergency-hotlines">
+        {hotlines.map((line) => (
+          <Card key={line.number} size="small">
+            <a
+              className="emergency-call"
+              href={`tel:${line.number}`}
+              aria-label={t("โทร {{number}} {{title}}", {
+                number: line.number,
+                title: t(line.title),
+              })}
+            >
+              <PhoneOutlined />
+              <strong>{line.number}</strong>
+            </a>
+            <Title level={5}>{t(line.title)}</Title>
+            <Text type="secondary">{t(line.detail)}</Text>
+            <div>
+              <a href={line.source} target="_blank" rel="noopener noreferrer">
+                {t("ข้อมูลจากหน่วยงานรัฐ")}
+              </a>
+            </div>
+          </Card>
+        ))}
+      </div>
+      <details className="emergency-utilities">
+        <summary>{t("ไฟฟ้าและประปา")}</summary>
+        <div className="emergency-hotlines">
+          {utilities.map((line) => (
+            <Card size="small" key={line.number}>
+              <a
+                href={`tel:${line.number}`}
+                className="emergency-call"
+                aria-label={t("โทร {{number}} {{title}}", {
+                  number: line.number,
+                  title: t(line.title),
+                })}
+              >
+                <PhoneOutlined />
+                <strong>{line.number}</strong>
+              </a>
+              <Title level={5}>{t(line.title)}</Title>
+              <Text type="secondary">{t(line.detail)}</Text>
+            </Card>
+          ))}
+        </div>
+        <a href={sources.government} target="_blank" rel="noopener noreferrer">
+          {t("แหล่งข้อมูลหมายเลขสาธารณูปโภค")}
+        </a>
+      </details>
     </div>
   );
 }

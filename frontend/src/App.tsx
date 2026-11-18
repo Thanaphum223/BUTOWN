@@ -260,6 +260,7 @@ function TownTrackApp() {
         ) : (
           <Select
             aria-label={t("เลือกหน่วยงานเพื่อเริ่มบทบาท")}
+            getPopupContainer={(node) => node.parentElement ?? document.body}
             style={{ width: "100%" }}
             placeholder={t("เลือกหน่วยงาน")}
             value={pendingDepartment}
@@ -339,7 +340,13 @@ function TownTrackApp() {
                     ? t("สวัสดี, {{name}}", { name: user.display_name })
                     : t("ศูนย์รับเรื่องเทศบาล")}
                 </strong>
-                <small>
+                <small
+                  title={
+                    user.role === "CITIZEN"
+                      ? undefined
+                      : t("งานบริการประชาชน · {{role}}", { role: t(roleNames[user.role]) })
+                  }
+                >
                   {user.role === "CITIZEN"
                     ? t("บริการประชาชน · TownTrack")
                     : t("งานบริการประชาชน · {{role}}", { role: t(roleNames[user.role]) })}
@@ -367,6 +374,7 @@ function TownTrackApp() {
                       <Select
                         aria-label={t("หน่วยงานสำหรับบทบาท")}
                         placeholder={t("เลือกหน่วยงาน")}
+                        getPopupContainer={(node) => node.parentElement ?? document.body}
                         style={{ minWidth: 150 }}
                         value={user.department_id || undefined}
                         disabled={switchingRole}
@@ -378,6 +386,7 @@ function TownTrackApp() {
                       aria-label={t("สลับบทบาทผู้ดูแลระบบ")}
                       className="admin-role-select"
                       popupClassName="admin-role-options"
+                      getPopupContainer={(node) => node.parentElement ?? document.body}
                       style={{ minWidth: 150 }}
                       value={user.role}
                       loading={switchingRole}
@@ -386,6 +395,15 @@ function TownTrackApp() {
                         value,
                         label: t(label),
                       }))}
+                      labelRender={({ value }) => (
+                        <span className="role-label-stack">
+                          {Object.entries(roleNames).map(([role, label]) => (
+                            <span key={role} aria-hidden={role !== value}>
+                              {t(label)}
+                            </span>
+                          ))}
+                        </span>
+                      )}
                       onChange={(role) => {
                         if (["LEADER", "FIELD"].includes(role) && !user.department_id) {
                           setPendingDepartment(

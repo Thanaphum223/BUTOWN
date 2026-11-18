@@ -172,6 +172,7 @@ public class GovIdentityService {
             town);
     if (rows.isEmpty())
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "บัญชี TownTrack ถูกระงับการใช้งาน");
+    db.run("UPDATE app_user SET gov_role=? WHERE id=?", roles.rank(town, user), local);
     db.run(
         "INSERT INTO iam_user_profile(municipality_id,iam_user_id,local_user_id,email,display_name) VALUES(?,?,?,?,?) ON CONFLICT(municipality_id,iam_user_id) DO UPDATE SET local_user_id=excluded.local_user_id,email=excluded.email,display_name=excluded.display_name,last_sso_at=now()",
         town,

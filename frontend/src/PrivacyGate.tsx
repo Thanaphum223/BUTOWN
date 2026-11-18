@@ -26,15 +26,14 @@ export default function PrivacyGate({
     try {
       const n = await api<typeof notice>("/privacy");
       setNotice(n);
-      if (n?.acknowledged) requestLocationOnce();
+      if (n?.acknowledged && user.role === "CITIZEN") requestLocationOnce();
     } catch (e) {
       setError((e as Error).message);
     }
   }
   useEffect(() => {
-    if (user.role === "CITIZEN") void load();
+    void load();
   }, [user.id, user.role]);
-  if (user.role !== "CITIZEN") return children;
   if (!notice?.acknowledged)
     return (
       <Modal open closable={false} title={t("ประกาศคุ้มครองข้อมูลส่วนบุคคล")} footer={null}>
@@ -61,7 +60,7 @@ export default function PrivacyGate({
                 try {
                   await post("/users/pdpa-consent", { version: notice.version });
                   setNotice({ ...notice, acknowledged: true });
-                  requestLocationOnce();
+                  if (user.role === "CITIZEN") requestLocationOnce();
                 } catch (e) {
                   setError((e as Error).message);
                 } finally {

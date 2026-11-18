@@ -1214,7 +1214,8 @@ class TownTrackIntegrationTest {
 
   ResultActions action(UUID id, String role, String action, Map<String, Object> extras)
       throws Exception {
-    var b = new HashMap<String, Object>(extras);
+    if (action.equals("START")) mvc.perform(as(WorkflowTestData.startPhoto(id).with(csrf()), role));
+    var b = new HashMap<String, Object>(WorkflowTestData.withDefaults(action, extras));
     if (action.equals("PROPOSE") && !b.containsKey("lineItems") && b.containsKey("amount"))
       b.put("lineItems", List.of(Map.of("name", "Test materials", "amount", b.get("amount"))));
     b.put("version", version(id));
@@ -1611,6 +1612,31 @@ class TownTrackIntegrationTest {
                 post("/api/complaints").contentType(MediaType.APPLICATION_JSON).content("{}"),
                 "CITIZEN"))
         .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void sameCategoryNearbyReachesFurtherThanAnyCategory() throws Exception {
+    UUID id = create();
+    // About 200 m north of the report: outside the any-category radius, inside the same-category
+    // one.
+    String point = "latitude=13.7518&longitude=100.5";
+    mvc.perform(as(get("/api/nearby?" + point), "CITIZEN"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(0));
+    mvc.perform(as(get("/api/nearby?" + point + "&categoryId=" + cat), "CITIZEN"))
+        .andExpect(jsonPath("$[0].id").value(id.toString()));
+    mvc.perform(
+            as(
+                post("/api/complaints/" + id + "/follow")
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        json.writeValueAsString(
+                            Map.of("categoryId", cat, "latitude", 13.7518, "longitude", 100.5))),
+                "CITIZEN"))
+        .andExpect(status().isOk());
+    mvc.perform(as(get("/api/nearby?latitude=13.755&longitude=100.5&categoryId=" + cat), "CITIZEN"))
+        .andExpect(jsonPath("$.length()").value(0));
   }
 
   @Test

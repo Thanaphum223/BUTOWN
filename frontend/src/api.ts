@@ -186,6 +186,10 @@ export const actionNames: Record<string, string> = {
   RETURN_LEADER: "ส่งกลับหัวหน้าแก้ไข",
   VERIFY: "ตรวจรายงานผ่าน",
   CLOSE: "ปิดเรื่อง",
+  WITHDRAW_RESOURCE_REQUEST: "ถอนคำขอใช้ทรัพยากร",
+  WITHDRAW_PROPOSAL: "ถอนข้อเสนอกลับมาแก้ไข",
+  WITHDRAW_APPROVAL: "ถอนการส่งพิจารณาอนุมัติ",
+  UNDO_START: "ยกเลิกการเริ่มปฏิบัติงาน",
 };
 export const roleNames: Record<string, string> = {
   CITIZEN: "ประชาชน",
@@ -219,6 +223,10 @@ export const requiredReasonActions = new Set([
   "APPROVE",
   "DENY",
   "CLOSE",
+  "WITHDRAW_RESOURCE_REQUEST",
+  "WITHDRAW_PROPOSAL",
+  "WITHDRAW_APPROVAL",
+  "UNDO_START",
 ]);
 export function progressLabel(item: Record<string, any>) {
   return item.transfer_department_name

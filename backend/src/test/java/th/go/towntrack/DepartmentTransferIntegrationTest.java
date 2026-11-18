@@ -76,7 +76,9 @@ class DepartmentTransferIntegrationTest {
 
   ResultActions action(UUID id, String role, String action, Map<String, ?> values)
       throws Exception {
-    Map<String, Object> body = new LinkedHashMap<>(values);
+    if (action.equals("START"))
+      mvc.perform(WorkflowTestData.startPhoto(id).with(user(names.get(role))).with(csrf()));
+    Map<String, Object> body = WorkflowTestData.withDefaults(action, values);
     body.put("action", action);
     body.put("version", db.one("SELECT version FROM complaint WHERE id=?", id).get("version"));
     return mvc.perform(
@@ -205,7 +207,14 @@ class DepartmentTransferIntegrationTest {
     action(id, "OFFICER", "CLOSE", Map.of("reason", "Both departments completed and verified"))
         .andExpect(status().isOk());
     assertEquals(2, db.list("SELECT id FROM field_report WHERE complaint_id=?", id).size());
-    assertEquals(4, db.list("SELECT id FROM attachment WHERE complaint_id=?", id).size());
+    assertEquals(
+        4,
+        db.list("SELECT id FROM attachment WHERE complaint_id=? AND report_id IS NOT NULL", id)
+            .size());
+    assertEquals(
+        2,
+        db.list("SELECT id FROM attachment WHERE complaint_id=? AND work_order_id IS NOT NULL", id)
+            .size());
     assertEquals(
         1,
         db.list("SELECT id FROM department_transfer WHERE complaint_id=? AND state='ACCEPTED'", id)

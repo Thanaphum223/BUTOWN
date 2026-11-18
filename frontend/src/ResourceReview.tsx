@@ -3,6 +3,29 @@ import { Card, List, Tag, Typography, Empty } from "antd";
 import AttachmentList from "./AttachmentList";
 import { date } from "./api";
 type D = Record<string, any>;
+function RequestedItems({ resource }: { resource: D }) {
+  const { t } = useI18n();
+  const items: D[] = JSON.parse(resource.requested_items || "[]");
+  if (!items.length) return null;
+  return (
+    <>
+      <Typography.Text strong>{t("รายการที่ผู้ลงพื้นที่ขอ")}</Typography.Text>
+      <List
+        size="small"
+        className="resource-revision-items"
+        dataSource={items}
+        renderItem={(item: D) => (
+          <List.Item>
+            <span>{item.name}</span>
+            <span>
+              {Number(item.quantity).toLocaleString()} {item.unit}
+            </span>
+          </List.Item>
+        )}
+      />
+    </>
+  );
+}
 export default function ResourceReview({
   resources = [],
   files = [],
@@ -17,7 +40,12 @@ export default function ResourceReview({
   const latest = submitted.at(-1);
   const drafts = resources.filter((resource) => !JSON.parse(resource.revisions || "[]").length);
   const draftRequests = drafts.map((resource) => (
-    <Card className="resource-request-draft" key={resource.id} title={t("ร่างข้อเสนอ")}>
+    <Card
+      className="resource-request-draft"
+      key={resource.id}
+      title={t("ร่างข้อเสนอ")}
+      extra={resource.status === "WITHDRAWN" ? <Tag>{t("ถอนแล้ว")}</Tag> : undefined}
+    >
       <Typography.Paragraph>
         <Typography.Text strong>{t("ผู้ขอทรัพยากร")}: </Typography.Text>
         {resource.requester_name || t("ไม่ระบุชื่อผู้ขอ")}
@@ -27,6 +55,7 @@ export default function ResourceReview({
       <Typography.Paragraph style={{ whiteSpace: "pre-wrap" }}>
         {resource.necessity || t("ไม่พบบันทึกความจำเป็นของคำขอเดิม")}
       </Typography.Paragraph>
+      <RequestedItems resource={resource} />
     </Card>
   ));
   if (!latest)
@@ -68,6 +97,7 @@ export default function ResourceReview({
           <Typography.Paragraph style={{ whiteSpace: "pre-wrap" }}>
             {latest.necessity || t("ไม่พบบันทึกความจำเป็นของคำขอเดิม")}
           </Typography.Paragraph>
+          <RequestedItems resource={latest} />
         </div>
         <Typography.Title level={4}>{revision.proposal}</Typography.Title>
         <div className="resource-review-summary">

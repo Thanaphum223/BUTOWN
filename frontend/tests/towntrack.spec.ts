@@ -115,12 +115,22 @@ test("full approved resource workflow across all municipal and field roles close
       await dialog.getByLabel("ข้อควรระวัง", { exact: true }).fill("กั้นพื้นที่ปลอดภัย");
       await dialog.getByLabel("ช่องทางประสานงาน", { exact: true }).fill("หัวหน้าทีม");
     }
+    if (label.startsWith("เริ่มปฏิบัติงานซ่อมแซม")) {
+      await dialog.locator("input[type=file][capture]").setInputFiles(photo("start.png"));
+      await expect(dialog.getByRole("link", { name: "start.png", exact: true })).toBeVisible();
+    }
+    if (label === "ส่งเอกสารประเมินทรัพยากร/ของบจากหน้างาน") {
+      await dialog.getByLabel("ชื่อรายการที่ขอ 1", { exact: true }).fill("ปูนซ่อมทางเท้า");
+      await dialog.getByLabel("จำนวนรายการ 1", { exact: true }).fill("3");
+      await dialog.getByLabel("หน่วยรายการ 1", { exact: true }).fill("ถุง");
+    }
     if (fill) await fill(dialog);
     const reason = dialog.getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true });
     if (
       ![
         "กดรับงานและลงพื้นที่สำรวจ",
         "เริ่มปฏิบัติงานซ่อมแซม (ใช้วัสดุ/อุปกรณ์ปกติ)",
+        "เริ่มปฏิบัติงานซ่อมแซม (ใช้ทรัพยากรที่ได้รับอนุมัติ)",
         "ส่งข้อเสนอทรัพยากร",
         "ส่งรายงานผล",
       ].includes(label)
@@ -161,11 +171,8 @@ test("full approved resource workflow across all municipal and field roles close
   });
   await switchUser("leader");
   await perform("มอบหมายทีม", async (d) => {
-    await d.getByLabel("ผู้ลงพื้นที่", { exact: true }).fill("บัญชีทดสอบ FIELD");
-    await page
-      .locator(".ant-select-dropdown:visible")
-      .getByText("บัญชีทดสอบ FIELD", { exact: true })
-      .click();
+    await d.getByLabel("ค้นหาทีมหรือผู้ลงพื้นที่", { exact: true }).fill("FIELD");
+    await d.getByRole("checkbox", { name: "บัญชีทดสอบ FIELD", exact: true }).check();
   });
   await switchUser("field");
   await perform("กดรับงานและลงพื้นที่สำรวจ");
@@ -226,16 +233,12 @@ test("full approved resource workflow across all municipal and field roles close
   await page.screenshot({ path: "../work/screenshots/journey-approval.png", fullPage: true });
   await perform("อนุมัติ");
   await switchUser("field");
-  await perform("เริ่มปฏิบัติงานซ่อมแซม (ใช้วัสดุ/อุปกรณ์ปกติ)");
+  await perform("เริ่มปฏิบัติงานซ่อมแซม (ใช้ทรัพยากรที่ได้รับอนุมัติ)");
   await perform("ส่งรายงานผล", async (d) => {
-    for (const [index, stage] of ["before", "after"].entries()) {
-      const section = d.locator(".field-evidence-steps section").nth(index);
-      await section
-        .locator("input[type=file]")
-        .last()
-        .setInputFiles(photo(stage + ".png"));
-      await expect(section.getByRole("link", { name: stage + ".png", exact: true })).toBeVisible();
-    }
+    const steps = d.locator(".field-evidence-steps section");
+    await expect(steps.nth(0)).toContainText("ถ่ายไว้ตอนเริ่มปฏิบัติงานแล้ว 1 รูป");
+    await steps.nth(1).locator("input[type=file]").last().setInputFiles(photo("after.png"));
+    await expect(steps.nth(1).getByRole("link", { name: "after.png", exact: true })).toBeVisible();
     await d
       .getByLabel("ข้อเท็จจริงและผลดำเนินการ", { exact: true })
       .fill("แก้ไขทางเท้าและตรวจสอบความเรียบร้อยแล้ว");
@@ -285,7 +288,12 @@ test("full approved resource workflow across all municipal and field roles close
   });
   expect(
     saved.files.filter((file: any) => file.report_id).map((file: any) => file.evidence_stage),
-  ).toEqual(expect.arrayContaining(["BEFORE", "AFTER"]));
+  ).toEqual(["AFTER"]);
+  expect(
+    saved.files
+      .filter((file: any) => file.work_order_id === saved.reports[0].work_order_id)
+      .map((file: any) => file.evidence_stage),
+  ).toEqual(["BEFORE"]);
   await expect(
     page.locator(".workspace-detail").getByText("ปิดเรื่องแล้ว", { exact: true }),
   ).toBeVisible();
@@ -344,12 +352,22 @@ test("resource refusal by approver terminates a real complaint", async ({ page, 
       await dialog.getByLabel("ข้อควรระวัง", { exact: true }).fill("กั้นพื้นที่ปลอดภัย");
       await dialog.getByLabel("ช่องทางประสานงาน", { exact: true }).fill("หัวหน้าทีม");
     }
+    if (label.startsWith("เริ่มปฏิบัติงานซ่อมแซม")) {
+      await dialog.locator("input[type=file][capture]").setInputFiles(photo("start.png"));
+      await expect(dialog.getByRole("link", { name: "start.png", exact: true })).toBeVisible();
+    }
+    if (label === "ส่งเอกสารประเมินทรัพยากร/ของบจากหน้างาน") {
+      await dialog.getByLabel("ชื่อรายการที่ขอ 1", { exact: true }).fill("ปูนซ่อมทางเท้า");
+      await dialog.getByLabel("จำนวนรายการ 1", { exact: true }).fill("3");
+      await dialog.getByLabel("หน่วยรายการ 1", { exact: true }).fill("ถุง");
+    }
     if (fill) await fill(dialog);
     const reason = dialog.getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true });
     if (
       ![
         "กดรับงานและลงพื้นที่สำรวจ",
         "เริ่มปฏิบัติงานซ่อมแซม (ใช้วัสดุ/อุปกรณ์ปกติ)",
+        "เริ่มปฏิบัติงานซ่อมแซม (ใช้ทรัพยากรที่ได้รับอนุมัติ)",
         "ส่งข้อเสนอทรัพยากร",
         "ส่งรายงานผล",
       ].includes(label)
@@ -382,11 +400,8 @@ test("resource refusal by approver terminates a real complaint", async ({ page, 
   });
   await switchUser("leader");
   await perform("มอบหมายทีม", async (d) => {
-    await d.getByLabel("ผู้ลงพื้นที่", { exact: true }).fill("บัญชีทดสอบ FIELD");
-    await page
-      .locator(".ant-select-dropdown:visible")
-      .getByText("บัญชีทดสอบ FIELD", { exact: true })
-      .click();
+    await d.getByLabel("ค้นหาทีมหรือผู้ลงพื้นที่", { exact: true }).fill("FIELD");
+    await d.getByRole("checkbox", { name: "บัญชีทดสอบ FIELD", exact: true }).check();
   });
   await switchUser("field");
   await perform("กดรับงานและลงพื้นที่สำรวจ");

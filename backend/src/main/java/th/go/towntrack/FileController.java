@@ -88,7 +88,7 @@ public class FileController {
       throw new IllegalArgumentException();
     var u = access.user(a);
     if (!evidenceStage.equals("GENERAL") && !u.get("role").equals("FIELD")) Access.deny();
-    var result = (Map<?, ?>) upload(id, f, a);
+    var result = (Map<?, ?>) upload(id, f, a, evidenceStage.equals("BEFORE"));
     if (!evidenceStage.equals("GENERAL")) {
       var saved = db.one("SELECT content_type FROM attachment WHERE id=?", result.get("id"));
       if (!saved.get("content_type").toString().startsWith("image/"))
@@ -103,6 +103,10 @@ public class FileController {
   public Object upload(
       @PathVariable UUID id, @RequestParam("file") MultipartFile f, Authentication a)
       throws Exception {
+    return upload(id, f, a, false);
+  }
+
+  Object upload(UUID id, MultipartFile f, Authentication a, boolean startPhoto) throws Exception {
     var u = access.user(a);
     var c = access.complaint(id, u, true);
     String r = (String) u.get("role"), s = (String) c.get("status");
@@ -111,7 +115,10 @@ public class FileController {
           case "CITIZEN" -> s.equals("NEW");
           case "OFFICER", "ADMIN" -> true;
           case "LEADER" -> List.of("RESOURCE_DRAFT", "RESOURCE_REVISION").contains(s);
-          case "FIELD" -> List.of("IN_PROGRESS", "FIELD_REVISION").contains(s);
+          // Before starting, field staff may only add the site photo that START requires.
+          case "FIELD" ->
+              List.of("IN_PROGRESS", "FIELD_REVISION").contains(s)
+                  || (startPhoto && List.of("ACCEPTED", "READY").contains(s));
           default -> false;
         };
     if (!allowed) Access.deny();

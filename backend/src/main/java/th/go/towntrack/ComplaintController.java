@@ -378,7 +378,7 @@ public class ComplaintController {
     result.put(
         "resources",
         db.list(
-            "SELECT r.*,u.display_name approver_name,requester.display_name"
+            "SELECT r.requested_items::text requested_items,r.*,u.display_name approver_name,requester.display_name"
                 + " requester_name,COALESCE((SELECT json_agg(v ORDER BY v.revision) FROM"
                 + " resource_revision v WHERE v.resource_id=r.id),'[]'::json)::text revisions FROM"
                 + " resource_request r LEFT JOIN app_user u ON u.id=r.approver_id LEFT JOIN"
@@ -401,7 +401,7 @@ public class ComplaintController {
         "files",
         db.list(
             "SELECT"
-                + " id,original_name,size_bytes,uploaded_by,report_id,resource_id,resource_revision_id,evidence_stage,content_type,public_approved,public_copy_of,created_at"
+                + " id,original_name,size_bytes,uploaded_by,report_id,resource_id,resource_revision_id,work_order_id,evidence_stage,content_type,public_approved,public_copy_of,created_at"
                 + " FROM attachment WHERE complaint_id=? ORDER BY created_at",
             id));
     result.put(
@@ -472,7 +472,7 @@ public class ComplaintController {
           department,
           u.get("municipality_id"));
     return db.list(
-        "SELECT id,display_name,department_id FROM app_user WHERE municipality_id=? AND role IN"
+        "SELECT id,display_name,department_id,gov_role FROM app_user WHERE municipality_id=? AND role IN"
             + " (?,'ADMIN') AND enabled=true AND (?::uuid IS NULL OR department_id=?) ORDER BY"
             + " display_name",
         u.get("municipality_id"),
@@ -644,6 +644,10 @@ public class ComplaintController {
     return Map.of("ok", true);
   }
 
+  // Any category: only reports at the same spot. Same category: a wider area is still likely the
+  // same problem, so citizens can follow it instead of filing a duplicate.
+  static final int NEARBY_ANY_METERS = 100, NEARBY_SAME_CATEGORY_METERS = 300;
+
   @GetMapping("/nearby")
   public Object nearby(
       @RequestParam(required = false) UUID categoryId,
@@ -668,7 +672,7 @@ public class ComplaintController {
             + " JOIN category k ON k.id=c.category_id WHERE c.municipality_id=? AND (?::uuid IS"
             + " NULL OR c.category_id=?::uuid) AND c.status NOT IN"
             + " ('REJECTED','TERMINATED','CLOSED') AND"
-            + " ST_DWithin(c.location,ST_SetSRID(ST_MakePoint(?,?),4326)::geography,100) ORDER BY"
+            + " ST_DWithin(c.location,ST_SetSRID(ST_MakePoint(?,?),4326)::geography,?) ORDER BY"
             + " c.created_at DESC LIMIT 20",
         u.get("id"),
         u.get("id"),
@@ -676,7 +680,8 @@ public class ComplaintController {
         categoryId,
         categoryId,
         longitude,
-        latitude);
+        latitude,
+        categoryId == null ? NEARBY_ANY_METERS : NEARBY_SAME_CATEGORY_METERS);
   }
 
   record Follow(
@@ -691,12 +696,13 @@ public class ComplaintController {
     db.one(
         "SELECT id FROM complaint WHERE id=? AND municipality_id=? AND category_id=? AND status NOT"
             + " IN ('REJECTED','TERMINATED','CLOSED') AND"
-            + " ST_DWithin(location,ST_SetSRID(ST_MakePoint(?,?),4326)::geography,100)",
+            + " ST_DWithin(location,ST_SetSRID(ST_MakePoint(?,?),4326)::geography,?)",
         id,
         u.get("municipality_id"),
         b.categoryId(),
         b.longitude(),
-        b.latitude());
+        b.latitude(),
+        NEARBY_SAME_CATEGORY_METERS);
     db.run("INSERT INTO follower VALUES(?,?) ON CONFLICT DO NOTHING", id, u.get("id"));
     return Map.of("ok", true);
   }
