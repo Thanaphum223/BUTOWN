@@ -30,6 +30,9 @@ async function boundary(page: Page, loggedIn = false) {
   await page.route("**/api/complaints?*", (r) =>
     r.fulfill({ json: { items: [], total: 0, stats: {} } }),
   );
+  await page.route("**/api/privacy", (r) =>
+    r.fulfill({ json: { version: "test", text: "", acknowledged: true } }),
+  );
   await page.route("**/api/public/line", (r) => r.fulfill({ json: { enabled: false } }));
   await page.route("**/api/public/municipalities", (r) => r.fulfill({ json: [] }));
   await page.route("**/api/auth/csrf", (r) =>

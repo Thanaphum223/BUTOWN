@@ -22,6 +22,8 @@ async function boundary(page: Page) {
       });
     if (path === "/api/auth/csrf")
       return route.fulfill({ json: { token: "test-csrf", headerName: "X-CSRF-TOKEN" } });
+    if (path === "/api/privacy")
+      return route.fulfill({ json: { version: "test", text: "", acknowledged: true } });
     if (path === "/api/auth/me")
       return seen.signedIn
         ? route.fulfill({

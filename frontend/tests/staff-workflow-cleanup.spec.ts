@@ -39,6 +39,7 @@ async function openCase(page: Page, role: string) {
         department_id: ["LEADER", "FIELD"].includes(role) ? "engineering" : null,
       },
       "/api/auth/csrf": { token: "test", headerName: "X-CSRF-TOKEN" },
+      "/api/privacy": { version: "test", text: "", acknowledged: true },
       "/api/catalog": {
         categories: [],
         departments: [{ id: "engineering", name: "กองช่าง" }],
