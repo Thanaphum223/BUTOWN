@@ -39,8 +39,11 @@ export default function EvidenceGallery({
           preview={{ src: `/api/media/${file.id}` }}
         />
       ) : (
-        <video controls playsInline preload="none" aria-label={file.original_name}>
-          <source src={`/api/media/${file.id}`} type={file.content_type} />
+        <video controls playsInline preload="metadata" aria-label={file.original_name}>
+          <source
+            src={`/api/media/${file.id}`}
+            type={file.content_type === "video/quicktime" ? "video/mp4" : file.content_type}
+          />
           {t("เบราว์เซอร์นี้ไม่รองรับวิดีโอชนิดนี้")}
         </video>
       )}

@@ -29,13 +29,10 @@ import {
   Button,
   Card,
   Col,
-  Descriptions,
   Drawer,
   Grid,
-  Empty,
   Form,
   Input,
-  InputNumber,
   Layout,
   List,
   Menu,
@@ -45,13 +42,9 @@ import {
   Space,
   Spin,
   Statistic,
-  Steps,
   Table,
   Tag,
-  Timeline,
   Typography,
-  Upload,
-  Switch,
 } from "antd";
 import {
   EnvironmentOutlined,
@@ -64,14 +57,11 @@ import {
   BellOutlined,
   SettingOutlined,
   LogoutOutlined,
-  ArrowLeftOutlined,
-  UploadOutlined,
   TeamOutlined,
   LockOutlined,
 } from "@ant-design/icons";
-import { api, post, refreshCsrf, statusNames, actionNames, roleNames, date } from "./api";
-import LocationMap from "./LocationMap";
-const { Title, Text, Paragraph } = Typography;
+import { api, post, statusNames, actionNames, roleNames, date } from "./api";
+const { Title, Text } = Typography;
 type RowData = Record<string, any>;
 function StateTag({ value }: { value: string }) {
   const { t } = useI18n();
@@ -599,7 +589,6 @@ function CaseList({
     refresh,
   );
   const rows: RowData[] = data?.items || [];
-  const terminal = ["CLOSED", "TERMINATED", "REJECTED"];
   return (
     <>
       <div className="page-heading">
@@ -712,65 +701,6 @@ function CaseList({
               render: (_, r) => <Button onClick={() => open(r.id)}>{t("ดูรายละเอียด")}</Button>,
             },
           ]}
-        />
-      </Card>
-    </>
-  );
-}
-function Following({ open }: { open: (id: string) => void }) {
-  const { t } = useI18n();
-  const [detailId, setDetailId] = useState<string>();
-  const [refresh, setRefresh] = useState(0);
-  const { data, error } = useData<RowData[]>("/following", refresh);
-  const { message } = AntApp.useApp();
-  return (
-    <>
-      <CommunityDetail id={detailId} onClose={() => setDetailId(undefined)} />
-      <Title level={2}>{t("เรื่องที่ติดตาม")}</Title>
-      <ErrorBox error={error} />
-      <Card>
-        <Alert
-          style={{ marginBottom: 16 }}
-          type="info"
-          message={t("แสดงเฉพาะประเภทปัญหาและสถานะของเรื่องที่ติดตาม เพื่อรักษาข้อมูลผู้แจ้ง")}
-        />
-        <List
-          dataSource={data}
-          locale={{ emptyText: t("ยังไม่มีเรื่องที่ติดตาม") }}
-          renderItem={(r) => (
-            <List.Item
-              actions={[
-                <Button key="detail" onClick={() => setDetailId(r.id)}>
-                  {t("ดูรายละเอียด")}
-                </Button>,
-                <Button
-                  key="unfollow"
-                  onClick={async () => {
-                    try {
-                      await api("/complaints/" + r.id + "/follow", {
-                        method: "DELETE",
-                      });
-                      setRefresh((x) => x + 1);
-                    } catch (e) {
-                      message.error(t((e as Error).message));
-                    }
-                  }}
-                >
-                  {t("เลิกติดตาม")}
-                </Button>,
-              ]}
-            >
-              <List.Item.Meta
-                title={r.category_name + " • #" + r.id.slice(0, 8)}
-                description={
-                  <Space wrap>
-                    <StateTag value={r.status} />
-                    <Text type="secondary">{date(r.updated_at)}</Text>
-                  </Space>
-                }
-              />
-            </List.Item>
-          )}
         />
       </Card>
     </>

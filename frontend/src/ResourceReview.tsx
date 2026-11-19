@@ -38,13 +38,22 @@ export default function ResourceReview({
     .map((resource): D => ({ ...resource, revisions: JSON.parse(resource.revisions || "[]") }))
     .filter((resource) => resource.revisions.length);
   const latest = submitted.at(-1);
-  const drafts = resources.filter((resource) => !JSON.parse(resource.revisions || "[]").length);
-  const draftRequests = drafts.map((resource) => (
+  const newestFirst = (a: D, b: D) => String(b.created_at).localeCompare(String(a.created_at));
+  const unsubmitted = resources.filter(
+    (resource) => !JSON.parse(resource.revisions || "[]").length,
+  );
+  const cancelled = unsubmitted
+    .filter((resource) => resource.status === "WITHDRAWN")
+    .sort(newestFirst);
+  const drafts = unsubmitted
+    .filter((resource) => resource.status !== "WITHDRAWN")
+    .sort(newestFirst);
+  const requestCard = (resource: D) => (
     <Card
       className="resource-request-draft"
       key={resource.id}
-      title={t("ร่างข้อเสนอ")}
-      extra={resource.status === "WITHDRAWN" ? <Tag>{t("ถอนแล้ว")}</Tag> : undefined}
+      title={resource.status === "WITHDRAWN" ? t("คำขอที่ยกเลิก") : t("ร่างข้อเสนอ")}
+      extra={resource.status === "WITHDRAWN" ? <Tag color="red">{t("ยกเลิกแล้ว")}</Tag> : undefined}
     >
       <Typography.Paragraph>
         <Typography.Text strong>{t("ผู้ขอทรัพยากร")}: </Typography.Text>
@@ -57,11 +66,22 @@ export default function ResourceReview({
       </Typography.Paragraph>
       <RequestedItems resource={resource} />
     </Card>
-  ));
+  );
+  const draftRequests = drafts.map(requestCard);
+  const cancelledRequests =
+    cancelled.length > 1 ? (
+      <details className="cancelled-resource-requests">
+        <summary>{t("คำขอที่ยกเลิกแล้ว ({{count}})", { count: cancelled.length })}</summary>
+        {cancelled.map(requestCard)}
+      </details>
+    ) : (
+      cancelled.map(requestCard)
+    );
   if (!latest)
     return (
       <>
         {draftRequests}
+        {cancelledRequests}
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
           description={t(
@@ -121,7 +141,11 @@ export default function ResourceReview({
             dataSource={revision.line_items}
             renderItem={(item: D) => (
               <List.Item>
-                <span>{item.name}</span>
+                <span>
+                  {item.name}
+                  {item.quantity != null &&
+                    ` ${Number(item.quantity).toLocaleString()} ${item.unit}`}
+                </span>
                 <Typography.Text>
                   {Number(item.amount).toLocaleString(language === "en" ? "en-GB" : "th-TH", {
                     minimumFractionDigits: 2,
@@ -153,6 +177,7 @@ export default function ResourceReview({
           </Typography.Paragraph>
         )}
       </Card>
+      {cancelledRequests}
     </>
   );
 }

@@ -453,7 +453,20 @@ public class Workflow {
               || items.isEmpty()
               || items.size() > 50)
             throw new IllegalArgumentException("กรุณาระบุรายการทรัพยากร 1–50 รายการ");
-          for (var entry : items) {
+          // When field staff listed what they need, the leader prices exactly those items and may
+          // only change quantities; names and units come from the request, matched by position.
+          com.fasterxml.jackson.databind.JsonNode requested;
+          try {
+            requested = json.readTree(String.valueOf(r.get("requested_items")));
+          } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException(e);
+          }
+          boolean fixed = requested != null && requested.isArray() && requested.size() > 0;
+          if (fixed && items.size() != requested.size())
+            throw new IllegalArgumentException(
+                "หัวหน้าเพิ่มหรือลบรายการที่ผู้ลงพื้นที่ขอไม่ได้ ปรับได้เฉพาะจำนวนและราคา");
+          for (int i = 0; i < items.size(); i++) {
+            var entry = items.get(i);
             if (!(entry instanceof Map<?, ?> item)
                 || !(item.get("name") instanceof String name)
                 || name.isBlank()
@@ -470,7 +483,19 @@ public class Workflow {
                 || price.compareTo(new java.math.BigDecimal("999999999999.99")) > 0)
               throw new IllegalArgumentException("ราคาต้องไม่ติดลบและมีทศนิยมไม่เกินสองตำแหน่ง");
             itemTotal = itemTotal.add(price);
-            lineItems.add(Map.of("name", name.trim(), "amount", price));
+            if (!fixed) {
+              lineItems.add(Map.of("name", name.trim(), "amount", price));
+              continue;
+            }
+            var want = requested.get(i);
+            Object asked = item.get("quantity");
+            if (asked == null) asked = want.get("quantity").asText();
+            var line = new LinkedHashMap<String, Object>();
+            line.put("name", want.get("name").asText());
+            line.put("quantity", quantity(asked));
+            line.put("unit", want.get("unit").asText());
+            line.put("amount", price);
+            lineItems.add(line);
           }
         }
         java.math.BigDecimal amount;
@@ -711,23 +736,27 @@ public class Workflow {
         throw new IllegalArgumentException("กรุณาระบุชื่อรายการ จำนวน และหน่วยให้ครบ");
       if (!UNIT.matcher(unit.trim()).matches())
         throw new IllegalArgumentException("หน่วยต้องเป็นคำ เช่น ถุง เมตร และห้ามมีตัวเลข");
-      java.math.BigDecimal quantity;
-      try {
-        quantity = new java.math.BigDecimal(String.valueOf(item.get("quantity")));
-      } catch (NumberFormatException e) {
-        throw new IllegalArgumentException("กรุณาระบุจำนวนเป็นตัวเลข");
-      }
-      if (quantity.signum() <= 0
-          || quantity.scale() > 2
-          || quantity.compareTo(new java.math.BigDecimal("1000000000")) > 0)
-        throw new IllegalArgumentException("จำนวนต้องมากกว่า 0 และมีทศนิยมไม่เกินสองตำแหน่ง");
       var clean = new LinkedHashMap<String, Object>();
       clean.put("name", name.trim());
-      clean.put("quantity", quantity);
+      clean.put("quantity", quantity(item.get("quantity")));
       clean.put("unit", unit.trim());
       result.add(clean);
     }
     return result;
+  }
+
+  static java.math.BigDecimal quantity(Object value) {
+    java.math.BigDecimal quantity;
+    try {
+      quantity = new java.math.BigDecimal(String.valueOf(value));
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("กรุณาระบุจำนวนเป็นตัวเลข");
+    }
+    if (quantity.signum() <= 0
+        || quantity.scale() > 2
+        || quantity.compareTo(new java.math.BigDecimal("1000000000")) > 0)
+      throw new IllegalArgumentException("จำนวนต้องมากกว่า 0 และมีทศนิยมไม่เกินสองตำแหน่ง");
+    return quantity;
   }
 
   Map<String, Object> latestReport(UUID id) {

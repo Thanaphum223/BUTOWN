@@ -142,7 +142,11 @@ const messages: Record<string, string> = {
   "หน่วยเป็นคำ เช่น ถุง เมตร ห้ามใส่ตัวเลข":
     "Use a word for the unit, e.g. bags or metres, without numbers",
   รายการที่ผู้ลงพื้นที่ขอ: "Items requested by the field worker",
-  ถอนแล้ว: "Withdrawn",
+  ยกเลิกแล้ว: "Cancelled",
+  คำขอที่ยกเลิก: "Cancelled request",
+  "คำขอที่ยกเลิกแล้ว ({{count}})": "Cancelled requests ({{count}})",
+  "รายการตามที่ผู้ลงพื้นที่ขอ ปรับได้เฉพาะจำนวนและราคา":
+    "Items follow the field worker's request; only quantity and price can change",
   "เลือกผู้ลงพื้นที่ (เลือกได้หลายคน)": "Choose field workers (several allowed)",
   "ผู้แทนทีม (ผู้รับงานหลัก)": "Team representative (main assignee)",
   รออนุมัติ: "Awaiting approval",

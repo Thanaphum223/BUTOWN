@@ -5,3 +5,12 @@
 work
 .env
 private-files
+# Not needed by either image; keeps the build context small.
+.github
+.vscode
+docs
+testdata
+scripts
+**/*.md
+frontend/tests
+frontend/public/pdfjs

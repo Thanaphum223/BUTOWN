@@ -64,7 +64,8 @@ export function GeoProvider({ children }: { children: React.ReactNode }) {
     consented.current = value;
     setDeclined(!value);
     if (value) {
-      setError("");
+      // Only lift our own "declined" notice; a browser denial must stay visible.
+      setError((current) => (current === GPS_DECLINED_MESSAGE ? "" : current));
       return;
     }
     cached = undefined;

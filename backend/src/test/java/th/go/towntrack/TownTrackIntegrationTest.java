@@ -660,7 +660,7 @@ class TownTrackIntegrationTest {
   }
 
   @Test
-  void evidencePreviewRequiresOwnershipOrApprovedCopyAndSupportsRanges() throws Exception {
+  void reporterPhotosAreSharedWithNeighboursUnlessARedactedCopyReplacesThem() throws Exception {
     UUID complaint = create();
     var image = new java.awt.image.BufferedImage(8, 8, java.awt.image.BufferedImage.TYPE_INT_RGB);
     var bytes = new java.io.ByteArrayOutputStream();
@@ -690,10 +690,10 @@ class TownTrackIntegrationTest {
         .andExpect(
             header().string("Content-Range", org.hamcrest.Matchers.startsWith("bytes 0-9/")));
     mvc.perform(get("/api/media/" + file).with(user("mediaPeer").roles("CITIZEN")))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isOk());
     mvc.perform(
             get("/api/community/complaints/" + complaint).with(user("mediaPeer").roles("CITIZEN")))
-        .andExpect(jsonPath("$.media.length()").value(0));
+        .andExpect(jsonPath("$.media[?(@.id=='" + file + "')]").exists());
     mvc.perform(as(get("/api/media/" + file + "?thumbnail=true"), "CITIZEN"))
         .andExpect(status().isOk())
         .andExpect(header().string("Content-Type", "image/jpeg"));
@@ -716,9 +716,12 @@ class TownTrackIntegrationTest {
     assertNotEquals(copy, file);
     mvc.perform(get("/api/media/" + copy).with(user("mediaPeer").roles("CITIZEN")))
         .andExpect(status().isOk());
+    mvc.perform(get("/api/media/" + file).with(user("mediaPeer").roles("CITIZEN")))
+        .andExpect(status().isForbidden());
     mvc.perform(
             get("/api/community/complaints/" + complaint).with(user("mediaPeer").roles("CITIZEN")))
-        .andExpect(jsonPath("$.media.length()").value(1));
+        .andExpect(jsonPath("$.media[?(@.id=='" + copy + "')]").exists())
+        .andExpect(jsonPath("$.media[?(@.id=='" + file + "')]").doesNotExist());
     mvc.perform(
             as(
                 delete("/api/complaints/" + complaint + "/shared-media/" + copy).with(csrf()),
@@ -726,6 +729,27 @@ class TownTrackIntegrationTest {
         .andExpect(status().isOk());
     mvc.perform(get("/api/media/" + copy).with(user("mediaPeer").roles("CITIZEN")))
         .andExpect(status().isForbidden());
+    mvc.perform(get("/api/media/" + file).with(user("mediaPeer").roles("CITIZEN")))
+        .andExpect(status().isOk());
+    UUID after = UUID.randomUUID(), internal = UUID.randomUUID();
+    var staffFiles =
+        List.of(
+            List.of(after, users.get("FIELD"), "AFTER"),
+            List.of(internal, users.get("OFFICER"), "GENERAL"));
+    for (var row : staffFiles)
+      db.run(
+          "INSERT INTO"
+              + " attachment(id,complaint_id,uploaded_by,original_name,content_type,size_bytes,sha256,storage_key,evidence_stage)"
+              + " VALUES(?,?,?,'site.jpg','image/jpeg',1,'x',?,?)",
+          row.get(0),
+          complaint,
+          row.get(1),
+          row.get(0) + ".jpg",
+          row.get(2));
+    mvc.perform(
+            get("/api/community/complaints/" + complaint).with(user("mediaPeer").roles("CITIZEN")))
+        .andExpect(jsonPath("$.media[?(@.id=='" + after + "')].evidence_stage").value("AFTER"))
+        .andExpect(jsonPath("$.media[?(@.id=='" + internal + "')]").doesNotExist());
   }
 
   @Test
@@ -1350,11 +1374,35 @@ class TownTrackIntegrationTest {
   }
 
   @Test
-  void resourceLineItemsAreStoredAndTotalIsCalculatedOnServer() throws Exception {
+  void resourceLineItemsFollowTheFieldRequestAndTotalIsCalculatedOnServer() throws Exception {
     UUID id = create();
     assign(id);
-    action(id, "FIELD", "REQUEST_RESOURCE", Map.of()).andExpect(status().isOk());
+    action(
+            id,
+            "FIELD",
+            "REQUEST_RESOURCE",
+            Map.of(
+                "items",
+                List.of(
+                    Map.of("name", "Sand", "quantity", 2, "unit", "bags"),
+                    Map.of("name", "Cement", "quantity", 1, "unit", "bags"))))
+        .andExpect(status().isOk());
     evidence(id, "LEADER");
+    action(
+            id,
+            "LEADER",
+            "PROPOSE",
+            Map.of(
+                "proposal",
+                "Materials",
+                "durationDays",
+                2,
+                "lineItems",
+                List.of(
+                    Map.of("name", "Sand", "quantity", 2, "amount", "12.50"),
+                    Map.of("name", "Cement", "quantity", 1, "amount", "11.25"),
+                    Map.of("name", "Gravel", "quantity", 1, "amount", "5"))))
+        .andExpect(status().isBadRequest());
     action(
             id,
             "LEADER",
@@ -1368,8 +1416,8 @@ class TownTrackIntegrationTest {
                 2,
                 "lineItems",
                 List.of(
-                    Map.of("name", "Sand", "amount", "12.50"),
-                    Map.of("name", "Cement", "amount", "11.25"))))
+                    Map.of("name", "Renamed sand", "quantity", "3.5", "amount", "12.50"),
+                    Map.of("name", "Cement", "quantity", 1, "amount", "11.25"))))
         .andExpect(status().isOk());
     var revision =
         db.one(
@@ -1379,6 +1427,8 @@ class TownTrackIntegrationTest {
     var items = json.readTree((String) revision.get("items"));
     assertEquals(2, items.size());
     assertEquals("Sand", items.get(0).get("name").asText());
+    assertEquals("bags", items.get(0).get("unit").asText());
+    assertEquals(new java.math.BigDecimal("3.5"), items.get(0).get("quantity").decimalValue());
     assertEquals(
         new java.math.BigDecimal("12.50"), items.get(0).get("amount").decimalValue().setScale(2));
   }
@@ -2302,6 +2352,17 @@ class TownTrackIntegrationTest {
                 .map(r -> (String) r.get("content_type"))
                 .filter(t -> t.startsWith("video/"))
                 .toList()));
+    var movId =
+        rows.stream()
+            .filter(r -> "video/quicktime".equals(r.get("content_type")))
+            .findFirst()
+            .orElseThrow()
+            .get("id");
+    mvc.perform(get("/api/media/" + movId).with(user("testCITIZEN")))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Content-Type", "video/mp4"))
+        .andExpect(
+            header().string("Content-Disposition", org.hamcrest.Matchers.startsWith("inline")));
     long used = rows.stream().mapToLong(r -> ((Number) r.get("size_bytes")).longValue()).sum();
     var first = rows.getFirst();
     // Simulate existing large attachments without allocating 1 GB in the test JVM.

@@ -48,15 +48,15 @@ jobs:
       DEV_UNSCANNED_FILES: "true"
       FILE_ROOT: /tmp/towntrack-ci-files
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: python3 scripts/check-source-hygiene.py
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
           cache-dependency-path: backend/pom.xml
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -88,7 +88,7 @@ jobs:
       # run the full suite locally before pushing, or on demand via full_suite.
       - run: npm test -- --max-failures=1 ${{ inputs.full_suite && ' ' || 'tests/cloud-smoke.spec.ts' }}
         working-directory: frontend
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: test-results

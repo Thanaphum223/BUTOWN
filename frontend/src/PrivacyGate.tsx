@@ -19,10 +19,12 @@ export default function PrivacyGate({
     automaticLocationUser.current = user.id;
     void geo.request();
   }
-  // Location is asked only after the user has accepted the privacy notice.
+  // Location is asked automatically only when the first decision is acceptance. After a decline,
+  // GPS waits for the user to tap "my location" even if they accept later.
   function applyDecision(consented: boolean) {
     geo.setConsent(consented);
-    if (consented && user.role === "CITIZEN") requestLocationOnce();
+    if (!consented) automaticLocationUser.current = user.id;
+    else if (user.role === "CITIZEN") requestLocationOnce();
   }
   const [notice, setNotice] = useState<Notice>();
   const [reviewing, setReviewing] = useState(false);

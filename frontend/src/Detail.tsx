@@ -19,7 +19,6 @@ import {
   Checkbox,
   Col,
   Descriptions,
-  Empty,
   Form,
   Input,
   InputNumber,
@@ -38,18 +37,10 @@ import {
   Upload,
 } from "antd";
 import { ArrowLeftOutlined, UploadOutlined, EnvironmentOutlined } from "@ant-design/icons";
-import {
-  api,
-  post,
-  statusNames,
-  actionNames,
-  date,
-  requiredReasonActions,
-  progressLabel,
-} from "./api";
+import { api, actionNames, date, requiredReasonActions, progressLabel } from "./api";
 import LocationMap from "./LocationMap";
 import { useGeo } from "./GeoContext";
-import { ATTACHMENT_ACCEPT, ATTACHMENT_HELP, attachmentError } from "./attachments";
+import { ATTACHMENT_HELP, attachmentError } from "./attachments";
 type D = Record<string, any>;
 const { Title, Text, Paragraph } = Typography;
 const denialPresets = [
@@ -81,6 +72,12 @@ const secondaryActions = [
   "WITHDRAW_APPROVAL",
   "UNDO_START",
 ];
+// Items the field worker asked for on the current request; leaders price exactly these.
+const fieldRequestedItems = (data?: D): D[] =>
+  JSON.parse(
+    (data?.resources || []).filter((r: D) => r.status !== "WITHDRAWN").at(-1)?.requested_items ||
+      "[]",
+  );
 const activeWorkOrder = (data?: D) =>
   (data?.workOrders || [])
     .filter((w: D) => !w.handed_off && !["DECLINED", "CANCELLED", "COMPLETE"].includes(w.status))
@@ -259,20 +256,22 @@ export default function Detail({
         JSON.parse(resource.revisions || "[]"),
       );
       const previous = revisions.at(-1);
-      const requested: D[] = JSON.parse(
-        (data?.resources || []).filter((r: D) => r.status !== "WITHDRAWN").at(-1)
-          ?.requested_items || "[]",
-      );
+      const requested = fieldRequestedItems(data);
+      const prior: D[] = previous?.line_items || [];
+      const reusePrior = prior.length === requested.length;
       form.setFieldsValue({
         proposal: previous?.proposal,
         durationDays: previous?.duration_days,
-        lineItems: previous?.line_items?.length
-          ? previous.line_items
-          : requested.length
-            ? requested.map((item) => ({
-                name: `${item.name} ${item.quantity} ${item.unit}`,
-                amount: null,
-              }))
+        lineItems: requested.length
+          ? requested.map((item, index) => ({
+              name: item.name,
+              unit: item.unit,
+              quantity: Number((reusePrior && prior[index].quantity) || item.quantity),
+              amount:
+                reusePrior && prior[index].amount != null ? Number(prior[index].amount) : null,
+            }))
+          : prior.length
+            ? prior
             : [{ name: "", amount: null }],
       });
       try {
@@ -455,6 +454,7 @@ export default function Detail({
   );
   const startPhotos = startPhotosOf(data, user.id);
   const startedWithPhoto = startPhotos.some((f: D) => f.work_order_id);
+  const proposalItemsFixed = fieldRequestedItems(data).length > 0;
   const pendingBytes = (data.files || []).reduce(
     (total: number, f: D) => total + Number(f.size_bytes),
     0,
@@ -931,9 +931,10 @@ export default function Detail({
                             renderItem={(r: D) => (
                               <List.Item>
                                 <div>
-                                  <Tag>
+                                  <Tag color={r.status === "WITHDRAWN" ? "red" : undefined}>
                                     {(
                                       {
+                                        WITHDRAWN: t("ยกเลิกแล้ว"),
                                         DRAFT: t("ร่างข้อเสนอ"),
                                         CHECK: t("รอตรวจเอกสาร"),
                                         REVISION: t("แก้ไขข้อเสนอ"),
@@ -963,7 +964,11 @@ export default function Detail({
                                           dataSource={v.line_items}
                                           renderItem={(item: D) => (
                                             <List.Item>
-                                              <span>{item.name}</span>
+                                              <span>
+                                                {item.name}
+                                                {item.quantity != null &&
+                                                  ` ${Number(item.quantity).toLocaleString()} ${item.unit}`}
+                                              </span>
                                               <Text>
                                                 {Number(item.amount).toLocaleString(
                                                   language === "en" ? "en-GB" : "th-TH",
@@ -1106,6 +1111,7 @@ export default function Detail({
                     f.content_type?.startsWith("image/") || f.content_type?.startsWith("video/"),
                 )) && (
                 <EvidenceGallery
+                  paired={citizen}
                   media={
                     citizen
                       ? data.media || []
@@ -1393,7 +1399,16 @@ export default function Detail({
               >
                 <Space direction="vertical">
                   {denialPresets.map((preset) => (
-                    <Radio key={preset.topic} value={preset.topic}>
+                    <Radio
+                      key={preset.topic}
+                      value={preset.topic}
+                      // Clicking the chosen preset again clears it; onChange only fires for a new one.
+                      onClick={() => {
+                        if (denialTopic !== preset.topic) return;
+                        setDenialTopic(undefined);
+                        form.setFieldsValue({ reason: "" });
+                      }}
+                    >
                       {t(preset.topic)}
                     </Radio>
                   ))}
@@ -1538,7 +1553,12 @@ export default function Detail({
                   <>
                     <div className="resource-items">
                       {fields.map((field, index) => (
-                        <div className="resource-item-row" key={field.key}>
+                        <div
+                          className={
+                            "resource-item-row" + (proposalItemsFixed ? " priced-item-row" : "")
+                          }
+                          key={field.key}
+                        >
                           <Form.Item
                             label={t("รายการที่ ") + (index + 1)}
                             name={[field.name, "name"]}
@@ -1548,8 +1568,28 @@ export default function Detail({
                               aria-label={t("ชื่อรายการ ") + (index + 1)}
                               placeholder={t("ชื่อรายการ เช่น ทราย ปูนซีเมนต์")}
                               maxLength={200}
+                              readOnly={proposalItemsFixed}
                             />
                           </Form.Item>
+                          {proposalItemsFixed && (
+                            <Form.Item
+                              label={t("จำนวน")}
+                              name={[field.name, "quantity"]}
+                              rules={[
+                                { required: true, type: "number", min: 0.01, max: 1000000000 },
+                              ]}
+                            >
+                              <InputNumber
+                                aria-label={t("จำนวนรายการ ") + (index + 1)}
+                                min={0.01}
+                                max={1000000000}
+                                precision={2}
+                                inputMode="decimal"
+                                addonAfter={form.getFieldValue(["lineItems", field.name, "unit"])}
+                                style={{ width: "100%" }}
+                              />
+                            </Form.Item>
+                          )}
                           <Form.Item
                             label={t("ราคา (บาท)")}
                             name={[field.name, "amount"]}
@@ -1580,7 +1620,7 @@ export default function Detail({
                               style={{ width: "100%" }}
                             />
                           </Form.Item>
-                          {index > 0 && (
+                          {index > 0 && !proposalItemsFixed && (
                             <Button
                               className="resource-remove"
                               icon={<DeleteOutlined />}
@@ -1595,13 +1635,19 @@ export default function Detail({
                       ))}
                     </div>
                     <Form.ErrorList errors={errors} />
-                    <Button
-                      icon={<PlusOutlined />}
-                      disabled={fields.length >= 50}
-                      onClick={() => add({ name: "", amount: null })}
-                    >
-                      {t("เพิ่มรายการ")}
-                    </Button>
+                    {proposalItemsFixed ? (
+                      <Text type="secondary">
+                        {t("รายการตามที่ผู้ลงพื้นที่ขอ ปรับได้เฉพาะจำนวนและราคา")}
+                      </Text>
+                    ) : (
+                      <Button
+                        icon={<PlusOutlined />}
+                        disabled={fields.length >= 50}
+                        onClick={() => add({ name: "", amount: null })}
+                      >
+                        {t("เพิ่มรายการ")}
+                      </Button>
+                    )}
                     <div className="resource-total" aria-live="polite">
                       <Text>
                         {t("งบประมาณรวม")} {fields.length}
@@ -1726,7 +1772,6 @@ export default function Detail({
                 complaintId={id}
                 stage="BEFORE"
                 photos
-                cameraOnly
                 used={pendingBytes}
                 disabled={uploadBusy}
                 onUploaded={load}

@@ -18,12 +18,15 @@ public class MediaController {
   final Access access;
   final FileController files;
   final ObjectStorage storage;
+  final EvidenceMedia evidence;
 
-  MediaController(Db db, Access access, FileController files, ObjectStorage storage) {
+  MediaController(
+      Db db, Access access, FileController files, ObjectStorage storage, EvidenceMedia evidence) {
     this.db = db;
     this.access = access;
     this.files = files;
     this.storage = storage;
+    this.evidence = evidence;
   }
 
   @GetMapping("/media/{id}")
@@ -39,16 +42,15 @@ public class MediaController {
             "SELECT a.*,c.municipality_id,c.external_id FROM attachment a JOIN complaint c ON c.id=a.complaint_id WHERE a.id=? AND c.municipality_id=?",
             id,
             u.get("municipality_id"));
-    boolean shared =
-        Boolean.TRUE.equals(f.get("public_approved"))
-            && (f.get("public_copy_of") != null
-                || String.valueOf(f.get("external_id")).startsWith("mock-community-v1:"));
     if ("CITIZEN".equals(u.get("role"))) {
-      if (!u.get("id").equals(f.get("uploaded_by")) && !shared) Access.deny();
+      if (!evidence.citizenCanView(id, u)) Access.deny();
     } else access.complaint((UUID) f.get("complaint_id"), u, false);
     String type = f.get("content_type").toString();
     if (!type.startsWith("image/") && !type.startsWith("video/") && !type.equals("application/pdf"))
       throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+    // Chrome and Android refuse video/quicktime, but iPhone MOV clips are the same ISO container as
+    // MP4, so labelling them MP4 lets every browser play them inline.
+    if (type.equals("video/quicktime")) type = "video/mp4";
     String key = f.get("storage_key").toString();
     boolean thumb = thumbnail && f.get("thumbnail_key") != null;
     if (thumb) {

@@ -23,7 +23,7 @@ import {
   LikeOutlined,
   FilterOutlined,
 } from "@ant-design/icons";
-import { api, statusNames, date } from "./api";
+import { api, statusNames } from "./api";
 import Detail from "./Detail";
 type D = Record<string, any>;
 const { Title, Text } = Typography;

@@ -211,7 +211,6 @@ const messages: Record<string, string> = {
   ก่อนทำ: "Before work",
   หลังทำ: "After work",
   "เลือกเอกสาร PDF": "Choose PDF document",
-  เลือกรูปจากเครื่อง: "Choose photo from device",
   "กำลังตรวจสอบและบันทึกไฟล์ กรุณารอสักครู่": "Checking and saving the file. Please wait.",
   "กำลังอัปโหลด กรุณาเปิดหน้านี้ไว้": "Uploading. Please keep this page open.",
   เปิดเอกสาร: "Open document",

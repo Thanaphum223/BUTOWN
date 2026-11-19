@@ -45,7 +45,7 @@ export default function CommunityDetail({ id, onClose }: { id?: string; onClose:
           />
           <CitizenOutcome status={c.status} history={data?.history || []} />
           <Typography.Title level={5}>{t("หลักฐานประกอบ")}</Typography.Title>
-          <EvidenceGallery media={data?.media || []} />
+          <EvidenceGallery paired media={data?.media || []} />
           {c.latitude != null && c.longitude != null && (
             <LocationMap
               points={[

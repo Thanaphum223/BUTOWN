@@ -11,7 +11,6 @@ type Props = {
   pdf?: boolean;
   proposalDocument?: boolean;
   photos?: boolean;
-  cameraOnly?: boolean;
   used: number;
   disabled?: boolean;
   onUploaded: () => Promise<void>;
@@ -24,7 +23,6 @@ export default function EvidenceUpload({
   pdf = false,
   proposalDocument = false,
   photos = false,
-  cameraOnly = false,
   used,
   disabled = false,
   onUploaded,
@@ -109,7 +107,8 @@ export default function EvidenceUpload({
             </Button>
           </Upload>
         )}
-        {!(photos && cameraOnly) && (
+        {/* Before/after evidence must be shot on site, so field photos never offer the gallery. */}
+        {!photos && (
           <Upload
             accept={accept}
             showUploadList={false}
@@ -121,9 +120,7 @@ export default function EvidenceUpload({
                 ? t("เลือกรูปหรือเอกสาร PDF")
                 : pdf
                   ? t("เลือกเอกสาร PDF")
-                  : photos
-                    ? t("เลือกรูปจากเครื่อง")
-                    : t("แนบภาพ วิดีโอ หรือเอกสาร")}
+                  : t("แนบภาพ วิดีโอ หรือเอกสาร")}
             </Button>
           </Upload>
         )}

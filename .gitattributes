@@ -1,4 +1,6 @@
-* text=auto
+# LF everywhere so Prettier and Spotless pass on Windows checkouts exactly as they do in CI.
+* text=auto eol=lf
+*.ps1 text eol=crlf
 *.sh text eol=lf
 *.java text eol=lf
 *.sql text eol=lf

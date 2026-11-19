@@ -192,9 +192,47 @@ test("leader proposal starts from the items the field worker requested", async (
   ];
   await expect(page.getByText("ปูนซ่อมทางเท้า", { exact: true })).toBeVisible({ timeout: 10000 });
   await page.getByRole("button", { name: "ส่งข้อเสนอทรัพยากร", exact: true }).click();
-  await expect(page.getByRole("dialog").getByLabel("ชื่อรายการ 1", { exact: true })).toHaveValue(
-    "ปูนซ่อมทางเท้า 3 ถุง",
-  );
+  const dialog = page.getByRole("dialog");
+  const name = dialog.getByLabel("ชื่อรายการ 1", { exact: true });
+  await expect(name).toHaveValue("ปูนซ่อมทางเท้า");
+  await expect(name).not.toBeEditable();
+  const quantity = dialog.getByRole("spinbutton", { name: "จำนวนรายการ 1", exact: true });
+  await expect(quantity).toHaveValue("3.00");
+  await expect(dialog.getByText("ถุง", { exact: true })).toBeVisible();
+  await quantity.fill("5");
+  await expect(quantity).toHaveValue("5");
+  await expect(dialog.getByRole("button", { name: /เพิ่มรายการ$/ })).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: /^ลบรายการ/ })).toHaveCount(0);
+});
+
+test("cancelled resource requests sit below the latest one and fold together", async ({ page }) => {
+  const { data } = await workspace(page, "LEADER", "RESOURCE_DRAFT", ["PROPOSE"]);
+  const request = (id: string, status: string, minute: number, item: string) => ({
+    id,
+    status,
+    necessity: "ทางเท้าแตก",
+    requester_name: "ผู้ลงพื้นที่",
+    created_at: `2026-11-19T10:${minute}:00Z`,
+    revisions: "[]",
+    requested_items: JSON.stringify([{ name: item, quantity: 1, unit: "ถุง" }]),
+  });
+  data.resources = [
+    request("old-1", "WITHDRAWN", 10, "หินหยาบรอบแรก"),
+    request("old-2", "WITHDRAWN", 20, "หินหยาบรอบสอง"),
+    request("latest", "DRAFT", 30, "หินเรียบล่าสุด"),
+  ];
+  const latest = page.getByText("หินเรียบล่าสุด", { exact: true });
+  await expect(latest).toBeVisible({ timeout: 10000 });
+  const folded = page.locator("details.cancelled-resource-requests");
+  await expect(folded.locator("summary")).toHaveText("คำขอที่ยกเลิกแล้ว (2)");
+  await expect(folded.getByText("หินหยาบรอบสอง", { exact: true })).toBeHidden();
+  const latestTop = (await latest.boundingBox())!.y;
+  expect(latestTop).toBeLessThan((await folded.boundingBox())!.y);
+  await folded.locator("summary").click();
+  await expect(folded.getByText("ยกเลิกแล้ว", { exact: true })).toHaveCount(2);
+  const second = (await folded.getByText("หินหยาบรอบสอง", { exact: true }).boundingBox())!.y;
+  const first = (await folded.getByText("หินหยาบรอบแรก", { exact: true }).boundingBox())!.y;
+  expect(second).toBeLessThan(first);
 });
 
 test("leader ticks several field workers and names the representative", async ({ page }) => {
@@ -281,6 +319,15 @@ test("denial preset fills once and preserves manual edits and existing DENY payl
     .getByRole("radio", { name: "Exceeds normal maintenance budget", exact: true })
     .check();
   const reason = dialog.getByRole("textbox");
+  await expect(reason).toHaveValue(/Exceeds the normal maintenance budget/);
+  const preset = dialog.getByRole("radio", {
+    name: "Exceeds normal maintenance budget",
+    exact: true,
+  });
+  await preset.click();
+  await expect(preset).not.toBeChecked();
+  await expect(reason).toHaveValue("");
+  await preset.check();
   await expect(reason).toHaveValue(/Exceeds the normal maintenance budget/);
   await reason.fill("รายละเอียด edited by approver");
   await expect(dialog.locator(".language-switcher")).toHaveCount(0);

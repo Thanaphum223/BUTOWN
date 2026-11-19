@@ -3,7 +3,8 @@ WORKDIR /app
 COPY backend/pom.xml ./pom.xml
 RUN mvn -B dependency:go-offline
 COPY backend/src ./src
-RUN mvn -B package -DskipTests
+# CI already ran the tests and format check on this commit; skip compiling tests here too.
+RUN mvn -B package -Dmaven.test.skip=true -Dspotless.check.skip=true
 FROM eclipse-temurin:21-jre
 RUN groupadd --system towntrack && useradd --system --gid towntrack towntrack && mkdir -p /data/files && chown -R towntrack:towntrack /data
 WORKDIR /app

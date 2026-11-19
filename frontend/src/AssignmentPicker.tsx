@@ -55,7 +55,8 @@ export default function AssignmentPicker({
       matches(person.display_name, person.gov_role) &&
       (rank === undefined || (person.gov_role || "") === rank),
   );
-  const pick = (ids: string[]) => {
+  const pick = (chosen: string[]) => {
+    const ids = people.map((person) => person.id).filter((id) => chosen.includes(id));
     const representative = ids.includes(assigneeId) ? assigneeId : ids[0];
     form.setFieldsValue({
       teamId: undefined,
@@ -128,19 +129,31 @@ export default function AssignmentPicker({
             ]}
           />
         )}
-        <Checkbox.Group
+        {/* Standalone checkboxes: a controlled Checkbox.Group syncs its value in an effect, so a
+            tick shows the old selection right after each tap. */}
+        <div
+          role="group"
           aria-label={t("ผู้ลงพื้นที่")}
-          className="assignment-options"
-          value={teamId ? [] : picked}
-          onChange={(ids) => pick(ids as string[])}
+          className="ant-checkbox-group assignment-options"
         >
           {shownPeople.map((person) => (
-            <Checkbox key={person.id} value={person.id}>
+            <Checkbox
+              key={person.id}
+              value={person.id}
+              checked={!teamId && picked.includes(person.id)}
+              onChange={(e) =>
+                pick(
+                  e.target.checked
+                    ? [...(teamId ? [] : picked), person.id]
+                    : picked.filter((id) => id !== person.id),
+                )
+              }
+            >
               {person.display_name}
               {person.gov_role && <Tag className="assignment-rank">{person.gov_role}</Tag>}
             </Checkbox>
           ))}
-        </Checkbox.Group>
+        </div>
         {!shownPeople.length && (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}

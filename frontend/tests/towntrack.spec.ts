@@ -180,7 +180,10 @@ test("full approved resource workflow across all municipal and field roles close
   await switchUser("leader");
   await perform("ส่งข้อเสนอทรัพยากร", async (d) => {
     await d.getByLabel("ชื่อคำขอทรัพยากร", { exact: true }).fill("ขอวัสดุซ่อมทางเท้า");
-    await d.getByRole("textbox", { name: "ชื่อรายการ 1", exact: true }).fill("วัสดุซ่อมทางเท้า");
+    await expect(d.getByRole("textbox", { name: "ชื่อรายการ 1", exact: true })).toHaveValue(
+      "ปูนซ่อมทางเท้า",
+    );
+    await d.getByRole("spinbutton", { name: "จำนวนรายการ 1", exact: true }).fill("4");
     await d.getByRole("spinbutton", { name: "ราคารายการ 1", exact: true }).fill("2500");
     await d.getByLabel("ระยะเวลาดำเนินการ (วัน)", { exact: true }).fill("2");
     await d
@@ -409,7 +412,6 @@ test("resource refusal by approver terminates a real complaint", async ({ page, 
   await switchUser("leader");
   await perform("ส่งข้อเสนอทรัพยากร", async (d) => {
     await d.getByLabel("ชื่อคำขอทรัพยากร", { exact: true }).fill("ขอวัสดุซ่อมถนน");
-    await d.getByRole("textbox", { name: "ชื่อรายการ 1", exact: true }).fill("วัสดุซ่อมถนน");
     await d.getByRole("spinbutton", { name: "ราคารายการ 1", exact: true }).fill("1000");
     await d.getByLabel("ระยะเวลาดำเนินการ (วัน)", { exact: true }).fill("2");
     await d.locator("input[type=file]:not([capture])").setInputFiles(pdfEvidence("proposal.pdf"));
