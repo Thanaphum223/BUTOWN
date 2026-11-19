@@ -26,6 +26,8 @@ class TownTrackIntegrationTest {
   @Autowired Workflow workflow;
   @Autowired ObjectMapper json;
   @Autowired GovIdentityService govIdentities;
+  @Autowired FileController fileController;
+  @Autowired VideoPreviews videoPreviews;
   @Autowired org.springframework.security.core.session.SessionRegistry loginSessions;
   UUID town, dept, cat, wf;
   Map<String, UUID> users = new HashMap<>();
@@ -915,9 +917,32 @@ class TownTrackIntegrationTest {
         .andExpect(jsonPath("$.items.length()").value(5));
     mvc.perform(as(get("/api/citizen/tracking?tab=mine&page=2"), "CITIZEN"))
         .andExpect(jsonPath("$.items.length()").value(1));
+    // Reporters follow their own reports automatically.
     mvc.perform(as(get("/api/citizen/tracking?tab=following"), "CITIZEN"))
-        .andExpect(jsonPath("$.items.length()").value(0));
+        .andExpect(jsonPath("$.items.length()").value(5))
+        .andExpect(jsonPath("$.total").value(11));
     mvc.perform(as(get("/api/citizen/tracking"), "OFFICER")).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void backfillMakesReportersOfOlderReportsFollowThem() throws Exception {
+    UUID id = create();
+    // A report filed before auto-follow existed has no follower row for its reporter.
+    db.run("DELETE FROM follower WHERE complaint_id=?", id);
+    db.run("INSERT INTO follower(complaint_id,user_id) VALUES(?,?)", id, users.get("OFFICER"));
+    try (var script =
+        getClass().getResourceAsStream("/db/migration/R__reporters_follow_their_reports.sql")) {
+      assertNotNull(script);
+      String sql = new String(script.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+      db.run(sql);
+      db.run(sql);
+    }
+    assertEquals(
+        Set.of(users.get("CITIZEN"), users.get("OFFICER")),
+        new HashSet<>(
+            db.list("SELECT user_id FROM follower WHERE complaint_id=?", id).stream()
+                .map(row -> row.get("user_id"))
+                .toList()));
   }
 
   @Test
@@ -1718,11 +1743,12 @@ class TownTrackIntegrationTest {
   void nearbySharesCommunityVoteAndFollowStateWithoutPrivateFields() throws Exception {
     UUID id = create();
     String endpoint = "/api/nearby?latitude=13.75&longitude=100.5";
+    // The reporter already follows their own report.
     mvc.perform(as(get(endpoint), "CITIZEN"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].votes").value(0))
         .andExpect(jsonPath("$[0].voted").value(false))
-        .andExpect(jsonPath("$[0].following").value(false));
+        .andExpect(jsonPath("$[0].following").value(true));
     mvc.perform(as(post("/api/community/complaints/" + id + "/vote").with(csrf()), "CITIZEN"))
         .andExpect(status().isOk());
     mvc.perform(
@@ -2323,6 +2349,85 @@ class TownTrackIntegrationTest {
         .andExpect(jsonPath("$.stats.total").value(2));
     mvc.perform(as(get("/api/complaints").param("size", "999999"), "CITIZEN"))
         .andExpect(status().isBadRequest());
+  }
+
+  UUID videoAttachment(UUID complaint, UUID file, String key, String preview) {
+    db.run(
+        "INSERT INTO"
+            + " attachment(id,complaint_id,uploaded_by,original_name,content_type,size_bytes,sha256,storage_key,thumbnail_key,thumbnail_size)"
+            + " VALUES(?,?,?,'clip.MOV','video/quicktime',1,'x',?,?,?)",
+        file,
+        complaint,
+        users.get("CITIZEN"),
+        key,
+        preview,
+        preview == null ? null : 14L);
+    return file;
+  }
+
+  @Test
+  void videoPlaysItsH264RenditionWhileDownloadsKeepTheOriginal() throws Exception {
+    UUID file = UUID.randomUUID();
+    var root = fileController.rootPath();
+    var original = root.resolve(file + ".mov");
+    var rendition = root.resolve(file + "-preview.mp4");
+    java.nio.file.Files.writeString(original, "original-hevc");
+    java.nio.file.Files.writeString(rendition, "h264-rendition");
+    try {
+      videoAttachment(create(), file, file + ".mov", file + "-preview.mp4");
+      mvc.perform(as(get("/api/media/" + file), "CITIZEN"))
+          .andExpect(status().isOk())
+          .andExpect(header().string("Content-Type", "video/mp4"))
+          .andExpect(content().string("h264-rendition"));
+      mvc.perform(as(get("/api/files/" + file), "CITIZEN"))
+          .andExpect(status().isOk())
+          .andExpect(content().string("original-hevc"));
+    } finally {
+      java.nio.file.Files.deleteIfExists(original);
+      java.nio.file.Files.deleteIfExists(rendition);
+    }
+  }
+
+  @Test
+  void onlyHevcClipsGetAnH264Rendition() throws Exception {
+    org.junit.jupiter.api.Assumptions.assumeTrue(videoPreviews.available(), "ffmpeg not installed");
+    UUID complaint = create();
+    var root = fileController.rootPath();
+    var created = new ArrayList<java.nio.file.Path>();
+    try {
+      for (String encoder : List.of("libx265", "libx264")) {
+        UUID file = UUID.randomUUID();
+        var source = root.resolve(file + ".mov");
+        created.add(source);
+        created.add(root.resolve(file + "-preview.mp4"));
+        VideoPreviews.exec(
+            120,
+            videoPreviews.ffmpeg,
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc=size=320x240:rate=10:duration=1",
+            "-c:v",
+            encoder,
+            "-pix_fmt",
+            "yuv420p",
+            "-y",
+            source.toString());
+        videoAttachment(complaint, file, file + ".mov", null);
+        videoPreviews.convert(file, source, null);
+        Object key =
+            db.one("SELECT thumbnail_key FROM attachment WHERE id=?", file).get("thumbnail_key");
+        if (encoder.equals("libx264")) assertNull(key);
+        else {
+          assertEquals(file + "-preview.mp4", key);
+          assertEquals("h264", videoPreviews.codec(root.resolve(file + "-preview.mp4")));
+        }
+      }
+    } finally {
+      for (var path : created) java.nio.file.Files.deleteIfExists(path);
+    }
   }
 
   @Test

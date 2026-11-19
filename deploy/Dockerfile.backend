@@ -6,6 +6,8 @@ COPY backend/src ./src
 # CI already ran the tests and format check on this commit; skip compiling tests here too.
 RUN mvn -B package -Dmaven.test.skip=true -Dspotless.check.skip=true
 FROM eclipse-temurin:21-jre
+# ffmpeg converts iPhone HEVC clips to H.264 so Android browsers can play them (VideoPreviews).
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 RUN groupadd --system towntrack && useradd --system --gid towntrack towntrack && mkdir -p /data/files && chown -R towntrack:towntrack /data
 WORKDIR /app
 COPY --from=build /app/target/towntrack-0.1.0.jar app.jar

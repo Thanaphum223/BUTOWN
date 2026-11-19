@@ -176,6 +176,9 @@ public class ComplaintController {
         u.get("id"),
         u.get("municipality_id"),
         id);
+    // Reporters follow their own report so community lists show it as followed; status
+    // notifications already skip the reporter in the follower loop, so nothing is sent twice.
+    db.run("INSERT INTO follower(complaint_id,user_id) VALUES(?,?)", id, u.get("id"));
     workflow.audit(u, id, "CREATE", null, "NEW", "ยื่นคำร้อง");
     return Map.of("id", id);
   }

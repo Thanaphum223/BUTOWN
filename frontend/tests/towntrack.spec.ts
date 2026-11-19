@@ -468,7 +468,7 @@ test("citizen municipal map lists real cases and follows sanitized summary", asy
   await expect(card).toBeVisible();
   await expect(card).not.toContainText("รายละเอียดส่วนตัวสำหรับทดสอบแผนที่");
   await expect(card).not.toContainText("ข้อมูลนี้ต้องไม่ปรากฏ");
-  await card.getByRole("button", { name: /ติดตาม$/ }).click();
+  // Filing a report follows it, so the reporter's own card is already marked as followed.
   await expect(card.getByRole("button", { name: /ติดตามแล้ว$/ })).toHaveAttribute(
     "aria-pressed",
     "true",

@@ -52,10 +52,13 @@ public class MediaController {
     // MP4, so labelling them MP4 lets every browser play them inline.
     if (type.equals("video/quicktime")) type = "video/mp4";
     String key = f.get("storage_key").toString();
-    boolean thumb = thumbnail && f.get("thumbnail_key") != null;
+    boolean video = type.startsWith("video/");
+    // Images keep the original unless a thumbnail is asked for; videos always play the H.264
+    // rendition when one exists (VideoPreviews), since HEVC fails on many Android browsers.
+    boolean thumb = (thumbnail || video) && f.get("thumbnail_key") != null;
     if (thumb) {
       key = f.get("thumbnail_key").toString();
-      type = "image/jpeg";
+      type = video ? "video/mp4" : "image/jpeg";
     }
     var headers = new HttpHeaders();
     headers.setContentType(MediaType.parseMediaType(type));

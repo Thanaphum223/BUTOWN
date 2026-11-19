@@ -27,6 +27,9 @@ public class FileController {
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   ObjectStorage objectStorage;
 
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  VideoPreviews previews;
+
   public FileController(
       Db d,
       Access a,
@@ -232,12 +235,18 @@ public class FileController {
     }
     boolean cloud = objectStorage != null && objectStorage.enabled();
     if (cloud) db.run("UPDATE attachment SET storage_provider='s3' WHERE id=?", fileId);
+    boolean preview = type.startsWith("video/") && previews != null && previews.available();
     if (org.springframework.transaction.support.TransactionSynchronizationManager
         .isSynchronizationActive())
       org.springframework.transaction.support.TransactionSynchronizationManager
           .registerSynchronization(
               new org.springframework.transaction.support.TransactionSynchronization() {
                 public void afterCompletion(int status) {
+                  // The preview worker owns the local copy from here and removes it when cloud.
+                  if (status == STATUS_COMMITTED && preview) {
+                    previews.submit(fileId, dest, cloud ? objectStorage : null);
+                    return;
+                  }
                   if (status == STATUS_COMMITTED && cloud) {
                     try {
                       Files.deleteIfExists(dest);
