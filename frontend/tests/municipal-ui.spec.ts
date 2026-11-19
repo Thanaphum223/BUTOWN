@@ -116,6 +116,9 @@ test("approved resources change the field start label", async ({ page }) => {
   await expect(page.getByText("กรุณาถ่ายรูปหน้างานก่อนเริ่มปฏิบัติงาน")).toBeVisible();
   expect(writes).toHaveLength(0);
   const startDialog = page.getByRole("dialog");
+  // Site photos must come from the camera, not the gallery.
+  await expect(startDialog.getByRole("button", { name: "เลือกรูปจากเครื่อง" })).toHaveCount(0);
+  await expect(startDialog.locator("input[type=file]:not([capture])")).toHaveCount(0);
   await startDialog.locator("input[type=file][capture]").setInputFiles(photo("start.png"));
   await expect(startDialog.getByRole("link", { name: "start.png", exact: true })).toBeVisible();
   await page.screenshot({ path: "../work/screenshots/start-photo-390.png" });

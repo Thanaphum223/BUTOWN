@@ -11,6 +11,7 @@ type Props = {
   pdf?: boolean;
   proposalDocument?: boolean;
   photos?: boolean;
+  cameraOnly?: boolean;
   used: number;
   disabled?: boolean;
   onUploaded: () => Promise<void>;
@@ -23,6 +24,7 @@ export default function EvidenceUpload({
   pdf = false,
   proposalDocument = false,
   photos = false,
+  cameraOnly = false,
   used,
   disabled = false,
   onUploaded,
@@ -107,22 +109,24 @@ export default function EvidenceUpload({
             </Button>
           </Upload>
         )}
-        <Upload
-          accept={accept}
-          showUploadList={false}
-          disabled={busy || disabled}
-          beforeUpload={send}
-        >
-          <Button icon={<UploadOutlined />} loading={busy} disabled={busy || disabled}>
-            {proposalDocument
-              ? t("เลือกรูปหรือเอกสาร PDF")
-              : pdf
-                ? t("เลือกเอกสาร PDF")
-                : photos
-                  ? t("เลือกรูปจากเครื่อง")
-                  : t("แนบภาพ วิดีโอ หรือเอกสาร")}
-          </Button>
-        </Upload>
+        {!(photos && cameraOnly) && (
+          <Upload
+            accept={accept}
+            showUploadList={false}
+            disabled={busy || disabled}
+            beforeUpload={send}
+          >
+            <Button icon={<UploadOutlined />} loading={busy} disabled={busy || disabled}>
+              {proposalDocument
+                ? t("เลือกรูปหรือเอกสาร PDF")
+                : pdf
+                  ? t("เลือกเอกสาร PDF")
+                  : photos
+                    ? t("เลือกรูปจากเครื่อง")
+                    : t("แนบภาพ วิดีโอ หรือเอกสาร")}
+            </Button>
+          </Upload>
+        )}
       </Space>
       {busy && (
         <div role="status">

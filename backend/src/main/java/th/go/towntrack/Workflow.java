@@ -692,6 +692,10 @@ public class Workflow {
     return Map.of("id", id, "status", to, "version", expected + 1);
   }
 
+  // Thai and Arabic digits both count as numbers; the quantity belongs in its own field.
+  static final java.util.regex.Pattern UNIT =
+      java.util.regex.Pattern.compile("[^\\p{N}]*\\p{L}[^\\p{N}]*");
+
   static List<Map<String, Object>> requestedItems(Map<String, Object> b) {
     if (!(b.get("items") instanceof List<?> items) || items.isEmpty() || items.size() > 50)
       throw new IllegalArgumentException("กรุณาระบุรายการที่ขอ 1–50 รายการ");
@@ -705,6 +709,8 @@ public class Workflow {
           || unit.isBlank()
           || unit.trim().length() > 50)
         throw new IllegalArgumentException("กรุณาระบุชื่อรายการ จำนวน และหน่วยให้ครบ");
+      if (!UNIT.matcher(unit.trim()).matches())
+        throw new IllegalArgumentException("หน่วยต้องเป็นคำ เช่น ถุง เมตร และห้ามมีตัวเลข");
       java.math.BigDecimal quantity;
       try {
         quantity = new java.math.BigDecimal(String.valueOf(item.get("quantity")));

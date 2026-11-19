@@ -2235,6 +2235,13 @@ h3,
   .resource-remove {
     margin-top: 30px;
   }
+  .requested-item-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .requested-item-row .resource-remove {
+    grid-column: 1/-1;
+    margin-top: 0;
+  }
 }
 .resource-review-card,
 .report-review-card {
@@ -3513,6 +3520,12 @@ button.queue-item .queue-item-top .ant-tag {
 }
 .staff-shell .account-controls > .ant-space-item:has(.admin-role-controls) {
   flex: 1 1 260px;
+}
+@media (max-width: 600px) {
+  .staff-shell .account-controls .account-name,
+  .staff-shell .account-controls > .ant-space-item:has(> .account-name) {
+    display: none;
+  }
 }
 .staff-shell .admin-role-controls {
   width: 100%;

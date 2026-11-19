@@ -209,6 +209,17 @@ class FieldTransparencyIntegrationTest {
                 "items",
                 List.of(Map.of("name", "PVC pipe", "quantity", 0, "unit", "pieces"))))
         .andExpect(status().isBadRequest());
+    for (String unit : List.of("5", "๕", "10 ถุง", "-"))
+      action(
+              id,
+              "FIELD",
+              "REQUEST_RESOURCE",
+              Map.of(
+                  "reason",
+                  "Need pipes",
+                  "items",
+                  List.of(Map.of("name", "PVC pipe", "quantity", 3, "unit", unit))))
+          .andExpect(status().isBadRequest());
     action(
             id,
             "FIELD",

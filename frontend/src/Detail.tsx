@@ -1726,6 +1726,7 @@ export default function Detail({
                 complaintId={id}
                 stage="BEFORE"
                 photos
+                cameraOnly
                 used={pendingBytes}
                 disabled={uploadBusy}
                 onUploaded={load}
@@ -1791,7 +1792,13 @@ export default function Detail({
                         <Form.Item
                           label={t("หน่วย")}
                           name={[field.name, "unit"]}
-                          rules={[{ required: true, whitespace: true, max: 50 }]}
+                          rules={[
+                            { required: true, whitespace: true, max: 50 },
+                            {
+                              pattern: /^[^\p{N}]*\p{L}[^\p{N}]*$/u,
+                              message: t("หน่วยเป็นคำ เช่น ถุง เมตร ห้ามใส่ตัวเลข"),
+                            },
+                          ]}
                         >
                           <Input
                             aria-label={t("หน่วยรายการ ") + (index + 1)}

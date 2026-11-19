@@ -524,6 +524,29 @@ test("a failed refresh after submission preserves the draft and retries only the
   expect(writes).toBe(1);
 });
 
+test("requested item quantity and unit share the row on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await workspace(page, "FIELD", "ACCEPTED", ["REQUEST_RESOURCE"]);
+  await page
+    .getByRole("button", { name: "ส่งเอกสารประเมินทรัพยากร/ของบจากหน้างาน", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("หน่วยรายการ 1", { exact: true }).fill("ห");
+  await dialog
+    .getByRole("button", { name: "ยืนยันส่งเอกสารประเมินทรัพยากร/ของบจากหน้างาน", exact: true })
+    .click();
+  await expect(dialog.getByText("กรุณากรอก จำนวน").first()).toBeVisible();
+  await dialog.getByLabel("หน่วยรายการ 1", { exact: true }).fill("5");
+  await expect(dialog.getByText("หน่วยเป็นคำ เช่น ถุง เมตร ห้ามใส่ตัวเลข")).toBeVisible();
+  await page.screenshot({ path: "../work/screenshots/field-request-items-phone.png" });
+  await dialog.getByLabel("หน่วยรายการ 1", { exact: true }).fill("ถุง");
+  await expect(dialog.getByText("หน่วยเป็นคำ เช่น ถุง เมตร ห้ามใส่ตัวเลข")).toHaveCount(0);
+  const quantity = await dialog.getByLabel("จำนวนรายการ 1", { exact: true }).boundingBox();
+  const unit = await dialog.getByLabel("หน่วยรายการ 1", { exact: true }).boundingBox();
+  expect(quantity!.width).toBeGreaterThan(100);
+  expect(Math.abs(quantity!.width - unit!.width)).toBeLessThan(30);
+});
+
 test("permission loss removes the cached case without signing out a valid account", async ({
   page,
 }) => {
