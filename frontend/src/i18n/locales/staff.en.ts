@@ -58,7 +58,6 @@ const messages: Record<string, string> = {
   "เลขเรื่อง #": "Reference #",
   "· ฉบับ": "· Version",
   "เหตุผล:": "Reason: ",
-  ยืนยัน: "Confirm",
   บันทึกแล้ว: "Saved",
   กลับรายการ: "Back to list",
   ยังไม่ได้แนบไฟล์: "No files attached",

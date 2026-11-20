@@ -2,7 +2,7 @@ import { useI18n } from "./i18n/useI18n";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Card, Spin, Typography } from "antd";
 import { AuthUnavailableError, post, refreshCsrf } from "./api";
-import { govClient, useGovConfig } from "./govSso";
+import { useGovConfig } from "./govSso";
 import type { GovCallbackReturn } from "./govCallbackReturn";
 export default function GovCallback({ returned }: { returned: GovCallbackReturn }) {
   const { t } = useI18n();
@@ -14,27 +14,33 @@ export default function GovCallback({ returned }: { returned: GovCallbackReturn 
     if (!config || started.current) return;
     started.current = true;
     const { code, state, service } = returned;
+    // Phones have no console: a short code on screen says which check stopped the login.
+    let step = returned.errorCode || "";
     void (async () => {
       try {
         if (!config.configured)
           throw new Error("ยังไม่ได้ตั้งค่า Gov Center SSO กรุณาเริ่มเข้าสู่ระบบใหม่");
         if (returned.error) throw new Error(returned.error);
+        step = "S1";
+        // The server matches state against the session that started login. The SDK's
+        // sessionStorage copy is per tab, and phones often return from LINE in a new tab.
         if (
           !code?.trim() ||
           !state ||
           !/^[a-f0-9]{64}$/.test(state) ||
-          (service !== null && service !== config.serviceCode) ||
-          !govClient(config).verifyState(state)
+          (service !== null && service !== config.serviceCode)
         )
           throw new Error("การตรวจสอบความปลอดภัยไม่สำเร็จ กรุณาเริ่มเข้าสู่ระบบใหม่");
+        step = "";
         const result = await post("/auth/sso-callback", { code: code.trim(), state });
         if (!result?.success) throw new Error("ยืนยันตัวตนไม่สำเร็จ กรุณาเริ่มเข้าสู่ระบบใหม่");
+        step = "S4";
         await refreshCsrf();
         // Root callbacks have already cleared their query. A hash-only navigation
         // would keep this callback component mounted instead of loading the app.
         window.location.replace("/");
       } catch (e) {
-        setErrorDetail(e instanceof AuthUnavailableError ? e.detail : "");
+        setErrorDetail(e instanceof AuthUnavailableError ? e.detail : step && `(${step})`);
         setError((e as Error).message);
       }
     })();

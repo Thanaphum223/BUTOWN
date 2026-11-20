@@ -907,20 +907,86 @@ class TownTrackIntegrationTest {
   }
 
   @Test
-  void citizenTrackingUsesFiveItemsPerPage() throws Exception {
+  void usersReadAndDeleteOnlyTheirOwnNotifications() throws Exception {
+    UUID complaint = create(), mine = UUID.randomUUID(), other = UUID.randomUUID();
+    db.run(
+        "INSERT INTO notification(id,user_id,complaint_id,message)"
+            + " VALUES(?,?,?,'mine'),(?,?,?,'other')",
+        mine,
+        users.get("OFFICER"),
+        complaint,
+        other,
+        users.get("CITIZEN"),
+        complaint);
+    db.run(
+        "INSERT INTO notification_delivery(notification_id,idempotency_key) VALUES(?,?)",
+        mine,
+        UUID.randomUUID());
+    mvc.perform(as(post("/api/notifications/" + other + "/read").with(csrf()), "OFFICER"))
+        .andExpect(status().isNotFound());
+    mvc.perform(as(delete("/api/notifications/" + other).with(csrf()), "OFFICER"))
+        .andExpect(status().isNotFound());
+    mvc.perform(as(post("/api/notifications/" + mine + "/read"), "OFFICER"))
+        .andExpect(status().isForbidden());
+    mvc.perform(as(post("/api/notifications/" + mine + "/read").with(csrf()), "OFFICER"))
+        .andExpect(status().isOk());
+    assertNotNull(db.one("SELECT read_at FROM notification WHERE id=?", mine).get("read_at"));
+    assertNull(db.one("SELECT read_at FROM notification WHERE id=?", other).get("read_at"));
+    mvc.perform(as(delete("/api/notifications/" + mine).with(csrf()), "OFFICER"))
+        .andExpect(status().isOk());
+    assertTrue(db.list("SELECT id FROM notification WHERE id=?", mine).isEmpty());
+    assertTrue(
+        db.list("SELECT 1 FROM notification_delivery WHERE notification_id=?", mine).isEmpty());
+    assertFalse(db.list("SELECT id FROM notification WHERE id=?", other).isEmpty());
+  }
+
+  @Test
+  void communityMapPointsCoverEveryCaseBeyondTheListPageAndArea() throws Exception {
+    for (int i = 0; i < 13; i++) create();
+    mvc.perform(as(get("/api/community/complaints?scope=municipality&size=12"), "CITIZEN"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items.length()").value(12))
+        .andExpect(jsonPath("$.points.length()").value(13))
+        .andExpect(jsonPath("$.points[0].latitude").exists())
+        .andExpect(jsonPath("$.points[0].description").doesNotExist());
+    mvc.perform(as(get("/api/community/complaints?latitude=0&longitude=0"), "CITIZEN"))
+        .andExpect(jsonPath("$.items.length()").value(0))
+        .andExpect(jsonPath("$.points.length()").value(13));
+  }
+
+  @Test
+  void citizenTrackingUsesSixItemsPerPage() throws Exception {
     for (int i = 0; i < 11; i++) create();
     mvc.perform(as(get("/api/citizen/tracking?tab=mine&page=0"), "CITIZEN"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.items.length()").value(5))
+        .andExpect(jsonPath("$.items.length()").value(6))
+        .andExpect(jsonPath("$.items[0].description").value("Private citizen details"))
+        .andExpect(jsonPath("$.items[0].votes").value(0))
         .andExpect(jsonPath("$.total").value(11));
     mvc.perform(as(get("/api/citizen/tracking?tab=mine&page=1"), "CITIZEN"))
         .andExpect(jsonPath("$.items.length()").value(5));
     mvc.perform(as(get("/api/citizen/tracking?tab=mine&page=2"), "CITIZEN"))
-        .andExpect(jsonPath("$.items.length()").value(1));
+        .andExpect(jsonPath("$.items.length()").value(0));
     // Reporters follow their own reports automatically.
     mvc.perform(as(get("/api/citizen/tracking?tab=following"), "CITIZEN"))
-        .andExpect(jsonPath("$.items.length()").value(5))
+        .andExpect(jsonPath("$.items.length()").value(6))
         .andExpect(jsonPath("$.total").value(11));
+    UUID neighbour = UUID.randomUUID();
+    db.run(
+        "INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role)"
+            + " VALUES(?,?,'testNEIGHBOUR','not-a-login-hash','Neighbour','CITIZEN')",
+        neighbour,
+        town);
+    db.run(
+        "INSERT INTO follower(complaint_id,user_id) SELECT id,? FROM complaint WHERE"
+            + " reporter_id=? LIMIT 1",
+        neighbour,
+        users.get("CITIZEN"));
+    mvc.perform(as(get("/api/citizen/tracking?tab=following"), "NEIGHBOUR"))
+        .andExpect(jsonPath("$.items.length()").value(1))
+        .andExpect(jsonPath("$.items[0].category_name").exists())
+        .andExpect(jsonPath("$.items[0].description").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.items[0].address").value(org.hamcrest.Matchers.nullValue()));
     mvc.perform(as(get("/api/citizen/tracking"), "OFFICER")).andExpect(status().isForbidden());
   }
 
@@ -2601,6 +2667,13 @@ class TownTrackIntegrationTest {
                 "CITIZEN"))
         .andExpect(jsonPath("$[0].contact_phone").doesNotExist())
         .andExpect(jsonPath("$[0].contact_name").doesNotExist());
+    for (String phone : List.of("08123456789", "081-234-5678", "812345678")) {
+      body.put("contactPhone", phone);
+      mvc.perform(as(complaintRequest(body).with(csrf()), "CITIZEN"))
+          .andExpect(status().isBadRequest());
+    }
+    body.put("contactPhone", "021234567");
+    mvc.perform(as(complaintRequest(body).with(csrf()), "CITIZEN")).andExpect(status().isOk());
     body.put("contactPhone", "not-a-phone");
     mvc.perform(
             as(

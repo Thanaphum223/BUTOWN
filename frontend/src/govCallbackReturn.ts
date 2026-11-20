@@ -3,6 +3,7 @@ export type GovCallbackReturn = {
   state: string | null;
   service: string | null;
   error: string;
+  errorCode?: string;
 };
 
 // Runs before importing the app, loading config or rendering React. Gov may
@@ -20,14 +21,21 @@ export function captureGovReturn(): GovCallbackReturn | null {
   if (!callback) return null;
   window.history.replaceState({}, "", pathname);
   let error = "";
+  let errorCode: string | undefined;
+  const securityError = "การตรวจสอบความปลอดภัยไม่สำเร็จ กรุณาเริ่มเข้าสู่ระบบใหม่";
+  // Gov sometimes echoes state onto a callback that already carries it; identical copies are
+  // unambiguous, differing ones are not.
   if (
     ["code", "state", "service", "error", "auth_status", "is_new_user"].some(
-      (key) => query.getAll(key).length > 1,
-    ) ||
-    ["access_token", "refresh_token", "id_token"].some((key) => query.has(key))
-  )
-    error = "การตรวจสอบความปลอดภัยไม่สำเร็จ กรุณาเริ่มเข้าสู่ระบบใหม่";
-  else if (query.has("error"))
+      (key) => new Set(query.getAll(key)).size > 1,
+    )
+  ) {
+    error = securityError;
+    errorCode = "S2";
+  } else if (["access_token", "refresh_token", "id_token"].some((key) => query.has(key))) {
+    error = securityError;
+    errorCode = "S3";
+  } else if (query.has("error"))
     error = "Gov Center ไม่ได้อนุมัติการเข้าสู่ระบบ กรุณาเริ่มเข้าสู่ระบบใหม่";
   else if (
     query.has("auth_status") ||
@@ -39,5 +47,6 @@ export function captureGovReturn(): GovCallbackReturn | null {
     state: query.get("state"),
     service: query.get("service"),
     error,
+    errorCode,
   };
 }

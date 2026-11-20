@@ -1,3 +1,4 @@
+import { categoryLabel } from "./i18n/categories";
 import { useLiveQuery } from "./useLiveQuery";
 import { useEffect, useState } from "react";
 import {
@@ -13,7 +14,7 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { FilterOutlined } from "@ant-design/icons";
+import { FilterOutlined } from "./icons";
 import { date, statusNames } from "./api";
 import { useI18n } from "./i18n/useI18n";
 
@@ -246,7 +247,7 @@ export default function ApproverOverview({
                   <Text type="secondary">#{item.id.slice(0, 8).toUpperCase()}</Text>
                 </div>
                 <Title level={3}>{item.title}</Title>
-                <Text>{item.category_name}</Text>
+                <Text>{categoryLabel(item.category_name)}</Text>
                 <Text type="secondary">{item.address || t("ไม่ระบุสถานที่")}</Text>
                 <Text type="secondary">
                   {t("วันที่แจ้ง")} {date(item.created_at)}

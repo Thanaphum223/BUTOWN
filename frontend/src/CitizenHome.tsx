@@ -1,3 +1,4 @@
+import { categoryLabel } from "./i18n/categories";
 import { useI18n } from "./i18n/useI18n";
 import { useEffect, useState } from "react";
 import {
@@ -23,7 +24,7 @@ import {
   FileTextOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
-} from "@ant-design/icons";
+} from "./icons";
 import { api, progressLabel } from "./api";
 import { useGeo } from "./GeoContext";
 import CommunityDetail from "./CommunityDetail";
@@ -95,6 +96,7 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
     setRevision((v) => v + 1);
   }
   const items: D[] = result?.items || [];
+  const mapPoints: D[] = result?.points || items;
   async function vote(item: D) {
     setVoting(item.id);
     try {
@@ -196,7 +198,7 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
         </span>
         {statusTag(item)}
       </div>
-      <Title level={4}>{item.category_name}</Title>
+      <Title level={4}>{categoryLabel(item.category_name)}</Title>
       <Text type="secondary">
         #{item.id.slice(0, 8).toUpperCase()} ·{" "}
         {new Date(item.created_at).toLocaleDateString(language === "en" ? "en-GB" : "th-TH")}
@@ -309,7 +311,10 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
             style={{ minWidth: 240 }}
             options={[
               { value: "", label: t("ทุกประเภทปัญหา") },
-              ...(catalog?.categories || []).map((c: D) => ({ value: c.id, label: c.name })),
+              ...(catalog?.categories || []).map((c: D) => ({
+                value: c.id,
+                label: categoryLabel(c.name),
+              })),
             ]}
             onChange={(value) => {
               setCategory(value || undefined);
@@ -334,7 +339,7 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
               setPoint(p);
               changeArea("nearby");
             }}
-            points={items
+            points={mapPoints
               .filter((i) => i.latitude != null && i.longitude != null)
               .map((i) => ({
                 id: i.id,
@@ -344,9 +349,7 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
                 categoryName: i.category_name,
               }))}
           />
-          <Text type="secondary">
-            {municipal ? t("ตำแหน่งโดยประมาณของรายการในหน้านี้") : t("ตำแหน่งโดยประมาณ")}
-          </Text>
+          <Text type="secondary">{t("ตำแหน่งโดยประมาณของทุกเรื่องในเทศบาล")}</Text>
         </Card>
         <section className="community-results">
           <div className="ranking-heading">
@@ -370,7 +373,7 @@ export default function CitizenHome({ onFollowing }: { onFollowing: () => void }
                 <div className="ranking-copy">
                   <strong>
                     <button className="community-detail-link" onClick={() => setDetailId(item.id)}>
-                      {item.category_name}
+                      {categoryLabel(item.category_name)}
                     </button>
                   </strong>
                   <div>

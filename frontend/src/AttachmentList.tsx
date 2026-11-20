@@ -2,12 +2,7 @@ import { useI18n } from "./i18n/useI18n";
 import { translate as t } from "./i18n/core";
 import { Component, lazy, Suspense, useState, type ReactNode } from "react";
 import { Alert, Button, Empty, Modal, Space, Spin, Typography } from "antd";
-import {
-  DownloadOutlined,
-  EyeOutlined,
-  FilePdfOutlined,
-  PaperClipOutlined,
-} from "@ant-design/icons";
+import { DownloadOutlined, EyeOutlined, FilePdfOutlined, PaperClipOutlined } from "./icons";
 const PdfPreview = lazy(() => import("./PdfPreview"));
 type D = Record<string, any>;
 type FileEndpoint = "files" | "media";

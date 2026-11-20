@@ -7,7 +7,7 @@ import {
   RightOutlined,
   MinusOutlined,
   PlusOutlined,
-} from "@ant-design/icons";
+} from "./icons";
 import {
   getDocument,
   GlobalWorkerOptions,

@@ -17,7 +17,7 @@ import {
   Tabs,
   Typography,
 } from "antd";
-import { DeleteOutlined } from "@ant-design/icons";
+import { DeleteOutlined } from "./icons";
 import { api, post, roleNames } from "./api";
 import DepartmentPeople from "./DepartmentPeople";
 import AccountDeletion from "./AccountDeletion";

@@ -1,3 +1,4 @@
+import { categoryLabel } from "./i18n/categories";
 import "./staffWorkspace.css";
 import { useLiveQuery } from "./useLiveQuery";
 import FieldTaskCard, { type CardMetadata } from "./FieldTaskCard";
@@ -22,7 +23,7 @@ import {
   RightOutlined,
   LikeOutlined,
   FilterOutlined,
-} from "@ant-design/icons";
+} from "./icons";
 import { api, statusNames } from "./api";
 import Detail from "./Detail";
 type D = Record<string, any>;
@@ -265,7 +266,7 @@ export default function StaffWorkspace({
                   }}
                   options={(catalog?.categories || []).map((c: D) => ({
                     value: c.id,
-                    label: c.name,
+                    label: categoryLabel(c.name),
                   }))}
                 />
                 <Input.Search
@@ -380,7 +381,7 @@ export default function StaffWorkspace({
                       <span className="queue-reference">#{r.id.slice(0, 8).toUpperCase()}</span>
                     </span>
                     <span className="queue-card-title">{r.title}</span>
-                    <span className="queue-card-category">{r.category_name}</span>
+                    <span className="queue-card-category">{categoryLabel(r.category_name)}</span>
                     {r.status === "TERMINATED" && (
                       <span className="terminal-subtitle">
                         {t(

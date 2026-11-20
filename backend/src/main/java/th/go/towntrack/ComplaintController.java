@@ -61,7 +61,8 @@ public class ComplaintController {
       @DecimalMin("-180") @DecimalMax("180") Double longitude,
       Map<String, String> answers,
       @Size(max = 200) String contactName,
-      @Size(max = 30) @Pattern(regexp = "[0-9+() -]*") String contactPhone) {}
+      // Thai numbers: 9-digit landlines or 10-digit mobiles, digits only.
+      @Pattern(regexp = "(0[0-9]{8,9})?") String contactPhone) {}
 
   @PostMapping(value = "/complaints", consumes = "application/json")
   public Object missingEvidence(@Valid @RequestBody NewComplaint b, Authentication a) {
@@ -511,6 +512,16 @@ public class ComplaintController {
         new ArrayList<Object>(Arrays.asList(u.get("municipality_id"), categoryId, categoryId));
     var municipalityTotal =
         db.one("SELECT count(*) total" + base, parameters.toArray()).get("total");
+    // The home map shows every case in the municipality, not just the current list page or area.
+    var points =
+        db.list(
+            "SELECT c.id,k.name category_name,c.status,"
+                + "round(ST_Y(c.location::geometry)::numeric,3) latitude,"
+                + "round(ST_X(c.location::geometry)::numeric,3) longitude"
+                + base
+                + " AND c.location IS NOT NULL ORDER BY c.created_at DESC,c.id LIMIT "
+                + MAP_POINTS,
+            parameters.toArray());
     if (nearby) {
       base += " AND ST_DWithin(c.location,ST_SetSRID(ST_MakePoint(?,?),4326)::geography,5000)";
       parameters.add(longitude);
@@ -566,7 +577,9 @@ public class ComplaintController {
         "stats",
         stats,
         "municipalityTotal",
-        municipalityTotal);
+        municipalityTotal,
+        "points",
+        points);
   }
 
   @GetMapping("/community/complaints/{id}")
@@ -650,6 +663,7 @@ public class ComplaintController {
   // Reports this close (of the chosen category, once picked) are likely the same problem, so
   // citizens can follow or vote instead of filing a duplicate.
   static final int NEARBY_METERS = 100;
+  static final int MAP_POINTS = 2000;
 
   @GetMapping("/nearby")
   public Object nearby(
@@ -739,5 +753,25 @@ public class ComplaintController {
     db.run(
         "UPDATE notification SET read_at=now() WHERE user_id=? AND read_at IS NULL",
         access.user(a).get("id"));
+  }
+
+  @PostMapping("/notifications/{id}/read")
+  public void readOne(@PathVariable UUID id, Authentication a) {
+    var user = access.user(a).get("id");
+    db.one("SELECT id FROM notification WHERE id=? AND user_id=?", id, user);
+    db.run(
+        "UPDATE notification SET read_at=now() WHERE id=? AND user_id=? AND read_at IS NULL",
+        id,
+        user);
+  }
+
+  @DeleteMapping("/notifications/{id}")
+  @Transactional
+  public void deleteNotification(@PathVariable UUID id, Authentication a) {
+    var user = access.user(a).get("id");
+    db.one("SELECT id FROM notification WHERE id=? AND user_id=?", id, user);
+    // A pending LINE copy has nothing left to deliver once its notification is gone.
+    db.run("DELETE FROM notification_delivery WHERE notification_id=?", id);
+    db.run("DELETE FROM notification WHERE id=? AND user_id=?", id, user);
   }
 }

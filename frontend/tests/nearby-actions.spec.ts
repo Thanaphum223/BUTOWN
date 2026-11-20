@@ -242,3 +242,122 @@ for (const initiallyVoted of [false, true]) {
     expect(state.writes).toHaveLength(1);
   });
 }
+
+test("nearby cases show five per page with numbered pages", async ({ page }) => {
+  const cases = Array.from({ length: 12 }, (_, index) => ({
+    id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    category_id: category,
+    category_name: `เคสที่ ${index + 1}`,
+    status: "NEW",
+    latitude: 13.75,
+    longitude: 100.5,
+    votes: 0,
+    voted: false,
+    following: false,
+    created_at: "2026-11-04T01:00:00Z",
+    media_count: 0,
+    cover: null,
+  }));
+  await page.route("https://tile.openstreetmap.org/**", (r) =>
+    r.fulfill({ contentType: "image/png", body: tile }),
+  );
+  await page.route("**/api/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const payload: Record<string, unknown> = {
+      "/api/auth/me": { id: "test-citizen", display_name: "ผู้ทดสอบ", role: "CITIZEN" },
+      "/api/auth/csrf": { token: "test", headerName: "X-CSRF-TOKEN" },
+      "/api/privacy": { version: "test", acknowledged: true },
+      "/api/public/map-config": { provider: "leaflet", publicToken: "" },
+      "/api/catalog": { categories: [], departments: [] },
+      "/api/municipal-center": { latitude: 13.75, longitude: 100.5 },
+      "/api/geocoding/reverse": { display_name: "สถานที่ทดสอบ" },
+      "/api/nearby": cases,
+      "/api/community/complaints": { items: [], top: [], total: 0, municipalityTotal: 0 },
+    };
+    return route.fulfill({ json: payload[path] ?? {} });
+  });
+  await page.goto("/");
+  await openReport(page);
+  await page.getByLabel("ค้นหาชื่อสถานที่ หรือพิกัด", { exact: true }).fill("13.75, 100.5");
+  await page.getByRole("button", { name: "ค้นหา", exact: true }).click();
+  await expect(page.getByText("พบ 12 เคสใกล้เคียง", { exact: true })).toBeVisible();
+  const list = page.locator(".nearby-issues");
+  await expect(list.locator(".nearby-issue")).toHaveCount(5);
+  await expect(list.getByText("เคสที่ 6", { exact: true })).toHaveCount(0);
+  await list.getByRole("listitem", { name: "3" }).click();
+  await expect(list.locator(".nearby-issue")).toHaveCount(2);
+  await expect(list.getByText("เคสที่ 11", { exact: true })).toBeVisible();
+});
+
+async function citizenRoutes(page: Page, nearbyCases: unknown[], community: unknown) {
+  await page.route("https://tile.openstreetmap.org/**", (r) =>
+    r.fulfill({ contentType: "image/png", body: tile }),
+  );
+  await page.route("**/api/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const payload: Record<string, unknown> = {
+      "/api/auth/me": { id: "test-citizen", display_name: "ผู้ทดสอบ", role: "CITIZEN" },
+      "/api/auth/csrf": { token: "test", headerName: "X-CSRF-TOKEN" },
+      "/api/privacy": { version: "test", acknowledged: true },
+      "/api/public/map-config": { provider: "leaflet", publicToken: "" },
+      "/api/catalog": { categories: [], departments: [] },
+      "/api/municipal-center": { latitude: 13.75, longitude: 100.5 },
+      "/api/geocoding/reverse": { display_name: "สถานที่ทดสอบ" },
+      "/api/nearby": nearbyCases,
+      "/api/community/complaints": community,
+    };
+    return route.fulfill({ json: payload[path] ?? {} });
+  });
+}
+
+test("report map keeps nearby markers inside the 100 metre circle", async ({ page }) => {
+  // Rounded to three decimals, this match plots about 150 m from the chosen point.
+  await citizenRoutes(
+    page,
+    [
+      {
+        id: "33333333-3333-4333-8333-333333333333",
+        category_id: category,
+        category_name: categoryName,
+        status: "NEW",
+        latitude: 13.751,
+        longitude: 100.501,
+        votes: 0,
+        voted: false,
+        following: false,
+        created_at: "2026-11-04T01:00:00Z",
+      },
+    ],
+    { items: [], top: [], total: 0, municipalityTotal: 0 },
+  );
+  await page.goto("/");
+  await openReport(page);
+  await page.getByLabel("ค้นหาชื่อสถานที่ หรือพิกัด", { exact: true }).fill("13.75, 100.5");
+  await page.getByRole("button", { name: "ค้นหา", exact: true }).click();
+  await expect(page.getByText("พบ 1 เคสใกล้เคียง", { exact: true })).toBeVisible();
+  const circle = (await page.locator(".nearby-radius").boundingBox())!;
+  const marker = (await page.locator(".complaint-map-icon").boundingBox())!;
+  const centre = [circle.x + circle.width / 2, circle.y + circle.height / 2];
+  const at = [marker.x + marker.width / 2, marker.y + marker.height / 2];
+  expect(Math.hypot(at[0] - centre[0], at[1] - centre[1])).toBeLessThan(circle.width / 2);
+});
+
+test("home map plots every municipal case, not just the listed page", async ({ page }) => {
+  const point = (index: number) => ({
+    id: `44444444-4444-4444-8444-${String(index).padStart(12, "0")}`,
+    category_name: categoryName,
+    status: "NEW",
+    latitude: 13.75 + index * 0.01,
+    longitude: 100.5 + index * 0.01,
+  });
+  await citizenRoutes(page, [], {
+    items: [{ ...point(0), votes: 0, voted: false, following: false, created_at: "2026-11-04" }],
+    top: [],
+    total: 1,
+    municipalityTotal: 3,
+    stats: { total: 3, votes: 0, closed: 0, in_progress: 3 },
+    points: [point(0), point(1), point(2)],
+  });
+  await page.goto("/");
+  await expect(page.locator(".community-map-panel .complaint-map-icon")).toHaveCount(3);
+});

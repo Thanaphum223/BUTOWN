@@ -1,7 +1,7 @@
 import { useI18n } from "./i18n/useI18n";
 import { useState } from "react";
 import { Alert, Button, Descriptions, Drawer, Space, Spin, Tooltip } from "antd";
-import { UserOutlined } from "@ant-design/icons";
+import { UserOutlined } from "./icons";
 import { api, date } from "./api";
 import GovLogin from "./GovLogin";
 

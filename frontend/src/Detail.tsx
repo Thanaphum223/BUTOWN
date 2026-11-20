@@ -6,7 +6,7 @@ import AttachmentList from "./AttachmentList";
 import AssignmentPicker from "./AssignmentPicker";
 import ResourceReview from "./ResourceReview";
 import CitizenOutcome from "./CitizenOutcome";
-import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { DeleteOutlined, PlusOutlined } from "./icons";
 import EvidenceUpload from "./EvidenceUpload";
 import EvidenceGallery from "./EvidenceGallery";
 import { readDraft, saveDraft, removeDraft, type FieldDraft } from "./fieldDraft";
@@ -36,7 +36,7 @@ import {
   Typography,
   Upload,
 } from "antd";
-import { ArrowLeftOutlined, UploadOutlined, EnvironmentOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, UploadOutlined, EnvironmentOutlined } from "./icons";
 import { api, actionNames, date, requiredReasonActions, progressLabel } from "./api";
 import LocationMap from "./LocationMap";
 import { useGeo } from "./GeoContext";

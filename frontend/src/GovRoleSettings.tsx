@@ -2,7 +2,7 @@ import { useI18n } from "./i18n/useI18n";
 import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
 import { useEffect, useRef, useState } from "react";
 import { Alert, App, Button, Card, Form, Input, Select, Space, Typography } from "antd";
-import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { DeleteOutlined, PlusOutlined } from "./icons";
 import { api, post, roleNames } from "./api";
 
 type Mapping = { govRole: string; role: string; departmentId: string | null };

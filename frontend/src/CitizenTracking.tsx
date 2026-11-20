@@ -1,3 +1,4 @@
+import { categoryLabel } from "./i18n/categories";
 import { useLiveQuery } from "./useLiveQuery";
 import { useI18n } from "./i18n/useI18n";
 import { useState } from "react";
@@ -14,7 +15,13 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { BellOutlined, CalendarOutlined, EyeOutlined } from "@ant-design/icons";
+import {
+  BellOutlined,
+  CalendarOutlined,
+  EnvironmentOutlined,
+  EyeOutlined,
+  LikeOutlined,
+} from "./icons";
 import { api, date, progressLabel } from "./api";
 type D = Record<string, any>;
 export default function CitizenTracking({
@@ -110,7 +117,17 @@ export default function CitizenTracking({
                   #{item.id.slice(0, 8).toUpperCase()}
                 </Typography.Text>
               </div>
-              <Typography.Title level={4}>{item.category_name}</Typography.Title>
+              <Typography.Title level={4}>{categoryLabel(item.category_name)}</Typography.Title>
+              {item.description && (
+                <Typography.Paragraph className="tracking-description" ellipsis={{ rows: 2 }}>
+                  {item.description}
+                </Typography.Paragraph>
+              )}
+              {item.address && (
+                <Typography.Text type="secondary" className="tracking-address">
+                  <EnvironmentOutlined aria-hidden /> {item.address}
+                </Typography.Text>
+              )}
               <div className="tracking-dates">
                 <span>
                   <CalendarOutlined aria-hidden /> {t("แจ้งเมื่อ")}
@@ -119,6 +136,9 @@ export default function CitizenTracking({
                 <span>
                   {t("อัปเดตล่าสุด")}
                   {date(item.updated_at)}
+                </span>
+                <span>
+                  <LikeOutlined aria-hidden /> {Number(item.votes || 0)} {t("โหวต")}
                 </span>
               </div>
               <Space className="tracking-card-actions" wrap>
@@ -147,8 +167,10 @@ export default function CitizenTracking({
         )}
       />
       <Pagination
+        className="tracking-pagination"
+        align="center"
         current={page}
-        pageSize={5}
+        pageSize={6}
         total={Number(data?.total || 0)}
         showSizeChanger={false}
         showTotal={(total) => t("ทั้งหมด {{count}} เรื่อง", { count: total })}

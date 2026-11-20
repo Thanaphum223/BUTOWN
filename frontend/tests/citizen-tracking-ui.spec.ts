@@ -166,6 +166,43 @@ for (const width of [390, 1440]) {
   });
 }
 
+test("tracking shows six detailed cases per page with centred page numbers", async ({ page }) => {
+  const { mine } = await citizen(page);
+  const pages: string[] = [];
+  await page.route("**/api/citizen/tracking?**", (route) => {
+    const url = new URL(route.request().url());
+    pages.push(url.searchParams.get("page")!);
+    const first = url.searchParams.get("page") === "0";
+    const items = Array.from({ length: first ? 6 : 2 }, (_, index) => ({
+      ...mine,
+      id: `case-${first ? index : index + 6}-0000`,
+      description: "ท่อแตกน้ำไหลตลอดคืน",
+      address: "ซอยทดสอบ 3",
+      votes: 4,
+    }));
+    return route.fulfill({ json: { items, total: 8 } });
+  });
+  await page
+    .getByRole("navigation", { name: "เมนูประชาชน", exact: true })
+    .getByRole("link", { name: /ติดตามสถานะ/ })
+    .click();
+  const cards = page.locator(".tracking-card");
+  await expect(cards).toHaveCount(6);
+  await expect(cards.first()).toContainText("ท่อแตกน้ำไหลตลอดคืน");
+  await expect(cards.first()).toContainText("ซอยทดสอบ 3");
+  await expect(cards.first()).toContainText("4 โหวต");
+  const pager = page.locator(".tracking-pagination");
+  const list = (await page.locator(".tracking-list").boundingBox())!;
+  const [left, right] = await pager.locator("li").evaluateAll((nodes) => {
+    const boxes = nodes.map((node) => node.getBoundingClientRect());
+    return [Math.min(...boxes.map((b) => b.left)), Math.max(...boxes.map((b) => b.right))];
+  });
+  expect(Math.abs((left + right) / 2 - (list.x + list.width / 2))).toBeLessThan(4);
+  await pager.getByRole("listitem", { name: "2" }).click();
+  await expect(cards).toHaveCount(2);
+  expect(pages).toContain("1");
+});
+
 test("a followed new complaint opens read only without reporter upload controls", async ({
   page,
 }) => {

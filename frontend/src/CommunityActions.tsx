@@ -1,6 +1,6 @@
 import { useI18n } from "./i18n/useI18n";
 import { Button } from "antd";
-import { BellOutlined, CheckOutlined, EyeOutlined, LikeOutlined } from "@ant-design/icons";
+import { BellOutlined, CheckOutlined, EyeOutlined, LikeOutlined } from "./icons";
 
 type Item = {
   id: string;

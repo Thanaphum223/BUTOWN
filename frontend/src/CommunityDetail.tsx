@@ -1,3 +1,4 @@
+import { categoryLabel } from "./i18n/categories";
 import { useI18n } from "./i18n/useI18n";
 import { useEffect, useState } from "react";
 import { Alert, Descriptions, Modal, Spin, Tag, Timeline, Typography } from "antd";
@@ -31,7 +32,7 @@ export default function CommunityDetail({ id, onClose }: { id?: string; onClose:
         <Spin />
       ) : (
         <>
-          <Typography.Title level={4}>{c.category_name}</Typography.Title>
+          <Typography.Title level={4}>{categoryLabel(c.category_name)}</Typography.Title>
           {c.mock && <Tag>{t("MOCK · ข้อมูลจำลอง")}</Tag>}
           <Descriptions
             column={1}

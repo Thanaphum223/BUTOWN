@@ -15,6 +15,7 @@ export default function LeafletLocationMap({
   const el = useRef<HTMLDivElement>(null),
     map = useRef<L.Map | null>(null),
     radius = useRef<L.Circle | null>(null),
+    pointBounds = useRef<L.LatLngBounds | null>(null),
     marker = useRef<L.CircleMarker | null>(null),
     cb = useRef(onChange);
   cb.current = onChange;
@@ -33,10 +34,13 @@ export default function LeafletLocationMap({
     m.on("click", (e) => cb.current?.([e.latlng.lat, e.latlng.lng]));
     map.current = m;
     const timer = setTimeout(() => m.invalidateSize(), 100);
+    // A fit made while the container had no size zooms out to the whole world; redo it on resize.
     const resize = new ResizeObserver(() => {
       m.invalidateSize();
       if (radius.current)
         m.fitBounds(radius.current.getBounds(), { padding: [20, 20], animate: false });
+      else if (pointBounds.current)
+        m.fitBounds(pointBounds.current, { padding: [28, 28], maxZoom: 15, animate: false });
     });
     resize.observe(el.current);
     return () => {
@@ -140,14 +144,18 @@ export default function LeafletLocationMap({
       label.textContent = (name ? name + " · " : "") + "#" + item.id.slice(0, 8).toUpperCase();
       dot.bindTooltip(label).addTo(layer);
     }
-    if (fitPoints && points?.length) {
-      map.current.fitBounds(
-        L.latLngBounds(
-          points.map((p) => [Number(p.latitude), Number(p.longitude)] as [number, number]),
-        ),
-        { padding: [28, 28], maxZoom: 15, animate: false },
-      );
-    }
+    pointBounds.current =
+      fitPoints && points?.length
+        ? L.latLngBounds(
+            points.map((p) => [Number(p.latitude), Number(p.longitude)] as [number, number]),
+          )
+        : null;
+    if (pointBounds.current)
+      map.current.fitBounds(pointBounds.current, {
+        padding: [28, 28],
+        maxZoom: 15,
+        animate: false,
+      });
     return () => {
       layer.remove();
     };

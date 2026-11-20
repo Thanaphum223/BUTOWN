@@ -1,3 +1,4 @@
+import { categoryLabel } from "./i18n/categories";
 import { Alert, Button, Card, Space, Spin, Tag, Typography } from "antd";
 import { useI18n } from "./i18n/useI18n";
 import { statusNames } from "./api";
@@ -36,7 +37,7 @@ export default function FieldTaskCard({
         </p>
       )}
       <p>
-        {t("ประเภทปัญหา")}: {item.category_name}
+        {t("ประเภทปัญหา")}: {categoryLabel(item.category_name)}
       </p>
       <p>
         {t("สถานที่")}: {item.address || t("ไม่ระบุสถานที่")}

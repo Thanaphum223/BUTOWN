@@ -3317,7 +3317,15 @@ button.queue-item .queue-item-top .ant-tag {
 }
 .citizen-tracking > .ant-pagination {
   margin-top: 24px;
-  justify-content: flex-end;
+  justify-content: center;
+}
+.tracking-card .tracking-description {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.tracking-address {
+  font-size: 14px;
+  overflow-wrap: anywhere;
 }
 .citizen-outcome {
   margin: 20px 0;
@@ -3343,12 +3351,10 @@ button.queue-item .queue-item-top .ant-tag {
   .tracking-card-actions .ant-btn {
     width: 100%;
   }
-  .citizen-tracking > .ant-pagination {
-    justify-content: center;
-  }
 }
 
-.language-switcher {
+.language-switcher,
+.theme-switcher {
   max-width: 100%;
   min-height: 44px;
   padding: 6px 10px;
@@ -3359,22 +3365,27 @@ button.queue-item .queue-item-top .ant-tag {
   font: inherit;
   line-height: 1.4;
 }
-.language-switcher:hover {
+.language-switcher:hover,
+.theme-switcher:hover {
   border-color: var(--gov-brand-dark);
   background: var(--gov-surface-soft);
 }
-.language-switcher:focus-visible {
+.language-switcher:focus-visible,
+.theme-switcher:focus-visible {
   outline: 3px solid var(--gov-brand-primary);
   outline-offset: 2px;
 }
-.topbar .language-switcher:focus-visible {
+.topbar .language-switcher:focus-visible,
+.topbar .theme-switcher:focus-visible {
   outline-color: var(--gov-surface);
 }
-.language-switcher option {
+.language-switcher option,
+.theme-switcher option {
   color: var(--gov-text-primary);
   background: var(--gov-surface);
 }
-.language-switcher option:checked {
+.language-switcher option:checked,
+.theme-switcher option:checked {
   color: var(--gov-brand-dark);
   background: var(--gov-surface-soft);
 }
@@ -3864,4 +3875,82 @@ button.queue-item .queue-item-top .ant-tag {
     min-height: 100dvh;
     border-radius: 0;
   }
+}
+
+/* Dark mode: tokens swap in govTheme.ts; these cover colours written directly above. */
+[data-theme="dark"] {
+  --gov-page-surface: var(--gov-brand-surface);
+}
+[data-theme="dark"] .topbar,
+[data-theme="dark"] .staff-shell .brand .municipal-mark,
+[data-theme="dark"] .staff-shell .sidebar-bottom .ant-tag,
+[data-theme="dark"] .staff-shell .sidebar .ant-menu-item-selected,
+[data-theme="dark"] .staff-shell .sidebar .ant-menu-item:hover {
+  background: var(--gov-brand-dark) !important;
+}
+[data-theme="dark"] .submit-bar,
+[data-theme="dark"] .auth-card .ant-input-affix-wrapper,
+[data-theme="dark"] .queue-item,
+[data-theme="dark"] .workspace-welcome,
+[data-theme="dark"] .citizen-bottom-nav,
+[data-theme="dark"] .community-home .community-results,
+[data-theme="dark"] .staff-shell .workspace-detail .page-heading,
+[data-theme="dark"] .staff-shell .split-workspace .work-grid,
+[data-theme="dark"] .staff-shell .split-workspace .queue-item,
+[data-theme="dark"] .staff-shell .split-section,
+[data-theme="dark"] .staff-shell .split-action-dock,
+[data-theme="dark"] .workspace-detail > .page-heading,
+[data-theme="dark"] .community-metrics > div,
+[data-theme="dark"] .community-toolbar,
+[data-theme="dark"] .report-categories button,
+[data-theme="dark"] .member-picked {
+  background: var(--gov-surface) !important;
+}
+[data-theme="dark"] .workflow-modal .ant-form > .ant-btn:last-child {
+  box-shadow: 0 -6px 16px var(--gov-surface);
+}
+[data-theme="dark"] .attention-panel {
+  background: #2a1517;
+  border-color: #5c2a2e;
+  color: #f2b8bc;
+}
+[data-theme="dark"] .attention-panel p {
+  color: #e0a3a8;
+}
+[data-theme="dark"] .resource-withdrawals {
+  background: #2a1517;
+}
+[data-theme="dark"] .resource-withdrawals ul {
+  color: var(--gov-text-tertiary);
+}
+[data-theme="dark"] .ranking-number.rank-1 {
+  background: #3d300c;
+  color: #f2cf6b;
+}
+[data-theme="dark"] .ranking-number.rank-2 {
+  background: #26323a;
+  color: #b9c9d4;
+}
+[data-theme="dark"] .ranking-number.rank-3 {
+  background: #3a2a1d;
+  color: #e3b48d;
+}
+[data-theme="dark"] .queue-card-due.is-overdue {
+  color: #f08a63;
+}
+[data-theme="dark"] .emergency-call:hover {
+  color: #ff9a9a;
+}
+[data-theme="dark"] .language-switcher,
+[data-theme="dark"] .language-switcher option:checked,
+[data-theme="dark"] .theme-switcher,
+[data-theme="dark"] .theme-switcher option:checked {
+  color: var(--gov-text-primary);
+}
+[data-theme="dark"] .staff-shell .sidebar {
+  background: #10241b !important;
+}
+[data-theme="dark"] .staff-shell .sidebar .ant-menu-item:not(.ant-menu-item-selected),
+[data-theme="dark"] .staff-shell .sidebar-bottom .ant-tag {
+  color: #c8dcd1 !important;
 }

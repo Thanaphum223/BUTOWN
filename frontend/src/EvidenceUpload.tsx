@@ -1,7 +1,7 @@
 import { useI18n } from "./i18n/useI18n";
 import { useState } from "react";
 import { Alert, Button, Progress, Space, Typography, Upload } from "antd";
-import { CameraOutlined, UploadOutlined } from "@ant-design/icons";
+import { CameraOutlined, UploadOutlined } from "./icons";
 import { uploadFile } from "./api";
 import { ATTACHMENT_ACCEPT, attachmentError } from "./attachments";
 

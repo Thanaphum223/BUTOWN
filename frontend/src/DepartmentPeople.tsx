@@ -2,7 +2,7 @@ import { useI18n } from "./i18n/useI18n";
 import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
 import { useRef, useState } from "react";
 import { Alert, App, Button, Form, Modal, Select, Space, Table, Typography } from "antd";
-import { DeleteOutlined, EditOutlined, UserAddOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EditOutlined, UserAddOutlined } from "./icons";
 import { post, roleNames } from "./api";
 import DepartmentEditor from "./DepartmentEditor";
 

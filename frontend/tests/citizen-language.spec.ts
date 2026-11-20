@@ -42,8 +42,11 @@ for (const width of [390, 768, 1280]) {
     await page.getByLabel("หัวข้อปัญหา", { exact: true }).fill("หัวข้อที่ผู้ใช้เขียน");
     await page.getByLabel("รายละเอียด", { exact: true }).fill("รายละเอียดประชาชนต้นฉบับ ห้ามแปล");
     await page.getByLabel("ชื่อ–นามสกุล (ไม่บังคับ)", { exact: true }).fill("ชื่อผู้แจ้งต้นฉบับ");
-    await expect(page.getByLabel("เบอร์ติดต่อ (ไม่บังคับ)", { exact: true })).toBeEmpty();
-    await page.getByLabel("เบอร์ติดต่อ (ไม่บังคับ)", { exact: true }).fill("0812345678");
+    const phone = page.getByLabel("เบอร์ติดต่อ (ไม่บังคับ)", { exact: true });
+    await expect(phone).toBeEmpty();
+    await phone.pressSequentially("081-234-5678-99");
+    await expect(phone).toHaveValue("0812345678");
+    await phone.fill("0812345678");
     await page.locator('input[type="file"][multiple]').setInputFiles(photo("หลักฐานต้นฉบับ.png"));
     const requests: { body: string; key: string | undefined }[] = [];
     page.on("request", (request) => {

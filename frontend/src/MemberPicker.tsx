@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, Checkbox, Empty, Input, Tag, Typography } from "antd";
-import { CloseOutlined, StarFilled, StarOutlined } from "@ant-design/icons";
+import { CloseOutlined, StarFilled, StarOutlined } from "./icons";
 import { useI18n } from "./i18n/useI18n";
 
 type D = Record<string, any>;

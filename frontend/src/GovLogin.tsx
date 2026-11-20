@@ -1,7 +1,7 @@
 import { useI18n } from "./i18n/useI18n";
 import { useRef, useState } from "react";
 import { Alert, Button, Space } from "antd";
-import { SafetyCertificateOutlined } from "@ant-design/icons";
+import { SafetyCertificateOutlined } from "./icons";
 import { AuthUnavailableError, post, refreshCsrf } from "./api";
 import { govLineLogin, useGovConfig } from "./govSso";
 export default function GovLogin({

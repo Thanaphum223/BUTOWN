@@ -1,7 +1,7 @@
 import { useI18n } from "./i18n/useI18n";
 import { useEffect, useState } from "react";
 import { Button, Form, Input, Typography } from "antd";
-import { LockOutlined } from "@ant-design/icons";
+import { LockOutlined } from "./icons";
 import { api } from "./api";
 
 export default function ReporterEmail() {

@@ -1,8 +1,9 @@
 import { useLiveQuery } from "./useLiveQuery";
 import { AuthUnavailableError, sessionExpiredEvent, sessionExpiredMessage } from "./api";
 import LanguageSwitcher from "./LanguageSwitcher";
+import ThemeSwitcher from "./ThemeSwitcher";
 import { useI18n } from "./i18n/useI18n";
-import { MenuOutlined } from "@ant-design/icons";
+import { MenuOutlined } from "./icons";
 import GovAuthPage from "./GovAuthPage";
 import GovProfile from "./GovProfile";
 import GovCallback from "./GovCallback";
@@ -59,7 +60,8 @@ import {
   LogoutOutlined,
   TeamOutlined,
   LockOutlined,
-} from "@ant-design/icons";
+  DeleteOutlined,
+} from "./icons";
 import { api, post, statusNames, actionNames, roleNames, date } from "./api";
 const { Title, Text } = Typography;
 type RowData = Record<string, any>;
@@ -345,6 +347,7 @@ function TownTrackApp() {
             </div>
             <Space className="account-controls" wrap>
               <LanguageSwitcher />
+              <ThemeSwitcher />
               {(user.account_role === "ADMIN" || user.role === "ADMIN") && (
                 <>
                   {!screens.lg && (
@@ -711,20 +714,38 @@ function Notifications({ open, citizen }: { open: (id: string) => void; citizen:
   const [communityId, setCommunityId] = useState<string>();
   const [refresh, setRefresh] = useState(0);
   const { data, error } = useData<RowData[]>("/notifications", refresh);
-  const { message } = AntApp.useApp();
+  const { message, modal } = AntApp.useApp();
+  async function run(action: () => Promise<unknown>) {
+    try {
+      await action();
+      setRefresh((x) => x + 1);
+    } catch (e) {
+      message.error(t((e as Error).message));
+    }
+  }
+  const confirm = (title: string, onOk: () => Promise<unknown>) =>
+    modal.confirm({
+      title: t(title),
+      okText: t("ยืนยัน"),
+      cancelText: t("ยกเลิก"),
+      onOk: () => run(onOk),
+    });
+  function view(r: RowData) {
+    if (!r.read_at) void run(() => post(`/notifications/${r.id}/read`, {}));
+    if (citizen) setCommunityId(r.complaint_id);
+    else open(r.complaint_id);
+  }
   return (
     <>
       <div className="page-heading">
         <Title level={2}>{t("การแจ้งเตือน")}</Title>
         <Button
-          onClick={async () => {
-            try {
-              await post("/notifications/read", {});
-              setRefresh((x) => x + 1);
-            } catch (e) {
-              message.error(t((e as Error).message));
-            }
-          }}
+          disabled={!data?.some((r) => !r.read_at)}
+          onClick={() =>
+            confirm("ต้องการทำเครื่องหมายว่าอ่านทั้งหมดแล้วใช่หรือไม่?", () =>
+              post("/notifications/read", {}),
+            )
+          }
         >
           {t("อ่านทั้งหมดแล้ว")}
         </Button>
@@ -737,20 +758,26 @@ function Notifications({ open, citizen }: { open: (id: string) => void; citizen:
           renderItem={(r) => (
             <List.Item
               className="notification-item"
-              actions={
-                r.complaint_id
+              actions={[
+                ...(r.complaint_id
                   ? [
-                      <Button
-                        key="open"
-                        onClick={() =>
-                          citizen ? setCommunityId(r.complaint_id) : open(r.complaint_id)
-                        }
-                      >
+                      <Button key="open" onClick={() => view(r)}>
                         {t("ดูคำร้อง")}
                       </Button>,
                     ]
-                  : undefined
-              }
+                  : []),
+                <Button
+                  key="delete"
+                  danger
+                  icon={<DeleteOutlined />}
+                  aria-label={t("ลบการแจ้งเตือน")}
+                  onClick={() =>
+                    confirm("ต้องการลบการแจ้งเตือนนี้ใช่หรือไม่?", () =>
+                      api(`/notifications/${r.id}`, { method: "DELETE" }),
+                    )
+                  }
+                />,
+              ]}
             >
               <List.Item.Meta
                 avatar={

@@ -1,7 +1,7 @@
 import "./staffWorkspace.css";
 import "./staffOverview.css";
 import { Alert, Button, Card, Empty, Space, Statistic, Tag, Typography } from "antd";
-import { RightOutlined } from "@ant-design/icons";
+import { RightOutlined } from "./icons";
 import { statusNames } from "./api";
 import { useLiveQuery } from "./useLiveQuery";
 import { useI18n } from "./i18n/useI18n";

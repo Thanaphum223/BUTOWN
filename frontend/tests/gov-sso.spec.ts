@@ -173,7 +173,7 @@ for (const suffix of [
   "&service=another-service",
   "&service=towntrack-test&service=another-service",
   "&code=duplicate",
-  `&state=${state}`,
+  `&state=${"b".repeat(64)}`,
   "&access_token=untrusted-parent-token",
 ]) {
   test(`unsafe provider return is rejected without verification: ${suffix}`, async ({ page }) => {
@@ -316,7 +316,7 @@ test("SSO start prevents concurrent Gov email login and recovers on start failur
   finish();
   await expect(page.getByRole("button", { name: /เข้าสู่ระบบ$/ })).toBeEnabled();
 });
-test("callback rejects missing or mismatched state without exchange", async ({ page }) => {
+test("callback rejects missing or malformed state without exchange", async ({ page }) => {
   const seen = await boundary(page);
   // Stored state cannot substitute for a provider echo: that would permit login CSRF.
   await page.addInitScript((s) => sessionStorage.setItem("gov_sso_state", s), state);
@@ -341,6 +341,23 @@ for (const callbackPath of ["/auth/callback", "/auth/callback/", "/"]) {
     expect(page.url()).not.toContain("sample-code");
   });
 }
+test("callback opened in a new tab still lets the server check its state", async ({ page }) => {
+  const seen = await boundary(page);
+  await page.goto(`/auth/callback?code=sample-code&state=${state}`);
+  await expect(page.getByText("SSO Test User", { exact: true })).toBeVisible();
+  expect(seen.callbacks).toEqual([{ code: "sample-code", state }]);
+});
+test("an identical echoed state is accepted but two different states are refused", async ({
+  page,
+}) => {
+  const seen = await boundary(page);
+  await page.goto(`/auth/callback?state=${state}&code=sample-code&state=${state}`);
+  await expect(page.getByText("SSO Test User", { exact: true })).toBeVisible();
+  expect(seen.callbacks).toEqual([{ code: "sample-code", state }]);
+  await page.goto(`/auth/callback?state=${state}&code=other-code&state=${"b".repeat(64)}`);
+  await expect(page.getByRole("alert")).toContainText("(S2)");
+  expect(seen.callbacks).toHaveLength(1);
+});
 test("Website URL callback rejects missing state instead of silently showing login", async ({
   page,
 }) => {

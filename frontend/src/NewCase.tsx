@@ -1,3 +1,4 @@
+import { categoryLabel } from "./i18n/categories";
 import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
 import { useI18n } from "./i18n/useI18n";
 import { useEffect, useRef, useState } from "react";
@@ -23,7 +24,7 @@ import {
   UploadOutlined,
   CheckOutlined,
   ArrowLeftOutlined,
-} from "@ant-design/icons";
+} from "./icons";
 import { api, post, statusNames } from "./api";
 import { useGeo } from "./GeoContext";
 import LocationMap from "./LocationMap";
@@ -61,6 +62,26 @@ const icons = [
   "☷",
   "…",
 ];
+// The server finds cases within the radius by their exact location but only shares coordinates
+// rounded to about 100 m, so a match can plot outside the circle. Pull such markers just inside.
+function insideRadius(
+  centre: [number, number] | undefined,
+  [latitude, longitude]: [number, number],
+  meters: number,
+) {
+  if (!centre) return { latitude, longitude };
+  const metersPerDegree = 111_320;
+  const north = (latitude - centre[0]) * metersPerDegree;
+  const east = (longitude - centre[1]) * metersPerDegree * Math.cos((centre[0] * Math.PI) / 180);
+  const distance = Math.hypot(north, east);
+  const limit = meters * 0.85;
+  if (distance <= limit) return { latitude, longitude };
+  const scale = limit / distance;
+  return {
+    latitude: centre[0] + (latitude - centre[0]) * scale,
+    longitude: centre[1] + (longitude - centre[1]) * scale,
+  };
+}
 export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
   const { t } = useI18n();
   const geo = useGeo();
@@ -99,6 +120,8 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
       : undefined;
   const nearbyContext = useRef(nearbyUrl);
   nearbyContext.current = nearbyUrl;
+  const [nearbyPage, setNearbyPage] = useState(1);
+  useEffect(() => setNearbyPage(1), [nearbyUrl]);
   const [places, setPlaces] = useState<Place[]>([]);
   const [showPlaces, setShowPlaces] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -132,8 +155,9 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
     return false;
   };
   const manual = useRef(false);
+  const search = categorySearch.toLocaleLowerCase("th");
   const filteredCategories = categories.filter((c) =>
-    c.name.toLocaleLowerCase("th").includes(categorySearch.toLocaleLowerCase("th")),
+    [c.name, categoryLabel(c.name)].some((name) => name.toLocaleLowerCase("th").includes(search)),
   );
   const categoryPageSize = 6;
   const visibleCategories = filteredCategories.slice(
@@ -470,11 +494,21 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
         className="nearby-issues"
         dataSource={nearby}
         locale={{ emptyText: <span /> }}
+        pagination={{
+          current: nearbyPage,
+          pageSize: 5,
+          onChange: setNearbyPage,
+          showSizeChanger: false,
+          hideOnSinglePage: true,
+          responsive: true,
+          align: "center",
+          locale: { prev_page: t("หน้าก่อนหน้า"), next_page: t("หน้าถัดไป") },
+        }}
         renderItem={(r) => (
           <List.Item key={r.id}>
             <Card className="nearby-issue" size="small">
               <div className="nearby-issue-heading">
-                <Text strong>{r.category_name}</Text>
+                <Text strong>{categoryLabel(r.category_name)}</Text>
                 <Tag color={r.status === "NEW" ? "orange" : "blue"}>
                   {t(statusNames[r.status] || r.status)}
                 </Tag>
@@ -570,7 +604,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
       <Form form={form} layout="vertical" preserve>
         <div hidden={step !== 0}>
           <Title level={2}>{t("เกิดเหตุที่ไหน?")}</Title>
-          <Text type="secondary">{category?.name}</Text>
+          <Text type="secondary">{category && categoryLabel(category.name)}</Text>
           <label className="control-label" htmlFor="place-query">
             {t("ค้นหาชื่อสถานที่ หรือพิกัด")}
           </label>
@@ -677,8 +711,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
               radiusMeters={100}
               points={nearby.map((r) => ({
                 id: r.id,
-                latitude: Number(r.latitude),
-                longitude: Number(r.longitude),
+                ...insideRadius(position, [Number(r.latitude), Number(r.longitude)], 100),
                 status: r.status,
                 categoryName: r.category_name,
               }))}
@@ -802,7 +835,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
                   }}
                 >
                   <span>{icons[categories.indexOf(c) % icons.length]}</span>
-                  {c.name}
+                  {categoryLabel(c.name)}
                 </button>
               ))}
             </div>
@@ -840,7 +873,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
           )}
 
           <div className="report-context">
-            <strong>{category?.name}</strong>
+            <strong>{category && categoryLabel(category.name)}</strong>
             <p>{address}</p>
           </div>
           <Form.Item
@@ -929,9 +962,20 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
           <Form.Item
             label={t("เบอร์ติดต่อ (ไม่บังคับ)")}
             name="contactPhone"
-            rules={[{ max: 30, pattern: /^[0-9+() -]*$/ }]}
+            normalize={(value: string) => value.replace(/\D/g, "").slice(0, 10)}
+            rules={[
+              {
+                pattern: /^0\d{8,9}$/,
+                message: t("เบอร์โทรต้องขึ้นต้นด้วย 0 และมี 9–10 หลัก"),
+              },
+            ]}
           >
-            <Input placeholder={t("เช่น 0812345678")} inputMode="tel" autoComplete="tel" />
+            <Input
+              placeholder={t("เช่น 0812345678")}
+              inputMode="numeric"
+              autoComplete="tel"
+              maxLength={10}
+            />
           </Form.Item>
           <ReporterEmail />
         </div>

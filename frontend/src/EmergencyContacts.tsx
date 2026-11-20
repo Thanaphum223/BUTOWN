@@ -1,7 +1,7 @@
 import { useI18n } from "./i18n/useI18n";
 import { useEffect, useState } from "react";
 import { Alert, Button, Card, Empty, Space, Spin, Tag, Typography } from "antd";
-import { AlertOutlined, EnvironmentOutlined, PhoneOutlined } from "@ant-design/icons";
+import { AlertOutlined, EnvironmentOutlined, PhoneOutlined } from "./icons";
 import { api } from "./api";
 import { useGeo } from "./GeoContext";
 import LocationMap from "./LocationMap";
