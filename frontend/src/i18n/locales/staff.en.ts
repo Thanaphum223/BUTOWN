@@ -113,6 +113,8 @@ const messages: Record<string, string> = {
   ฉบับที่: "Revision",
   คำขอทรัพยากร: "Resource requests",
   ยังไม่มีคำขอทรัพยากร: "No resource requests yet",
+  "ยกเลิกคำขอ {{count}} ครั้ง": "Request withdrawn {{count}} times",
+  ยกเลิกเมื่อ: "Withdrawn on",
   ร่างข้อเสนอ: "Draft proposal",
   "กำลังระบุพิกัดหน้างาน...": "Locating the work site...",
   "ระบุพิกัดไม่ได้ ระบบจะบันทึกว่าไม่มีพิกัดตอนเริ่มงาน":

@@ -925,8 +925,34 @@ export default function Detail({
                       label: t("คำขอทรัพยากร"),
                       children: (
                         <>
+                          {(() => {
+                            const withdrawals = (data.history || []).filter(
+                              (h: D) => h.action === "WITHDRAW_RESOURCE_REQUEST",
+                            );
+                            return (
+                              withdrawals.length > 0 && (
+                                <div className="resource-withdrawals">
+                                  <Text type="secondary">
+                                    {t("ยกเลิกคำขอ {{count}} ครั้ง", {
+                                      count: withdrawals.length,
+                                    })}
+                                  </Text>
+                                  <ul>
+                                    {withdrawals.map((h: D) => (
+                                      <li key={h.id || h.created_at}>
+                                        {t("ยกเลิกเมื่อ")} {date(h.created_at)}
+                                        {h.actor_name && ` • ${h.actor_name}`}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )
+                            );
+                          })()}
                           <List
-                            dataSource={data.resources}
+                            dataSource={(data.resources || []).filter(
+                              (r: D) => r.status !== "WITHDRAWN",
+                            )}
                             locale={{ emptyText: t("ยังไม่มีคำขอทรัพยากร") }}
                             renderItem={(r: D) => (
                               <List.Item>

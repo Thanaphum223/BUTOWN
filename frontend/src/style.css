@@ -2221,6 +2221,17 @@ h3,
 .cancelled-resource-requests {
   margin-bottom: 16px;
 }
+.resource-withdrawals {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--ant-color-error-bg, #fff2f0);
+}
+.resource-withdrawals ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--ant-color-text-secondary, #666);
+}
 .cancelled-resource-requests > summary {
   cursor: pointer;
   padding: 12px 0;

@@ -235,6 +235,31 @@ test("cancelled resource requests sit below the latest one and fold together", a
   expect(second).toBeLessThan(first);
 });
 
+test("resource tab lists when each request was withdrawn instead of repeating them", async ({
+  page,
+}) => {
+  const { data } = await workspace(page, "LEADER", "RESOURCE_DRAFT", ["PROPOSE"]);
+  data.resources = [
+    { id: "old", status: "WITHDRAWN", revisions: "[]", created_at: "2026-11-19T10:10:00Z" },
+    { id: "latest", status: "DRAFT", revisions: "[]", created_at: "2026-11-19T10:30:00Z" },
+  ];
+  data.history = [
+    {
+      id: "h1",
+      action: "WITHDRAW_RESOURCE_REQUEST",
+      actor_name: "ผู้ลงพื้นที่",
+      created_at: "2026-11-19T10:20:00Z",
+    },
+  ];
+  await page.getByText("ข้อมูลคำร้อง เอกสาร และรายงานทั้งหมด", { exact: true }).click();
+  await page.getByRole("tab", { name: "คำขอทรัพยากร", exact: true }).click();
+  const panel = page.getByRole("tabpanel");
+  await expect(panel.getByText("ยกเลิกคำขอ 1 ครั้ง")).toBeVisible();
+  await expect(panel.getByText(/ยกเลิกเมื่อ .* • ผู้ลงพื้นที่/)).toBeVisible();
+  await expect(panel.getByText("ยกเลิกแล้ว", { exact: true })).toHaveCount(0);
+  await expect(panel.getByText("ร่างข้อเสนอ", { exact: true })).toBeVisible();
+});
+
 test("leader ticks several field workers and names the representative", async ({ page }) => {
   const { writes } = await workspace(page, "LEADER", "TRIAGED", ["ASSIGN"], {
     "/api/people": [
