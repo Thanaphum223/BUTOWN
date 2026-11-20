@@ -4,6 +4,7 @@ import { Alert, Card, ConfigProvider, Divider, Typography } from "antd";
 import GovAccountForm, { type GovAccountMode } from "./GovAccountForm";
 import GovLogin from "./GovLogin";
 import ThemeSwitcher from "./ThemeSwitcher";
+import LanguageToggle from "./LanguageToggle";
 
 export default function GovAuthPage({
   onLogin,
@@ -31,6 +32,7 @@ export default function GovAuthPage({
       <main className="auth-page">
         <Card className="auth-card">
           <div className="auth-toolbar">
+            <LanguageToggle />
             <ThemeSwitcher />
           </div>
           {authError && (

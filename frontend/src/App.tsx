@@ -1,6 +1,6 @@
 import { useLiveQuery } from "./useLiveQuery";
 import { AuthUnavailableError, sessionExpiredEvent, sessionExpiredMessage } from "./api";
-import LanguageSwitcher from "./LanguageSwitcher";
+import LanguageToggle from "./LanguageToggle";
 import ThemeSwitcher from "./ThemeSwitcher";
 import { useI18n } from "./i18n/useI18n";
 import { MenuOutlined } from "./icons";
@@ -346,7 +346,7 @@ function TownTrackApp() {
               </div>
             </div>
             <Space className="account-controls" wrap>
-              <LanguageSwitcher />
+              <LanguageToggle className="language-switcher" />
               <ThemeSwitcher />
               {(user.account_role === "ADMIN" || user.role === "ADMIN") && (
                 <>

@@ -19,11 +19,18 @@ public class GovAccountController {
     this.central = central;
   }
 
+  // Emails and passwords are typed on a Latin keyboard; Thai letters usually mean the keyboard
+  // was left in Thai mode. Names may be Thai.
+  static final String NO_THAI = "[^\\x{0E00}-\\x{0E7F}]*";
+
   record Registration(
       @NotNull @Pattern(regexp = "[a-f0-9]{64}") String state,
       @NotBlank @Size(min = 2, max = 200) String name,
-      @NotBlank @Email @Size(max = 320) String email,
-      @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) @NotBlank @Size(min = 12, max = 72)
+      @NotBlank @Email @Size(max = 320) @Pattern(regexp = NO_THAI) String email,
+      @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+          @NotBlank
+          @Size(min = 12, max = 72)
+          @Pattern(regexp = NO_THAI)
           String password) {
     Registration {
       name = clean(name);
@@ -38,8 +45,11 @@ public class GovAccountController {
 
   record PasswordLogin(
       @NotNull @Pattern(regexp = "[a-f0-9]{64}") String state,
-      @NotBlank @Email @Size(max = 320) String email,
-      @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) @NotBlank @Size(min = 1, max = 72)
+      @NotBlank @Email @Size(max = 320) @Pattern(regexp = NO_THAI) String email,
+      @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+          @NotBlank
+          @Size(min = 1, max = 72)
+          @Pattern(regexp = NO_THAI)
           String password) {
     PasswordLogin {
       email = cleanEmail(email);

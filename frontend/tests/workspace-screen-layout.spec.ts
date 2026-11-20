@@ -139,7 +139,7 @@ test("overview translations keep task names and stages readable in English on mo
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await screen(page, "OFFICER", false, false);
-  await page.locator(".language-switcher").selectOption("en");
+  await page.locator('.language-switcher button[lang="en"]').click();
   await expect(page.locator(".overview-recent button").first()).toHaveAccessibleName(/^Open task /);
   await expect(
     page
@@ -273,7 +273,7 @@ for (const role of ["OFFICER", "LEADER", "FIELD", "APPROVER"])
     await page.setViewportSize({ width: 1280, height: 720 });
     await screen(page, role);
     await page.getByRole("button", { name: /^เปิดงาน งานลำดับที่ 1 / }).click();
-    await page.locator(".language-switcher").selectOption("en");
+    await page.locator('.language-switcher button[lang="en"]').click();
     const detail = page.locator(".workspace-detail");
     await expect(page.locator(".split-case-summary")).toBeVisible();
     await detail.evaluate((node) => {
@@ -295,7 +295,7 @@ test("administrator role controls fit the tablet header without trapping the que
 }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await screen(page, "LEADER", true);
-  await page.locator(".language-switcher").selectOption("en");
+  await page.locator('.language-switcher button[lang="en"]').click();
   for (const control of await page.locator(".admin-role-controls .ant-select").all())
     await expect(control).toBeInViewport();
   await page.locator(".queue-filters > summary").click();
@@ -311,7 +311,7 @@ for (const width of [992, 1024])
     }) => {
       await page.setViewportSize({ width, height: 680 });
       await screen(page, role, true);
-      await page.locator(".language-switcher").selectOption("en");
+      await page.locator('.language-switcher button[lang="en"]').click();
       await page.locator(".queue-filters > summary").click();
       await page.locator(".queue-panel .ant-pagination").scrollIntoViewIfNeeded();
       await expect(page.locator(".queue-panel .ant-pagination")).toBeInViewport();

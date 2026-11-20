@@ -6,6 +6,11 @@ import { AuthUnavailableError, post, refreshCsrf } from "./api";
 import { useGovConfig } from "./govSso";
 export type GovAccountMode = "register" | "login";
 type Fields = { name?: string; email: string; password: string; confirmation?: string };
+// Thai letters in these fields almost always mean the keyboard is still in Thai mode.
+const noThai = {
+  pattern: /^[^\u0E00-\u0E7F]*$/,
+  message: "ใช้ภาษาอังกฤษ ตัวเลข หรือสัญลักษณ์เท่านั้น ตรวจว่าแป้นพิมพ์ไม่ได้เป็นภาษาไทย",
+};
 export default function GovAccountForm({
   mode,
   onModeChange,
@@ -142,6 +147,7 @@ export default function GovAccountForm({
           label={t("อีเมล")}
           name="email"
           rules={[
+            { ...noThai, message: t(noThai.message) },
             { required: true, type: "email", max: 320, message: t("กรุณากรอกอีเมลให้ถูกต้อง") },
           ]}
         >
@@ -152,6 +158,7 @@ export default function GovAccountForm({
           name="password"
           extra={register ? t("อย่างน้อย 12 ตัวอักษร") : undefined}
           rules={[
+            { ...noThai, message: t(noThai.message) },
             {
               required: true,
               whitespace: true,
@@ -173,6 +180,7 @@ export default function GovAccountForm({
             name="confirmation"
             dependencies={["password"]}
             rules={[
+              { ...noThai, message: t(noThai.message) },
               { required: true, message: t("กรุณายืนยันรหัสผ่าน") },
               ({ getFieldValue }) => ({
                 validator(_, v) {

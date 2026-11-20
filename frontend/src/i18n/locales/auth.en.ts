@@ -4,8 +4,12 @@ const messages: Record<string, string> = {
   "บัญชี Gov Center · TownTrack": "Gov Center account · TownTrack",
   หรือ: "or",
   "ยังไม่ได้ตั้งค่า Gov Center SSO ครบถ้วน": "Gov Center SSO has not been fully configured",
+  "ใช้ภาษาอังกฤษ ตัวเลข หรือสัญลักษณ์เท่านั้น ตรวจว่าแป้นพิมพ์ไม่ได้เป็นภาษาไทย":
+    "Use English letters, numbers or symbols only. Check that your keyboard is not set to Thai.",
   "กรุณาเข้า TownTrack ด้วยโดเมนที่ลงทะเบียน SSO ไว้":
     "Please access TownTrack using the domain registered for SSO",
+  "เข้าสู่ระบบด้วย LINE ใช้ได้เมื่อเว็บอยู่บนโดเมน govcenter.co หรือ gov.co กรุณาเข้าสู่ระบบด้วยอีเมลและรหัสผ่าน":
+    "LINE sign-in works only when TownTrack runs on a govcenter.co or gov.co domain. Please sign in with your email and password.",
   "ยังตรวจสอบผลการสมัครไม่ได้ กรุณาลองเข้าสู่ระบบด้วยอีเมล Gov Center ก่อนสมัครใหม่":
     "We could not confirm registration. Try signing in with your Gov Center email before registering again.",
   "กำลังโหลดข้อมูล Gov Center": "Loading Gov Center configuration",

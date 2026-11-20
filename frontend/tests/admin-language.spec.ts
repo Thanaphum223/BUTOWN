@@ -67,7 +67,7 @@ test("category edit uses header language and retains authored fields and stable 
 }) => {
   const writes = await setup(page);
   await page.getByRole("tab", { name: "ประเภทปัญหา / แบบฟอร์ม / SLA", exact: true }).click();
-  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
+  await page.getByRole("button", { name: "English", exact: true }).click();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Name", { exact: true }).fill("ร่างต้นฉบับ");
@@ -104,7 +104,7 @@ test("role edit keeps stable role keys and original account names", async ({ pag
   const row = page
     .getByRole("row")
     .filter({ has: page.getByRole("cell", { name: "original", exact: true }) });
-  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
+  await page.getByRole("button", { name: "English", exact: true }).click();
   await row.getByRole("button", { name: "Assign role", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.locator(".language-switcher")).toHaveCount(0);
@@ -124,9 +124,7 @@ for (const width of [390, 768, 1280])
     test(`admin edit fits ${width}px in ${language}`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await setup(page, "OFFICER");
-      await page
-        .getByRole("combobox", { name: "Language / ภาษา", exact: true })
-        .selectOption(language);
+      await page.locator(`.language-switcher button[lang="${language}"]`).click();
       await page
         .getByRole("row")
         .filter({ has: page.getByRole("cell", { name: "original", exact: true }) })
@@ -169,7 +167,7 @@ test("Gov mapping validation and failed save change language while retaining dra
   await page.getByRole("textbox", { name: "รหัสบทบาท Gov 1", exact: true }).fill("");
   await page.getByRole("button", { name: "บันทึกการจับคู่บทบาท", exact: true }).click();
   await expect(page.getByText("กรุณากรอกรหัสบทบาท Gov", { exact: true })).toBeVisible();
-  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
+  await page.getByRole("button", { name: "English", exact: true }).click();
   await expect(page.getByText("Please enter a Gov role code", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Gov Center municipality ID", { exact: true })).toHaveValue(
     "draft-municipality",
@@ -195,9 +193,9 @@ test("Gov mapping validation and failed save change language while retaining dra
   await expect(page.getByLabel("Gov Center municipality ID", { exact: true })).toHaveValue(
     "draft-municipality",
   );
-  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("th");
+  await page.getByRole("button", { name: "ภาษาไทย", exact: true }).click();
   await expect(page.getByText("ข้อมูลไม่ครบหรือรูปแบบไม่ถูกต้อง", { exact: true })).toBeVisible();
-  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
+  await page.getByRole("button", { name: "English", exact: true }).click();
   await expect(saveMapping).toBeEnabled();
   await expect(saveMapping).not.toHaveClass(/ant-btn-loading/);
   await saveMapping.click();

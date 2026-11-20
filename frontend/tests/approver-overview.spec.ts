@@ -96,7 +96,7 @@ for (const width of [390, 768, 1280])
     }) => {
       await page.setViewportSize({ width, height: 1000 });
       const { detailRequests, lists } = await setup(page);
-      await page.locator(".topbar .language-switcher").selectOption(language);
+      await page.locator(`.topbar .language-switcher button[lang="${language}"]`).click();
       const overview = page.locator(".approver-overview");
       await expect(
         overview.getByRole("heading", {
@@ -194,7 +194,7 @@ for (const language of ["th", "en"])
   test(`overview opens only the recipient's routed complaint in ${language}`, async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 1000 });
     const { detailRequests } = await setup(page);
-    await page.locator(".topbar .language-switcher").selectOption(language);
+    await page.locator(`.topbar .language-switcher button[lang="${language}"]`).click();
     const overview = page.locator(".approver-overview");
     const assigned = overview.locator(".overview-summary").filter({ hasText: "Original assigned" });
     await expect(overview.locator(".overview-summary")).toHaveCount(7);

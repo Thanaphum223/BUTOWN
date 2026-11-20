@@ -164,6 +164,23 @@ class GovAccountControllerTest {
   }
 
   @Test
+  void refusesThaiLettersInEmailAndPassword() throws Exception {
+    for (String thai :
+        List.of(
+            data(true).replace(" Password123! ", "รหัสผ่านภาษาไทย12"),
+            data(true).replaceFirst("\"email\":\"", "\"email\":\"ไทย"))) {
+      start("REGISTER");
+      mvc.perform(
+              post("/api/auth/gov/register")
+                  .session(session)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(thai))
+          .andExpect(status().isBadRequest());
+    }
+    verifyNoInteractions(api);
+  }
+
+  @Test
   void partialSignupReportsAccountExistsAndNeverRetriesRegister() throws Exception {
     start("REGISTER");
     when(api.loginCode(anyString(), anyString()))

@@ -105,8 +105,7 @@ for (const width of [390, 768, 1024, 1470])
           page.getByRole("button", { name: /ขยายขนาดตัวอักษร|ย่อขนาดตัวอักษร|text size/i }),
         ).toHaveCount(0);
       for (const language of ["th", "en"] as const) {
-        const languageControl = page.locator(".topbar .language-switcher");
-        await languageControl.selectOption(language);
+        await page.locator(`.topbar .language-switcher button[lang="${language}"]`).click();
         await expect(page.locator("html")).toHaveAttribute("lang", language);
         if (account === "administrator" && width < 992 && language === "th")
           await page.getByRole("button", { name: "สลับบทบาท", exact: true }).click();
@@ -117,31 +116,32 @@ for (const width of [390, 768, 1024, 1470])
       }
     });
 
-test("native language selection has readable green styling and visible keyboard focus", async ({
-  page,
-}) => {
+test("TH/EN language toggle is readable with visible keyboard focus", async ({ page }) => {
   await header(page, "nonadmin");
-  const language = page.getByRole("combobox", { name: "Language / ภาษา", exact: true });
-  await language.selectOption("en");
-  await expect(language).toHaveValue("en");
-  await language.focus();
+  const english = page.locator('.topbar .language-switcher button[lang="en"]');
+  await english.click();
+  await expect(english).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await english.focus();
   await page.keyboard.press("Tab");
   await page.keyboard.press("Shift+Tab");
-  await expect(language).toBeFocused();
-  const paint = await language.evaluate((node) => {
-    const style = getComputedStyle(node);
+  await expect(english).toBeFocused();
+  const paint = await page.locator(".topbar .language-switcher").evaluate((group) => {
     const rgb = (color: string) =>
       color
         .match(/[\d.]+/g)!
         .slice(0, 3)
         .map(Number);
+    const [thai, active] = [...group.querySelectorAll("button")].map((b) => getComputedStyle(b));
     return {
-      background: rgb(style.backgroundColor),
-      text: rgb(style.color),
-      outline: rgb(style.outlineColor),
-      header: rgb(getComputedStyle(node.closest(".topbar")!).backgroundColor),
-      outlineWidth: parseFloat(style.outlineWidth),
-      height: node.getBoundingClientRect().height,
+      group: rgb(getComputedStyle(group).backgroundColor),
+      activeBackground: rgb(active.backgroundColor),
+      activeText: rgb(active.color),
+      idleText: rgb(thai.color),
+      outline: rgb(active.outlineColor),
+      outlineWidth: parseFloat(active.outlineWidth),
+      header: rgb(getComputedStyle(group.closest(".topbar")!).backgroundColor),
+      height: group.getBoundingClientRect().height,
     };
   });
   const contrast = (first: number[], second: number[]) => {
@@ -153,9 +153,8 @@ test("native language selection has readable green styling and visible keyboard 
     const [light, dark] = [luminance(first), luminance(second)].sort((a, b) => b - a);
     return (light + 0.05) / (dark + 0.05);
   };
-  expect(paint.background[1]).toBeGreaterThan(paint.background[0]);
-  expect(paint.background[1]).toBeGreaterThan(paint.background[2]);
-  expect(contrast(paint.text, paint.background)).toBeGreaterThanOrEqual(4.5);
+  expect(contrast(paint.activeText, paint.activeBackground)).toBeGreaterThanOrEqual(4.5);
+  expect(contrast(paint.idleText, paint.group)).toBeGreaterThanOrEqual(4.5);
   expect(paint.height).toBeGreaterThanOrEqual(44);
   expect(paint.outlineWidth).toBeGreaterThanOrEqual(2);
   expect(contrast(paint.outline, paint.header)).toBeGreaterThanOrEqual(3);

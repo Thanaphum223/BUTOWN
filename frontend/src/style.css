@@ -197,12 +197,44 @@ body {
 .auth-toolbar {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 4px;
 }
-.auth-toolbar .theme-switcher {
-  min-height: 36px;
-  padding: 4px 8px;
+/* TH | EN pill: the active language is filled, the other one is a plain tap target. */
+.language-toggle {
+  display: inline-flex;
+  height: 44px;
+  padding: 3px;
+  border: 1px solid var(--gov-border-neutral);
+  border-radius: 999px;
+  background: var(--gov-surface);
+}
+.language-toggle button {
+  min-width: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--gov-text-tertiary);
+  background: transparent;
+  font: inherit;
   font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.language-toggle button[aria-pressed="true"] {
+  color: #fff;
+  background: var(--gov-brand-dark);
+}
+.language-toggle button:focus-visible {
+  outline: 3px solid var(--gov-brand-primary);
+  outline-offset: 1px;
+}
+.topbar .language-toggle button:focus-visible {
+  outline-color: var(--gov-surface);
+}
+.auth-toolbar .theme-switcher {
+  border-color: var(--gov-border-neutral);
 }
 .auth-card .ant-input-affix-wrapper .ant-input {
   min-height: 0;
@@ -3370,41 +3402,39 @@ button.queue-item .queue-item-top .ant-tag {
   }
 }
 
-.language-switcher,
+/* Round light/dark toggle: a moon in light mode, a sun in dark mode. */
 .theme-switcher {
-  max-width: 100%;
-  min-height: 44px;
-  padding: 6px 10px;
-  border: 1px solid var(--gov-brand-primary);
-  border-radius: var(--gov-radius-control);
-  color: var(--gov-brand-dark);
-  background: var(--gov-brand-surface);
-  font: inherit;
-  line-height: 1.4;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid #ffffff60;
+  border-radius: 50%;
+  color: #5b6b80;
+  background: #fbfaf7;
+  cursor: pointer;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
 }
-.language-switcher:hover,
 .theme-switcher:hover {
-  border-color: var(--gov-brand-dark);
-  background: var(--gov-surface-soft);
+  transform: translateY(-1px);
+  box-shadow: var(--gov-shadow-low);
 }
-.language-switcher:focus-visible,
 .theme-switcher:focus-visible {
   outline: 3px solid var(--gov-brand-primary);
   outline-offset: 2px;
 }
-.topbar .language-switcher:focus-visible,
 .topbar .theme-switcher:focus-visible {
   outline-color: var(--gov-surface);
 }
-.language-switcher option,
-.theme-switcher option {
-  color: var(--gov-text-primary);
-  background: var(--gov-surface);
-}
-.language-switcher option:checked,
-.theme-switcher option:checked {
-  color: var(--gov-brand-dark);
-  background: var(--gov-surface-soft);
+[data-theme="dark"] .theme-switcher {
+  color: #f1be25;
+  background: #111b26;
+  border-color: #2e3a48;
 }
 
 @media (max-width: 600px) {
@@ -3414,9 +3444,16 @@ button.queue-item .queue-item-top .ant-tag {
   .citizen-shell .header-identity {
     flex-basis: 100%;
   }
+  /* Keep language, theme, profile and sign-out on one aligned row instead of wrapping. */
   .citizen-shell .account-controls {
     width: 100%;
     justify-content: flex-end;
+    flex-wrap: nowrap !important;
+    align-items: center;
+  }
+  .citizen-shell .account-controls .language-switcher {
+    min-width: 0;
+    flex: 0 1 auto;
   }
 }
 
@@ -3956,12 +3993,6 @@ button.queue-item .queue-item-top .ant-tag {
 }
 [data-theme="dark"] .emergency-call:hover {
   color: #ff9a9a;
-}
-[data-theme="dark"] .language-switcher,
-[data-theme="dark"] .language-switcher option:checked,
-[data-theme="dark"] .theme-switcher,
-[data-theme="dark"] .theme-switcher option:checked {
-  color: var(--gov-text-primary);
 }
 [data-theme="dark"] .staff-shell .sidebar {
   background: #10241b !important;

@@ -181,7 +181,7 @@ test("profile follows header language while preserving identity and hiding resid
   await expect(drawer.getByText("บ้านเดิม เลขที่ 12", { exact: true })).toHaveCount(0);
   await expect(drawer.locator(".language-switcher")).toHaveCount(0);
   await drawer.getByRole("button", { name: "ปิด", exact: true }).click();
-  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
+  await page.getByRole("button", { name: "English", exact: true }).click();
   await page.getByRole("button", { name: "Gov Center profile", exact: true }).click();
   await expect(drawer).toContainText("Gov Center profile");
   await expect(drawer.getByText("Gov Center name", { exact: true })).toBeVisible();
@@ -200,7 +200,7 @@ test("profile follows header language while preserving identity and hiding resid
     ),
   ).toHaveCount(0);
   await drawer.getByRole("button", { name: "Close", exact: true }).click();
-  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("th");
+  await page.getByRole("button", { name: "ภาษาไทย", exact: true }).click();
   await page.getByRole("button", { name: "ข้อมูล Gov Center", exact: true }).click();
   await expect(drawer).toContainText("ข้อมูล Gov Center");
 });

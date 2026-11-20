@@ -54,9 +54,7 @@ for (const width of [390, 768, 1280]) {
         requests.push({ body: request.postData()!, key: request.headers()["idempotency-key"] });
     });
     for (const language of ["en", "th", "en"]) {
-      await page
-        .getByRole("combobox", { name: "Language / ภาษา", exact: true })
-        .selectOption(language);
+      await page.locator(`.language-switcher button[lang="${language}"]`).click();
       const en = language === "en";
       await expect(
         page.getByRole("heading", {
@@ -108,7 +106,7 @@ for (const width of [390, 768, 1280]) {
     });
     expect(requests[1].key).toBe(requests[0].key);
     expect(requests[1].body).toContain('filename="หลักฐานต้นฉบับ.png"');
-    await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("th");
+    await page.getByRole("button", { name: "ภาษาไทย", exact: true }).click();
     await page
       .getByLabel("ชื่อ–นามสกุล (ไม่บังคับ)", { exact: true })
       .evaluate((input) => input.scrollIntoView({ block: "center" }));
@@ -127,7 +125,7 @@ test("existing citizen validation errors switch language without resetting the r
   await openReport(page);
   await page.getByRole("button", { name: "ถัดไป", exact: true }).click();
   await expect(page.getByText("กรุณาระบุสถานที่หรือจุดสังเกต", { exact: true })).toBeVisible();
-  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
+  await page.getByRole("button", { name: "English", exact: true }).click();
   await expect(
     page.getByText("Please enter a location or landmark", { exact: true }),
   ).toBeVisible();
@@ -227,12 +225,12 @@ test("emergency links and Leaflet zoom controls follow language without changing
     emergency.getByRole("link", { name: "โทร 199 แจ้งเหตุเพลิงไหม้", exact: true }),
   ).toHaveAttribute("href", "tel:199");
   await emergency.locator("summary").filter({ hasText: "เลือกจุดค้นหาบนแผนที่เอง" }).click();
-  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
+  await page.getByRole("button", { name: "English", exact: true }).click();
   await expect(
     emergency.getByRole("link", { name: "Call 199 Report a fire", exact: true }),
   ).toHaveAttribute("href", "tel:199");
   await expect(emergency.getByRole("button", { name: "Zoom in", exact: true })).toBeVisible();
-  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("th");
+  await page.getByRole("button", { name: "ภาษาไทย", exact: true }).click();
   await expect(emergency.getByRole("button", { name: "ซูมเข้า", exact: true })).toBeVisible();
 });
 
@@ -263,10 +261,10 @@ test("Mapbox fallback translates controls and statuses while keeping stored cate
   await page.goto("/");
   const panel = page.locator(".community-map-panel");
   await expect(panel.getByRole("button", { name: "ลองโหลดแผนที่ใหม่", exact: true })).toBeVisible();
-  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("en");
+  await page.getByRole("button", { name: "English", exact: true }).click();
   await expect(panel.getByRole("button", { name: "Retry loading map", exact: true })).toBeVisible();
   await expect(panel.getByRole("cell", { name: "สมัครสมาชิก", exact: true })).toBeVisible();
   await expect(panel.getByRole("cell", { name: "Awaiting intake", exact: true })).toBeVisible();
-  await page.getByRole("combobox", { name: "Language / ภาษา", exact: true }).selectOption("th");
+  await page.getByRole("button", { name: "ภาษาไทย", exact: true }).click();
   await expect(panel.getByRole("cell", { name: "รอรับเรื่อง", exact: true })).toBeVisible();
 });
