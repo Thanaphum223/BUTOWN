@@ -183,9 +183,26 @@ body {
 }
 .auth-card .ant-input,
 .auth-card .ant-input-affix-wrapper {
-  background: #fff !important;
+  background: var(--gov-surface) !important;
   min-height: 36px;
   border-radius: 8px;
+}
+/* The password field is one bordered box: its inner input and eye toggle share that box. */
+.auth-card .ant-input-affix-wrapper .ant-input {
+  background: transparent !important;
+}
+.auth-card .ant-input-password-icon {
+  color: var(--gov-text-tertiary);
+}
+.auth-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+.auth-toolbar .theme-switcher {
+  min-height: 36px;
+  padding: 4px 8px;
+  font-size: 14px;
 }
 .auth-card .ant-input-affix-wrapper .ant-input {
   min-height: 0;
@@ -3889,7 +3906,6 @@ button.queue-item .queue-item-top .ant-tag {
   background: var(--gov-brand-dark) !important;
 }
 [data-theme="dark"] .submit-bar,
-[data-theme="dark"] .auth-card .ant-input-affix-wrapper,
 [data-theme="dark"] .queue-item,
 [data-theme="dark"] .workspace-welcome,
 [data-theme="dark"] .citizen-bottom-nav,

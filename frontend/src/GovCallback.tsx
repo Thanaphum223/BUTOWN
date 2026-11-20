@@ -14,6 +14,7 @@ export default function GovCallback({ returned }: { returned: GovCallbackReturn 
     if (!config || started.current) return;
     started.current = true;
     const { code, state, service } = returned;
+    const exchangeCode = code?.trim() ?? "";
     // Phones have no console: a short code on screen says which check stopped the login.
     let step = returned.errorCode || "";
     void (async () => {
@@ -21,18 +22,20 @@ export default function GovCallback({ returned }: { returned: GovCallbackReturn 
         if (!config.configured)
           throw new Error("ยังไม่ได้ตั้งค่า Gov Center SSO กรุณาเริ่มเข้าสู่ระบบใหม่");
         if (returned.error) throw new Error(returned.error);
-        step = "S1";
         // The server matches state against the session that started login. The SDK's
         // sessionStorage copy is per tab, and phones often return from LINE in a new tab.
-        if (
-          !code?.trim() ||
-          !state ||
-          !/^[a-f0-9]{64}$/.test(state) ||
-          (service !== null && service !== config.serviceCode)
-        )
+        step = !exchangeCode
+          ? "S1-code"
+          : !state || !/^[a-f0-9]{64}$/.test(state)
+            ? "S1-state"
+            : service !== null && service !== config.serviceCode
+              ? "S1-service"
+              : "";
+        if (step) {
+          step += " · " + (returned.keys.join(", ") || "-");
           throw new Error("การตรวจสอบความปลอดภัยไม่สำเร็จ กรุณาเริ่มเข้าสู่ระบบใหม่");
-        step = "";
-        const result = await post("/auth/sso-callback", { code: code.trim(), state });
+        }
+        const result = await post("/auth/sso-callback", { code: exchangeCode, state });
         if (!result?.success) throw new Error("ยืนยันตัวตนไม่สำเร็จ กรุณาเริ่มเข้าสู่ระบบใหม่");
         step = "S4";
         await refreshCsrf();

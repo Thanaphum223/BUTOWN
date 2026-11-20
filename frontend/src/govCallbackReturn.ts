@@ -4,13 +4,30 @@ export type GovCallbackReturn = {
   service: string | null;
   error: string;
   errorCode?: string;
+  // Parameter names only (never values), shown with a failure to tell which part was missing.
+  keys: string[];
 };
+
+// Gov can append "?code=..." to a callback that already carries "?state=...", and may return
+// parameters in the fragment instead of the query. Fold both into one set of parameters.
+function returnedParameters(search: string, hash: string) {
+  const query = new URLSearchParams(search);
+  const states = query.getAll("state");
+  const joined = states.length === 1 ? /^([a-f0-9]{64})\?(.*)$/s.exec(states[0]) : null;
+  if (joined) {
+    query.set("state", joined[1]);
+    new URLSearchParams(joined[2]).forEach((value, key) => query.append(key, value));
+  }
+  if (!query.has("code"))
+    new URLSearchParams(hash.replace(/^#/, "")).forEach((value, key) => query.append(key, value));
+  return query;
+}
 
 // Runs before importing the app, loading config or rendering React. Gov may
 // accompany its service-scoped code with a parent IAM ticket: never retain it.
 export function captureGovReturn(): GovCallbackReturn | null {
-  const { pathname, search } = window.location;
-  const query = new URLSearchParams(search);
+  const { pathname, search, hash } = window.location;
+  const query = returnedParameters(search, hash);
   const callback =
     pathname === "/auth/callback" ||
     pathname === "/auth/callback/" ||
@@ -48,5 +65,6 @@ export function captureGovReturn(): GovCallbackReturn | null {
     service: query.get("service"),
     error,
     errorCode,
+    keys: [...new Set(query.keys())],
   };
 }

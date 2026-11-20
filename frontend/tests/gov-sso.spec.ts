@@ -347,6 +347,29 @@ test("callback opened in a new tab still lets the server check its state", async
   await expect(page.getByText("SSO Test User", { exact: true })).toBeVisible();
   expect(seen.callbacks).toEqual([{ code: "sample-code", state }]);
 });
+for (const [label, url] of [
+  ["a code appended with a second question mark", `/auth/callback?state=${state}?code=sample-code`],
+  ["a code returned in the fragment", `/auth/callback?state=${state}#code=sample-code`],
+]) {
+  test(`callback accepts ${label}`, async ({ page }) => {
+    const seen = await boundary(page);
+    await page.goto(url);
+    await expect(page.getByText("SSO Test User", { exact: true })).toBeVisible();
+    expect(seen.callbacks).toEqual([{ code: "sample-code", state }]);
+    expect(page.url()).not.toContain("sample-code");
+  });
+}
+test("a callback without a code names the missing part and parameter names only", async ({
+  page,
+}) => {
+  const seen = await boundary(page);
+  await page.goto(`/auth/callback?state=${state}&ticket=secret-ticket-value`);
+  const alert = page.getByRole("alert");
+  await expect(alert).toContainText("(S1-code · state, ticket)");
+  await expect(alert).not.toContainText(state);
+  await expect(alert).not.toContainText("secret-ticket-value");
+  expect(seen.callbacks).toHaveLength(0);
+});
 test("an identical echoed state is accepted but two different states are refused", async ({
   page,
 }) => {

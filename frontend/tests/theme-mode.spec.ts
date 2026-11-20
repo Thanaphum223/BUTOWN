@@ -43,6 +43,34 @@ test("dark mode is chosen from the header and survives a reload", async ({ page 
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 });
 
+test("login page switches to dark mode with readable fields", async ({ page }) => {
+  await page.route("**/api/auth/me", (route) => route.fulfill({ status: 401, json: {} }));
+  await page.route("**/api/public/gov-auth", (route) =>
+    route.fulfill({
+      json: {
+        configured: true,
+        mode: "local",
+        iamAuthUrl: "https://auth.govcenter.co",
+        serviceCode: "ui-test",
+        callbackUrl: new URL(route.request().url()).origin + "/auth/callback",
+      },
+    }),
+  );
+  await page.goto("/");
+  await page.getByRole("combobox", { name: "โหมดสี", exact: true }).selectOption("dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  const background = (selector: string) =>
+    page
+      .locator(selector)
+      .first()
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+  // Inputs fade between colours, so wait for the dark surface to settle.
+  await expect.poll(() => background(".auth-card input[type=email]")).toBe("rgb(22, 34, 28)");
+  await expect.poll(() => background(".auth-card .ant-input-password")).toBe("rgb(22, 34, 28)");
+  expect(await background(".auth-card .ant-input-password input")).toBe("rgba(0, 0, 0, 0)");
+  await page.screenshot({ path: "../work/screenshots/login-dark.png" });
+});
+
 test("default category names follow the language while custom ones stay as written", async ({
   page,
 }) => {
