@@ -104,8 +104,8 @@ export function pdfEvidence(name: string) {
 }
 export async function fillReport(page: Page, title: string, description: string) {
   await page.getByRole("button", { name: /ถนนและทางเท้า/ }).click();
-  await page.getByLabel("หัวข้อปัญหา", { exact: true }).fill(title);
-  await page.getByLabel("รายละเอียด", { exact: true }).fill(description);
+  await page.getByLabel("หัวข้อปัญหา (ไม่บังคับ)", { exact: true }).fill(title);
+  await page.getByLabel("รายละเอียดอื่น ๆ (ไม่บังคับ)", { exact: true }).fill(description);
   await page
     .locator("input[type=file][multiple]")
     .setInputFiles(pdfEvidence("initial-evidence.pdf"));

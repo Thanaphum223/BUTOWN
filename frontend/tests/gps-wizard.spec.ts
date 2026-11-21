@@ -41,7 +41,7 @@ test("first visit asks GPS once and prefills wizard, preserves manual address, s
   await page.getByRole("button", { name: "ย้อนกลับ", exact: true }).click();
   await expect(page.getByLabel("สถานที่ / จุดสังเกต", { exact: true })).toHaveValue(address);
   await confirmLocation(page, address);
-  await expect(page.getByLabel("หัวข้อปัญหา", { exact: true })).toHaveValue(title);
+  await expect(page.getByLabel("หัวข้อปัญหา (ไม่บังคับ)", { exact: true })).toHaveValue(title);
   await expect(page.getByText("initial-evidence.pdf", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as any).gpsCalls)).toBe(1);
   const id = await submitReport(page);

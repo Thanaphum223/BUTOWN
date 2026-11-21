@@ -54,8 +54,9 @@ public class ComplaintController {
 
   record NewComplaint(
       @NotNull UUID categoryId,
-      @NotBlank @Size(max = 200) String title,
-      @NotBlank @Size(max = 20000) String description,
+      // Both optional: the category names the report and symptoms come from preset buttons.
+      @Size(max = 200) String title,
+      @Size(max = 20000) String description,
       @NotBlank @Size(max = 1000) String address,
       @DecimalMin("-90") @DecimalMax("90") Double latitude,
       @DecimalMin("-180") @DecimalMax("180") Double longitude,
@@ -87,9 +88,12 @@ public class ComplaintController {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "กรุณาแนบหลักฐานอย่างน้อย 1 ไฟล์");
     long total = 0;
     for (var file : evidence) {
-      if (file.getSize() > FileController.MAX_TOTAL_BYTES - total)
+      if (file.getSize() > FileController.MAX_FILE_BYTES)
         throw new ResponseStatusException(
-            HttpStatus.PAYLOAD_TOO_LARGE, "ไฟล์แนบรวมทั้งหมดต่อคำร้องต้องไม่เกิน 1 GB (1,000 MB)");
+            HttpStatus.PAYLOAD_TOO_LARGE, "ไฟล์แต่ละไฟล์ต้องไม่เกิน 100 MB");
+      if (file.getSize() > FileController.MAX_REPORT_BYTES - total)
+        throw new ResponseStatusException(
+            HttpStatus.PAYLOAD_TOO_LARGE, "ไฟล์แนบรวมทั้งหมดต่อคำร้องต้องไม่เกิน 300 MB");
       total += file.getSize();
     }
     var fingerprints = new ArrayList<String>();
@@ -160,8 +164,8 @@ public class ComplaintController {
         u.get("id"),
         cat.get("department_id"),
         cat.get("workflow_id"),
-        b.title(),
-        b.description(),
+        b.title() == null || b.title().isBlank() ? cat.get("name") : b.title().trim(),
+        b.description() == null ? "" : b.description().trim(),
         b.address(),
         position,
         json.writeValueAsString(answers),
@@ -475,14 +479,59 @@ public class ComplaintController {
           "SELECT id FROM department WHERE id=? AND municipality_id=? AND deleted_at IS NULL",
           department,
           u.get("municipality_id"));
-    return db.list(
-        "SELECT id,display_name,department_id,gov_role FROM app_user WHERE municipality_id=? AND role IN"
-            + " (?,'ADMIN') AND enabled=true AND (?::uuid IS NULL OR department_id=?) ORDER BY"
-            + " display_name",
-        u.get("municipality_id"),
-        role,
-        department,
-        department);
+    var people =
+        db.list(
+            "SELECT id,display_name,department_id,gov_role FROM app_user WHERE municipality_id=? AND"
+                + " role IN (?,'ADMIN') AND enabled=true AND (?::uuid IS NULL OR department_id=?)"
+                + " ORDER BY display_name",
+            u.get("municipality_id"),
+            role,
+            department,
+            department);
+    var extra = new HashMap<Object, Map<String, Object>>();
+    if ("FIELD".equals(role)) {
+      // Leaders see each person's open jobs and what they are doing now before assigning more.
+      for (var row :
+          db.list(
+              "SELECT p.id,count(DISTINCT w.id) FILTER(WHERE w.status='ASSIGNED') waiting,"
+                  + "count(DISTINCT w.id) FILTER(WHERE w.status='ACCEPTED') accepted,"
+                  + "count(DISTINCT w.id) FILTER(WHERE w.status='IN_PROGRESS' AND c.status IN"
+                  + " ('IN_PROGRESS','FIELD_REVISION')) working,count(DISTINCT w.id) active,"
+                  + "(array_agg(c.title ORDER BY w.created_at DESC) FILTER(WHERE"
+                  + " w.status='IN_PROGRESS' AND c.status IN ('IN_PROGRESS','FIELD_REVISION')))[1]"
+                  + " current_title FROM app_user p JOIN work_order w ON (w.assignee_id=p.id OR"
+                  + " EXISTS(SELECT 1 FROM work_member m WHERE m.work_order_id=w.id AND"
+                  + " m.user_id=p.id)) JOIN complaint c ON c.id=w.complaint_id WHERE"
+                  + " p.municipality_id=? AND NOT w.handed_off AND w.status NOT IN"
+                  + " ('DECLINED','COMPLETE','CANCELLED') AND c.status NOT IN"
+                  + " ('CLOSED','REJECTED','TERMINATED') GROUP BY p.id",
+              u.get("municipality_id"))) extra.put(row.get("id"), row);
+    }
+    if ("APPROVER".equals(role)) {
+      // Suggest, per approval step, whoever this officer has chosen most often; they may change it.
+      var seen = new HashSet<Object>();
+      for (var row :
+          db.list(
+              "SELECT a.step,a.approver_id,count(*) n FROM approval_assignment a JOIN review r ON"
+                  + " r.resource_id=a.resource_id AND r.decision='SEND_APPROVAL' AND r.actor_id=?"
+                  + " GROUP BY a.step,a.approver_id ORDER BY a.step,n DESC,a.approver_id",
+              u.get("id")))
+        if (seen.add(row.get("step")) && !extra.containsKey(row.get("approver_id")))
+          extra.put(
+              row.get("approver_id"), Map.of("usual_step", row.get("step"), "times", row.get("n")));
+    }
+    var result = new ArrayList<Map<String, Object>>();
+    for (var person : people) {
+      var row = new LinkedHashMap<String, Object>(person);
+      var more = extra.get(person.get("id"));
+      if (more != null)
+        for (var e : more.entrySet())
+          if (!e.getKey().equals("id")) row.put(e.getKey(), e.getValue());
+      if ("FIELD".equals(role))
+        for (var k : List.of("waiting", "accepted", "working", "active")) row.putIfAbsent(k, 0);
+      result.add(row);
+    }
+    return result;
   }
 
   @GetMapping("/community/complaints")

@@ -4,6 +4,7 @@ import auth from "./locales/auth.en";
 import citizen from "./locales/citizen.en";
 import staff from "./locales/staff.en";
 import admin from "./locales/admin.en";
+import features from "./locales/features.en";
 export const englishMessages: Record<string, string> = {
   "กรุณาแนบเอกสารคำขอ PDF หรือรูปภาพ PNG/JPEG": "Attach a PDF document or PNG/JPEG image.",
   "รองรับเอกสาร PDF หรือรูปภาพ PNG/JPEG": "Use a PDF document or a PNG/JPEG image",
@@ -33,4 +34,5 @@ export const englishMessages: Record<string, string> = {
   ...citizen,
   ...staff,
   ...admin,
+  ...features,
 };

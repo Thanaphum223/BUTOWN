@@ -39,8 +39,10 @@ for (const width of [390, 768, 1280]) {
     await page.getByRole("spinbutton", { name: "ลองจิจูด", exact: true }).fill("100.502");
     await confirmLocation(page, "สถานที่ที่ผู้แจ้งพิมพ์");
     await page.getByRole("button", { name: /หมวดข้อมูลเทศบาลต้นฉบับ/ }).click();
-    await page.getByLabel("หัวข้อปัญหา", { exact: true }).fill("หัวข้อที่ผู้ใช้เขียน");
-    await page.getByLabel("รายละเอียด", { exact: true }).fill("รายละเอียดประชาชนต้นฉบับ ห้ามแปล");
+    await page.getByLabel("หัวข้อปัญหา (ไม่บังคับ)", { exact: true }).fill("หัวข้อที่ผู้ใช้เขียน");
+    await page
+      .getByLabel("รายละเอียดอื่น ๆ (ไม่บังคับ)", { exact: true })
+      .fill("รายละเอียดประชาชนต้นฉบับ ห้ามแปล");
     await page.getByLabel("ชื่อ–นามสกุล (ไม่บังคับ)", { exact: true }).fill("ชื่อผู้แจ้งต้นฉบับ");
     const phone = page.getByLabel("เบอร์ติดต่อ (ไม่บังคับ)", { exact: true });
     await expect(phone).toBeEmpty();
@@ -62,11 +64,15 @@ for (const width of [390, 768, 1280]) {
           exact: true,
         }),
       ).toBeVisible();
-      await expect(page.getByLabel(en ? "Description" : "รายละเอียด", { exact: true })).toHaveValue(
-        "รายละเอียดประชาชนต้นฉบับ ห้ามแปล",
-      );
       await expect(
-        page.getByLabel(en ? "Problem title" : "หัวข้อปัญหา", { exact: true }),
+        page.getByLabel(en ? "Other details (optional)" : "รายละเอียดอื่น ๆ (ไม่บังคับ)", {
+          exact: true,
+        }),
+      ).toHaveValue("รายละเอียดประชาชนต้นฉบับ ห้ามแปล");
+      await expect(
+        page.getByLabel(en ? "Problem title (optional)" : "หัวข้อปัญหา (ไม่บังคับ)", {
+          exact: true,
+        }),
       ).toHaveValue("หัวข้อที่ผู้ใช้เขียน");
       await expect(page.getByLabel(en ? "Email" : "อีเมล", { exact: true })).toHaveValue(
         "original@example.test",

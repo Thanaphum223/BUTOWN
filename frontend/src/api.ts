@@ -190,6 +190,9 @@ export const actionNames: Record<string, string> = {
   WITHDRAW_PROPOSAL: "ถอนข้อเสนอกลับมาแก้ไข",
   WITHDRAW_APPROVAL: "ถอนการส่งพิจารณาอนุมัติ",
   UNDO_START: "ยกเลิกการเริ่มปฏิบัติงาน",
+  REQUEST_EXTENSION: "ขอขยายระยะเวลาดำเนินการ",
+  APPROVE_EXTENSION: "อนุมัติการขยายเวลา",
+  REJECT_EXTENSION: "ไม่อนุมัติการขยายเวลา",
 };
 export const roleNames: Record<string, string> = {
   CITIZEN: "ประชาชน",

@@ -17,8 +17,10 @@ test("citizen can take a photo, preview attachments and open each file once afte
   await confirmLocation(page, "จุดทดสอบแนบรูป");
   await page.getByRole("button", { name: /ถนนและทางเท้า/ }).click();
   const title = "แนบรูป " + Date.now();
-  await page.getByLabel("หัวข้อปัญหา", { exact: true }).fill(title);
-  await page.getByLabel("รายละเอียด", { exact: true }).fill("ทดสอบแนบรูปและเปิดดู");
+  await page.getByLabel("หัวข้อปัญหา (ไม่บังคับ)", { exact: true }).fill(title);
+  await page
+    .getByLabel("รายละเอียดอื่น ๆ (ไม่บังคับ)", { exact: true })
+    .fill("ทดสอบแนบรูปและเปิดดู");
   const camera = page.locator('input[type=file][capture="environment"]');
   await expect(camera).toHaveAttribute("accept", "image/jpeg,image/png");
   await expect(page.locator("input[type=file][multiple]")).toHaveAttribute(

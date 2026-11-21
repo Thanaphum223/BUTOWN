@@ -24,14 +24,23 @@ import {
   UploadOutlined,
   CheckOutlined,
   ArrowLeftOutlined,
+  VideoCameraOutlined,
+  SafetyCertificateOutlined,
 } from "./icons";
 import { api, post, statusNames } from "./api";
 import { useGeo } from "./GeoContext";
 import LocationMap from "./LocationMap";
 import CommunityActions from "./CommunityActions";
 import CommunityDetail from "./CommunityDetail";
-import { ATTACHMENT_ACCEPT, ATTACHMENT_HELP, attachmentError } from "./attachments";
+import {
+  ATTACHMENT_ACCEPT,
+  ATTACHMENT_HELP,
+  MAX_ATTACHMENT_BYTES,
+  attachmentError,
+} from "./attachments";
 import { reportDescriptionExample } from "./reportExamples";
+import { composeDescription, reportSymptoms } from "./reportSymptoms";
+import VideoRecorder, { canRecordVideo } from "./VideoRecorder";
 import ReporterEmail from "./ReporterEmail";
 type D = Record<string, any>;
 type Place = { place_id: number; lat: string; lon: string; display_name: string };
@@ -133,6 +142,8 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
   const searchVersion = useRef(0);
   const pendingFiles = useRef<File[]>([]);
   const [attachmentMissing, setAttachmentMissing] = useState(false);
+  const [symptoms, setSymptoms] = useState<string[]>([]);
+  const [recording, setRecording] = useState(false);
   const { message } = App.useApp();
   const [previews, setPreviews] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -437,8 +448,8 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
       const v = form.getFieldsValue(true);
       const payload = {
         categoryId: category!.id,
-        title: v.title,
-        description: v.description,
+        title: v.title?.trim() || category!.name,
+        description: composeDescription(symptoms, v.description),
         address: v.address,
         answers: v.answers || {},
         latitude: position?.[0] ?? null,
@@ -831,6 +842,9 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
                     if (!currentTitle?.trim() || currentTitle === category?.name)
                       form.setFieldValue("title", c.name);
                     setCategory(c);
+                    setSymptoms((picked) =>
+                      picked.filter((symptom) => reportSymptoms(c.name).includes(symptom)),
+                    );
                     setNearby([]);
                   }}
                 >
@@ -876,19 +890,40 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
             <strong>{category && categoryLabel(category.name)}</strong>
             <p>{address}</p>
           </div>
+          {category && (
+            <section className="symptom-picker" aria-label={t("อาการที่พบ")}>
+              <Text strong>{t("อาการที่พบ (แตะเลือกได้หลายข้อ ไม่บังคับ)")}</Text>
+              <div className="symptom-options">
+                {reportSymptoms(category.name).map((symptom) => (
+                  <Tag.CheckableTag
+                    key={symptom}
+                    checked={symptoms.includes(symptom)}
+                    onChange={(checked) =>
+                      setSymptoms((picked) =>
+                        checked ? [...picked, symptom] : picked.filter((s) => s !== symptom),
+                      )
+                    }
+                  >
+                    {t(symptom)}
+                  </Tag.CheckableTag>
+                ))}
+              </div>
+            </section>
+          )}
           <Form.Item
-            label={t("หัวข้อปัญหา")}
+            label={t("หัวข้อปัญหา (ไม่บังคับ)")}
             name="title"
-            rules={[{ required: step === 1, max: 200 }]}
+            rules={[{ max: 200 }]}
+            extra={t("ถ้าไม่กรอก ระบบจะใช้ชื่อประเภทปัญหาเป็นหัวข้อ")}
           >
             <Input placeholder={t("สรุปปัญหาที่พบ")} />
           </Form.Item>
           <Form.Item
-            label={t("รายละเอียด")}
+            label={t("รายละเอียดอื่น ๆ (ไม่บังคับ)")}
             name="description"
-            rules={[{ required: step === 1, max: 20000 }]}
+            rules={[{ max: 19000 }]}
           >
-            <Input.TextArea rows={5} placeholder={reportDescriptionExample(category?.name, t)} />
+            <Input.TextArea rows={3} placeholder={reportDescriptionExample(category?.name, t)} />
           </Form.Item>
           {fields.map((f) => (
             <Form.Item
@@ -914,6 +949,16 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
             >
               <Button icon={<CameraOutlined />}>{t("ถ่ายรูปด้วยกล้อง")}</Button>
             </Upload>
+            {canRecordVideo() && (
+              <Button icon={<VideoCameraOutlined />} onClick={() => setRecording(true)}>
+                {t("ถ่ายวิดีโอ (ไม่เกิน 60 วินาที)")}
+              </Button>
+            )}
+            <VideoRecorder
+              open={recording}
+              onClose={() => setRecording(false)}
+              onRecorded={addAttachment}
+            />
             <Upload
               multiple
               accept={ATTACHMENT_ACCEPT}
@@ -948,10 +993,29 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
             </Text>
             <p aria-live="polite">
               {t("ขนาดรวมที่เลือก:")}{" "}
-              {(files.reduce((total, f) => total + f.size, 0) / 1_000_000).toFixed(1)} / 1,000 MB
+              {(files.reduce((total, f) => total + f.size, 0) / 1_000_000).toFixed(1)} /{" "}
+              {MAX_ATTACHMENT_BYTES / 1_000_000} MB
             </p>
+            <Alert
+              className="media-privacy-note"
+              type="info"
+              showIcon
+              message={t(
+                "ภาพและวิดีโออาจติดใบหน้า ทะเบียนรถ หรือบ้านเลขที่ของผู้อื่น กรุณาถ่ายเฉพาะจุดเกิดเหตุเท่าที่จำเป็น",
+              )}
+            />
           </Form.Item>
           <Title level={5}>{t("ข้อมูลติดต่อผู้แจ้ง")}</Title>
+          <Alert
+            className="contact-privacy-note"
+            type="success"
+            showIcon
+            icon={<SafetyCertificateOutlined />}
+            message={t("ข้อมูลส่วนตัวของคุณจะไม่ถูกเผยแพร่")}
+            description={t(
+              "ชื่อ เบอร์โทร และอีเมลจะเห็นได้เฉพาะเจ้าหน้าที่ที่รับผิดชอบเรื่องนี้ เพื่อติดต่อกลับเท่านั้น ไม่แสดงต่อประชาชนคนอื่น ตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562",
+            )}
+          />
           <Form.Item
             label={t("ชื่อ–นามสกุล (ไม่บังคับ)")}
             name="contactName"

@@ -62,7 +62,7 @@ for (const denied of [false, true]) {
       await openReport(page);
       if (denied) await expect(page.getByText(/ไม่ได้รับอนุญาตให้ใช้ตำแหน่ง/)).toBeVisible();
       await confirmLocation(page, "ใช้แอปได้หลังตอบสิทธิ์ GPS");
-      await expect(page.getByLabel("หัวข้อปัญหา", { exact: true })).toBeVisible();
+      await expect(page.getByLabel("หัวข้อปัญหา (ไม่บังคับ)", { exact: true })).toBeVisible();
       expect(await page.evaluate(() => (window as any).gpsCalls)).toBe(1);
     },
   );

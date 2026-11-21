@@ -33,7 +33,8 @@ async function setup(
     const url = new URL(route.request().url()),
       path = url.pathname;
     if (path.startsWith("/api/complaints/")) {
-      detailRequests.push(path);
+      // Sub-resources such as /sla belong to the same complaint; record which complaint was read.
+      detailRequests.push(path.split("/").slice(0, 4).join("/"));
       if (path !== "/api/complaints/assigned")
         return route.fulfill({ status: 403, json: { message: "Forbidden" } });
       return route.fulfill({

@@ -1,6 +1,7 @@
-import { theme, type ThemeConfig } from "antd";
+import type { ThemeConfig } from "antd";
 
-// Gov brand palette with TownTrack green surfaces and readable neutral colors.
+// Gov brand palette with TownTrack green surfaces and readable neutral colors. The interface
+// uses this Gov theme only; there is no alternative colour mode.
 // Reference: https://library.govcenter.co/tokens
 export const govTokens = {
   "brand-primary": "#1E7D55",
@@ -37,31 +38,12 @@ export const govTokens = {
   "shadow-high": "0 8px 15px 2px #123d2d26, 0 0 4px #123d2d14",
 } as const;
 
-// Dark mode keeps the brand green but lifts it so text and outlines stay readable on dark
-// surfaces; filled brand areas use brand-dark so white text keeps its contrast.
-const darkTokens: Partial<Record<keyof typeof govTokens, string>> = {
-  "brand-primary": "#5ACB94",
-  "brand-dark": "#1E7D55",
-  "brand-soft": "#183126",
-  "brand-surface": "#0E1813",
-  "brand-text-dark": "#E4EFE9",
-  "text-primary": "#E4EFE9",
-  "text-secondary": "#5ACB94",
-  "text-tertiary": "#A9BDB3",
-  "text-placeholder": "#8DA398",
-  "btn-default": "#1B2A23",
-  "border-neutral": "#2E4038",
-  surface: "#16221C",
-  "shadow-low": "0 0 4px #0006, 0 2px 2px #0004",
-  "shadow-medium": "0 4px 10px #0008, 0 2px 2px #0006",
-  "shadow-high": "0 8px 15px 2px #0009, 0 0 4px #0006",
-};
-
-export function installGovTokens(mode: "light" | "dark" = "light") {
-  for (const [name, value] of Object.entries(govTokens)) {
-    const tone = mode === "dark" ? darkTokens[name as keyof typeof govTokens] : undefined;
-    document.documentElement.style.setProperty(`--gov-${name}`, tone ?? value);
-  }
+export function installGovTokens() {
+  const root = document.documentElement;
+  for (const [name, value] of Object.entries(govTokens))
+    root.style.setProperty(`--gov-${name}`, value);
+  root.dataset.theme = "light";
+  root.style.colorScheme = "light";
 }
 
 export const govTheme: ThemeConfig = {
@@ -93,33 +75,5 @@ export const govTheme: ThemeConfig = {
     controlHeight: 48,
     boxShadow: govTokens["shadow-high"],
     boxShadowSecondary: govTokens["shadow-medium"],
-  },
-};
-
-export const govDarkTheme: ThemeConfig = {
-  algorithm: theme.darkAlgorithm,
-  token: {
-    ...govTheme.token,
-    colorPrimary: darkTokens["brand-primary"],
-    colorPrimaryBg: darkTokens["brand-soft"],
-    colorPrimaryBgHover: "#1F3D30",
-    colorPrimaryHover: "#7FD8AC",
-    colorPrimaryActive: "#7FD8AC",
-    colorLink: darkTokens["brand-primary"],
-    colorLinkHover: "#7FD8AC",
-    colorInfo: darkTokens["brand-primary"],
-    colorInfoBg: darkTokens["brand-soft"],
-    // Text on the light green primary fill must be dark to stay readable.
-    colorTextLightSolid: "#08130E",
-    colorText: darkTokens["text-primary"],
-    colorTextSecondary: darkTokens["text-tertiary"],
-    colorTextDescription: darkTokens["text-tertiary"],
-    colorTextPlaceholder: darkTokens["text-placeholder"],
-    colorBorder: darkTokens["border-neutral"],
-    colorBgContainer: darkTokens.surface,
-    colorBgElevated: "#1B2A23",
-    colorBgLayout: darkTokens["brand-surface"],
-    boxShadow: darkTokens["shadow-high"],
-    boxShadowSecondary: darkTokens["shadow-medium"],
   },
 };

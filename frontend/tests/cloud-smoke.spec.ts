@@ -50,7 +50,7 @@ test("citizen privacy notice and report location confirmation work", async ({ pa
   await expect(confirmation).toHaveCSS("transform", "none");
   await confirmation.getByRole("button", { name: "ยืนยันตำแหน่ง", exact: true }).click();
   await expect(confirmation).not.toBeVisible();
-  await expect(page.getByLabel("หัวข้อปัญหา", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("หัวข้อปัญหา (ไม่บังคับ)", { exact: true })).toBeVisible();
 });
 test("admin selects a registered account to assign a role without password entry", async ({
   page,

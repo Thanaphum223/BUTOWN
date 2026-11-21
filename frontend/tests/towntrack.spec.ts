@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import {
   signIn as login,
   signOut as logout,
@@ -125,7 +125,12 @@ test("full approved resource workflow across all municipal and field roles close
       await dialog.getByLabel("หน่วยรายการ 1", { exact: true }).fill("ถุง");
     }
     if (fill) await fill(dialog);
-    const reason = dialog.getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true });
+    const reason = dialog.getByLabel(
+      label === "อนุมัติ" ? "เหตุผลอื่น ๆ (กรอกเพิ่มเองได้)" : "เหตุผล / บันทึกการดำเนินการ",
+      { exact: true },
+    );
+    if (label === "อนุมัติ")
+      await dialog.getByText("เอกสารและหลักฐานประกอบครบถ้วน", { exact: true }).click();
     if (
       ![
         "กดรับงานและลงพื้นที่สำรวจ",
@@ -194,13 +199,7 @@ test("full approved resource workflow across all municipal and field roles close
   await switchUser("officer");
   expect((await (await page.request.get("/api/auth/me")).json()).department_id).toBeNull();
   await perform("เอกสารครบถ้วนตามระเบียบสารบรรณ - ส่งต่อผู้มีอำนาจ", async (d) => {
-    const approver = d.getByLabel("ผู้อนุมัติตามลำดับ (เลือก 1 คน)", { exact: true });
-    await approver.click();
-    await approver.fill("บัญชีทดสอบ APPROVER");
-    await page
-      .locator(".ant-select-dropdown:visible")
-      .getByText("บัญชีทดสอบ APPROVER", { exact: true })
-      .click();
+    await chooseApprover(page, d);
   });
   await expect(page.getByRole("alert").filter({ hasText: "บัญชีทดสอบ APPROVER" })).toContainText(
     "รออนุมัติโดย",
@@ -365,7 +364,12 @@ test("resource refusal by approver terminates a real complaint", async ({ page, 
       await dialog.getByLabel("หน่วยรายการ 1", { exact: true }).fill("ถุง");
     }
     if (fill) await fill(dialog);
-    const reason = dialog.getByLabel("เหตุผล / บันทึกการดำเนินการ", { exact: true });
+    const reason = dialog.getByLabel(
+      label === "อนุมัติ" ? "เหตุผลอื่น ๆ (กรอกเพิ่มเองได้)" : "เหตุผล / บันทึกการดำเนินการ",
+      { exact: true },
+    );
+    if (label === "อนุมัติ")
+      await dialog.getByText("เอกสารและหลักฐานประกอบครบถ้วน", { exact: true }).click();
     if (
       ![
         "กดรับงานและลงพื้นที่สำรวจ",
@@ -420,13 +424,7 @@ test("resource refusal by approver terminates a real complaint", async ({ page, 
   });
   await switchUser("officer");
   await perform("เอกสารครบถ้วนตามระเบียบสารบรรณ - ส่งต่อผู้มีอำนาจ", async (d) => {
-    const approver = d.getByLabel("ผู้อนุมัติตามลำดับ (เลือก 1 คน)", { exact: true });
-    await approver.click();
-    await approver.fill("บัญชีทดสอบ APPROVER");
-    await page
-      .locator(".ant-select-dropdown:visible")
-      .getByText("บัญชีทดสอบ APPROVER", { exact: true })
-      .click();
+    await chooseApprover(page, d);
   });
   await switchUser("approver");
   await perform(
@@ -484,3 +482,16 @@ test("citizen municipal map lists real cases and follows sanitized summary", asy
     page.locator(".ant-list-item").filter({ hasText: "#" + id.slice(0, 8).toUpperCase() }),
   ).toBeVisible();
 });
+
+// The officer's usual approver is preselected after the first time; otherwise pick them.
+async function chooseApprover(page: Page, d: Locator) {
+  const chosen = d.locator(".ant-select-selection-item").filter({ hasText: "บัญชีทดสอบ APPROVER" });
+  if (await chosen.count()) return;
+  const approver = d.getByLabel("ผู้อนุมัติตามลำดับ (เลือก 1 คน)", { exact: true });
+  await approver.click();
+  await approver.fill("บัญชีทดสอบ APPROVER");
+  await page
+    .locator(".ant-select-dropdown:visible")
+    .getByText(/^บัญชีทดสอบ APPROVER/)
+    .click();
+}

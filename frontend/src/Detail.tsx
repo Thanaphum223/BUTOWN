@@ -41,6 +41,9 @@ import { api, actionNames, date, requiredReasonActions, progressLabel } from "./
 import LocationMap from "./LocationMap";
 import { useGeo } from "./GeoContext";
 import { ATTACHMENT_HELP, attachmentError } from "./attachments";
+import SlaPanel from "./SlaPanel";
+import StockUsage from "./StockUsage";
+import { StockReturns, StockTaken, stockOptions } from "./StockFields";
 type D = Record<string, any>;
 const { Title, Text, Paragraph } = Typography;
 const denialPresets = [
@@ -60,6 +63,15 @@ const denialPresets = [
       "ไม่คุ้มค่าทางวิศวกรรม ให้ยุติการใช้งบประมาณพิเศษและให้กองช่างซ่อมแซมบรรเทาความเดือดร้อนชั่วคราวตามวัสดุคงคลัง",
   },
 ];
+const approvalPresets = [
+  "เอกสารและหลักฐานประกอบครบถ้วน",
+  "ราคาสมเหตุสมผลเทียบราคากลาง",
+  "อยู่ในวงเงินงบประมาณที่ได้รับจัดสรร",
+  "จำเป็นเร่งด่วนต่อความปลอดภัยของประชาชน",
+  "ใช้วัสดุจากคลังของเทศบาลได้",
+];
+const composeReason = (picked: string[], note?: string) =>
+  [picked.join(" / "), note?.trim()].filter(Boolean).join(" — ");
 const secondaryActions = [
   "REJECT",
   "DENY",
@@ -160,6 +172,9 @@ export default function Detail({
     );
   const [action, setAction] = useState(""),
     [denialTopic, setDenialTopic] = useState<string>(),
+    [approvalPicked, setApprovalPicked] = useState<string[]>([]),
+    [stockItems, setStockItems] = useState<D[]>([]),
+    [heldStock, setHeldStock] = useState<D[]>([]),
     [teams, setTeams] = useState<D[]>([]),
     [people, setPeople] = useState<D[]>([]),
     [busy, setBusy] = useState(false);
@@ -172,7 +187,10 @@ export default function Detail({
   const draftKey = `${user.id}:${id}`;
   const [draft, setDraft] = useState<FieldDraft>({ values: {}, files: [] });
   const [online, setOnline] = useState(navigator.onLine);
-  useEffect(() => setDenialTopic(undefined), [action]);
+  useEffect(() => {
+    setDenialTopic(undefined);
+    setApprovalPicked([]);
+  }, [action]);
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
     window.addEventListener("online", update);
@@ -185,6 +203,7 @@ export default function Detail({
   const [form] = Form.useForm();
   useLocalizedFormErrors(form);
   const resourceItems = Form.useWatch("lineItems", form) as D[] | undefined;
+  const requestItems = Form.useWatch("items", form) as D[] | undefined;
   const resourceTotal =
     (resourceItems || []).reduce(
       (total: number, item: D) => total + Math.round(Number(item?.amount || 0) * 100),
@@ -232,6 +251,25 @@ export default function Detail({
     setTeams([]);
     setAction(a);
     if (a === "REQUEST_RESOURCE") form.setFieldsValue({ items: [{ name: "", unit: "" }] });
+    setHeldStock([]);
+    if (["REQUEST_RESOURCE", "START", "REPORT"].includes(a)) {
+      api<D>("/stock")
+        .then((s) => setStockItems(s.items.filter((item: D) => item.active)))
+        .catch(() => setStockItems([]));
+    }
+    if (a === "REPORT") {
+      const work = activeWorkOrder(data);
+      api<D[]>(`/stock/complaints/${id}`)
+        .then((rows) => {
+          const held = rows.filter((r) => r.work_order_id === work?.id && Number(r.used) > 0);
+          setHeldStock(held);
+          if (!form.getFieldValue("stockReturns"))
+            form.setFieldsValue({
+              stockReturns: held.map((r) => ({ stockItemId: r.stock_item_id, quantity: 0 })),
+            });
+        })
+        .catch(() => setHeldStock([]));
+    }
     if (a === "START") {
       setStartPoint(undefined);
       void geo.request().then((p) => setStartPoint(p ?? null));
@@ -312,7 +350,16 @@ export default function Detail({
       try {
         const department =
           role === "APPROVER" ? "" : `&departmentId=${data?.complaint.department_id}`;
-        setPeople(await api("/people?role=" + role + department));
+        const found = await api<D[]>("/people?role=" + role + department);
+        setPeople(found);
+        if (a === "SEND_APPROVAL") {
+          const usual = found
+            .filter((p) => p.usual_step)
+            .sort((x, y) => x.usual_step - y.usual_step)
+            .map((p) => p.id)
+            .slice(0, data?.approvalStages || 1);
+          if (usual.length) form.setFieldsValue({ approverIds: usual });
+        }
       } catch (e) {
         message.error(t((e as Error).message));
       }
@@ -329,7 +376,15 @@ export default function Detail({
       message.error(t("บันทึกไฟล์ร่างไม่ได้ กรุณาเก็บไฟล์ต้นฉบับไว้"));
     }
   }
-  async function submit(v: D) {
+  async function submit(input: D) {
+    const v: D =
+      action === "APPROVE"
+        ? { ...input, reason: composeReason(approvalPicked, input.reason) }
+        : { ...input };
+    // Only lines with an item and a positive amount reach the stock register.
+    for (const key of ["stockItems", "stockReturns"])
+      if (v[key])
+        v[key] = (v[key] as D[]).filter((line) => line?.stockItemId && Number(line.quantity) > 0);
     if (data?.readOnlyHistory) return;
     if (submitting.current) return;
     if (uploadBusy) {
@@ -893,6 +948,8 @@ export default function Detail({
                 />
               )}
             </Card>
+            {!publicView && <SlaPanel id={id} version={c.version} onChanged={load} />}
+            {!citizen && !publicView && <StockUsage id={id} version={c.version} />}
             {!citizen && (
               <Card style={{ marginTop: 20 }}>
                 <Tabs
@@ -1532,10 +1589,44 @@ export default function Detail({
                 mode={action === "SEND_APPROVAL" ? "multiple" : undefined}
                 options={people.map((p) => ({
                   value: p.id,
-                  label: p.display_name,
+                  label: p.usual_step
+                    ? t("{{name}} (เลือกบ่อย · ลำดับ {{step}})", {
+                        name: p.display_name,
+                        step: p.usual_step,
+                      })
+                    : p.display_name,
                 }))}
               />
             </Form.Item>
+          )}
+          {action === "SEND_APPROVAL" && people.some((p) => p.usual_step) && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message={t("ระบบเลือกผู้อนุมัติที่คุณส่งให้บ่อยไว้ให้แล้ว เปลี่ยนเป็นคนอื่นได้")}
+            />
+          )}
+          {action === "APPROVE" && (
+            <section className="approval-presets" aria-label={t("เหตุผลที่อนุมัติ")}>
+              <Text strong>{t("เหตุผลที่อนุมัติ (แตะเลือกได้หลายข้อ)")}</Text>
+              <div className="symptom-options">
+                {approvalPresets.map((preset) => (
+                  <Tag.CheckableTag
+                    key={preset}
+                    checked={approvalPicked.includes(preset)}
+                    onChange={(checked) => {
+                      setApprovalPicked((picked) =>
+                        checked ? [...picked, preset] : picked.filter((p) => p !== preset),
+                      );
+                      void form.validateFields(["reason"]).catch(() => {});
+                    }}
+                  >
+                    {t(preset)}
+                  </Tag.CheckableTag>
+                ))}
+              </div>
+            </section>
           )}
           {action === "PROPOSE" && (
             <>
@@ -1770,6 +1861,7 @@ export default function Detail({
                 {t("ภาพก่อนและหลังต้องเป็น PNG/JPEG ·")}
                 {t(ATTACHMENT_HELP)}
               </Text>
+              <StockReturns held={heldStock} />
             </>
           )}
           {action === "START" && (
@@ -1816,6 +1908,7 @@ export default function Detail({
                   </List.Item>
                 )}
               />
+              <StockTaken items={stockItems} approved={c.status === "READY"} />
             </div>
           )}
           {action === "REQUEST_RESOURCE" && (
@@ -1835,8 +1928,15 @@ export default function Detail({
                   <div className="resource-items">
                     {fields.map((field, index) => (
                       <div className="resource-item-row requested-item-row" key={field.key}>
+                        <Form.Item name={[field.name, "stockItemId"]} hidden>
+                          <Input />
+                        </Form.Item>
                         <Form.Item
-                          label={t("รายการที่ ") + (index + 1)}
+                          label={
+                            requestItems?.[index]?.stockItemId
+                              ? t("รายการที่ {{n}} (จากคลัง)", { n: index + 1 })
+                              : t("รายการที่ ") + (index + 1)
+                          }
                           name={[field.name, "name"]}
                           rules={[{ required: true, whitespace: true, max: 200 }]}
                         >
@@ -1844,6 +1944,7 @@ export default function Detail({
                             aria-label={t("ชื่อรายการที่ขอ ") + (index + 1)}
                             placeholder={t("ชื่อรายการ เช่น ทราย ปูนซีเมนต์")}
                             maxLength={200}
+                            readOnly={!!requestItems?.[index]?.stockItemId}
                           />
                         </Form.Item>
                         <Form.Item
@@ -1875,6 +1976,7 @@ export default function Detail({
                             aria-label={t("หน่วยรายการ ") + (index + 1)}
                             placeholder={t("เช่น ถุง ท่อน เมตร")}
                             maxLength={50}
+                            readOnly={!!requestItems?.[index]?.stockItemId}
                           />
                         </Form.Item>
                         {index > 0 && (
@@ -1892,14 +1994,45 @@ export default function Detail({
                     ))}
                   </div>
                   <Form.ErrorList errors={errors} />
-                  <Button
-                    icon={<PlusOutlined />}
-                    disabled={fields.length >= 50}
-                    onClick={() => add({ name: "", unit: "" })}
-                    style={{ marginBottom: 16 }}
-                  >
-                    {t("เพิ่มรายการที่ขอ")}
-                  </Button>
+                  <div className="stock-quick-add">
+                    {stockItems.length > 0 && (
+                      <Select
+                        showSearch
+                        value={null}
+                        optionFilterProp="label"
+                        aria-label={t("เลือกจากคลังวัสดุ")}
+                        placeholder={t("+ เลือกจากคลังวัสดุ")}
+                        disabled={fields.length >= 50}
+                        options={stockOptions(stockItems, t).map((o) => ({
+                          ...o,
+                          disabled: false,
+                        }))}
+                        onChange={(stockId: string) => {
+                          const item = stockItems.find((s) => s.id === stockId);
+                          if (!item) return;
+                          const rows: D[] = form.getFieldValue("items") || [];
+                          const blank = rows.findIndex((r) => !r?.name?.trim() && !r?.stockItemId);
+                          const line = {
+                            stockItemId: item.id,
+                            name: item.name,
+                            unit: item.unit,
+                            quantity: 1,
+                          };
+                          if (blank >= 0) {
+                            rows[blank] = line;
+                            form.setFieldsValue({ items: [...rows] });
+                          } else add(line);
+                        }}
+                      />
+                    )}
+                    <Button
+                      icon={<PlusOutlined />}
+                      disabled={fields.length >= 50}
+                      onClick={() => add({ name: "", unit: "" })}
+                    >
+                      {t("เพิ่มรายการที่ขอ (นอกคลัง)")}
+                    </Button>
+                  </div>
                 </>
               )}
             </Form.List>
@@ -1911,12 +2044,16 @@ export default function Detail({
                   ? t(
                       "ระบุสิ่งที่ต้องปรับปรุงเพิ่มเติม (เช่น ภาพถ่ายไม่ชัดเจนสำหรับแจ้งประชาชน หรือข้อมูลสรุปไม่ครบถ้วน)",
                     )
-                  : t("เหตุผล / บันทึกการดำเนินการ")
+                  : action === "APPROVE"
+                    ? t("เหตุผลอื่น ๆ (กรอกเพิ่มเองได้)")
+                    : t("เหตุผล / บันทึกการดำเนินการ")
               }
               name="reason"
               rules={[
                 {
-                  required: requiredReasonActions.has(action),
+                  required:
+                    requiredReasonActions.has(action) &&
+                    !(action === "APPROVE" && approvalPicked.length > 0),
                   whitespace: true,
                   max: 4000,
                   message: t("กรุณาระบุเหตุผลให้ครบถ้วน"),

@@ -3,7 +3,6 @@ import { useState } from "react";
 import { Alert, Card, ConfigProvider, Divider, Typography } from "antd";
 import GovAccountForm, { type GovAccountMode } from "./GovAccountForm";
 import GovLogin from "./GovLogin";
-import ThemeSwitcher from "./ThemeSwitcher";
 import LanguageToggle from "./LanguageToggle";
 
 export default function GovAuthPage({
@@ -33,7 +32,6 @@ export default function GovAuthPage({
         <Card className="auth-card">
           <div className="auth-toolbar">
             <LanguageToggle />
-            <ThemeSwitcher />
           </div>
           {authError && (
             <Alert

@@ -1,0 +1,136 @@
+import { Alert, Button, Form, InputNumber, Select, Typography } from "antd";
+import { DeleteOutlined, PlusOutlined } from "./icons";
+import { useI18n } from "./i18n/useI18n";
+
+type D = Record<string, any>;
+const amount = (value: unknown) =>
+  Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+export function stockOptions(items: D[], t: (key: string, params?: D) => string) {
+  return items.map((item) => ({
+    value: item.id,
+    label: t("{{name}} · คงเหลือ {{left}} {{unit}}", {
+      name: item.name,
+      left: amount(item.on_hand),
+      unit: item.unit,
+    }),
+    disabled: Number(item.on_hand) <= 0,
+  }));
+}
+
+// Items taken from the store when work starts. Approved request items are issued automatically.
+export function StockTaken({ items, approved }: { items: D[]; approved: boolean }) {
+  const { t } = useI18n();
+  if (!items.length) return null;
+  return (
+    <section className="stock-fields">
+      <Typography.Title level={5}>{t("วัสดุที่เบิกจากคลัง (ไม่บังคับ)")}</Typography.Title>
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 12 }}
+        message={
+          approved
+            ? t(
+                "วัสดุในคำขอที่อนุมัติแล้วจะถูกตัดจากคลังอัตโนมัติเมื่อเริ่มงาน เพิ่มได้ถ้าต้องใช้มากกว่านั้น",
+              )
+            : t(
+                "ไม่ได้ขอใช้ทรัพยากรล่วงหน้า? เลือกวัสดุที่หยิบจากคลัง ระบบจะตัดยอดและแจ้งหัวหน้าตรวจสอบ",
+              )
+        }
+      />
+      <Form.List name="stockItems">
+        {(fields, { add, remove }) => (
+          <>
+            {fields.map((field, index) => (
+              <div className="stock-line" key={field.key}>
+                <Form.Item
+                  name={[field.name, "stockItemId"]}
+                  rules={[{ required: true, message: t("กรุณาเลือกวัสดุ") }]}
+                >
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    aria-label={t("วัสดุรายการที่ ") + (index + 1)}
+                    placeholder={t("เลือกวัสดุ")}
+                    options={stockOptions(items, t)}
+                  />
+                </Form.Item>
+                <Form.Item
+                  name={[field.name, "quantity"]}
+                  rules={[{ required: true, type: "number", min: 0.01 }]}
+                >
+                  <InputNumber
+                    aria-label={t("จำนวนที่เบิก ") + (index + 1)}
+                    min={0.01}
+                    precision={2}
+                    inputMode="decimal"
+                    placeholder={t("จำนวน")}
+                  />
+                </Form.Item>
+                <Button
+                  icon={<DeleteOutlined />}
+                  danger
+                  aria-label={t("ลบรายการ ") + (index + 1)}
+                  onClick={() => remove(field.name)}
+                />
+              </div>
+            ))}
+            <Button icon={<PlusOutlined />} onClick={() => add({ quantity: 1 })}>
+              {t("เพิ่มวัสดุจากคลัง")}
+            </Button>
+          </>
+        )}
+      </Form.List>
+    </section>
+  );
+}
+
+// With the report, the team says how much of each issued item comes back to the store.
+export function StockReturns({ held }: { held: D[] }) {
+  const { t } = useI18n();
+  if (!held.length) return null;
+  return (
+    <section className="stock-fields">
+      <Typography.Title level={5}>{t("คืนวัสดุที่เหลือเข้าคลัง")}</Typography.Title>
+      <Typography.Paragraph type="secondary">
+        {t("ระบุจำนวนที่เหลือนำกลับคืน ส่วนที่ไม่คืนจะนับเป็นวัสดุที่ใช้ไปในงานนี้")}
+      </Typography.Paragraph>
+      <Form.List name="stockReturns">
+        {(fields) =>
+          fields.map((field, index) => {
+            const line = held[index];
+            if (!line) return null;
+            return (
+              <div className="stock-line" key={field.key}>
+                <Form.Item name={[field.name, "stockItemId"]} hidden>
+                  <input />
+                </Form.Item>
+                <Typography.Text className="stock-line-name">
+                  {t("{{name}} · เบิกไป {{held}} {{unit}}", {
+                    name: line.name,
+                    held: amount(line.used),
+                    unit: line.unit,
+                  })}
+                </Typography.Text>
+                <Form.Item
+                  name={[field.name, "quantity"]}
+                  rules={[{ type: "number", min: 0, max: Number(line.used) }]}
+                >
+                  <InputNumber
+                    aria-label={t("จำนวนที่คืน {{name}}", { name: line.name })}
+                    min={0}
+                    max={Number(line.used)}
+                    precision={2}
+                    inputMode="decimal"
+                    addonAfter={line.unit}
+                  />
+                </Form.Item>
+              </div>
+            );
+          })
+        }
+      </Form.List>
+    </section>
+  );
+}

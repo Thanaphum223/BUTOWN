@@ -38,7 +38,7 @@ test("manual location confirmation waits for modal animation before continuing",
   });
   await page.getByRole("link", { name: /แจ้งปัญหา/ }).click();
   await confirmLocation(page, "Manual landmark without GPS");
-  await expect(page.getByLabel("หัวข้อปัญหา", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("หัวข้อปัญหา (ไม่บังคับ)", { exact: true })).toBeVisible();
 });
 for (const width of [390, 768, 1280])
   for (const language of ["th", "en"]) {

@@ -22,6 +22,35 @@ function memberNames(team: D): string[] {
   }
 }
 
+// Open jobs and current activity, so leaders can spread work before assigning more.
+function Workload({ person }: { person: D }) {
+  const { t } = useI18n();
+  const active = Number(person.active || 0);
+  const level = active === 0 ? "free" : active <= 2 ? "normal" : "busy";
+  return (
+    <span id={`workload-${person.id}`} className={`assignment-workload workload-${level}`}>
+      <Tag color={level === "free" ? "green" : level === "normal" ? "gold" : "red"}>
+        {active === 0
+          ? t("ว่าง")
+          : level === "busy"
+            ? t("งานมาก · {{count}} งานค้าง", { count: active })
+            : t("{{count}} งานค้าง", { count: active })}
+      </Tag>
+      <Typography.Text type="secondary" className="assignment-activity">
+        {Number(person.working) > 0
+          ? t("กำลังปฏิบัติงาน: {{title}}", { title: person.current_title || "" })
+          : Number(person.accepted) > 0
+            ? t("รับงานแล้ว {{count}} งาน รอเริ่ม", { count: person.accepted })
+            : Number(person.waiting) > 0
+              ? t("รอตอบรับ {{count}} งาน", { count: person.waiting })
+              : active > 0
+                ? t("รอตรวจรายงาน")
+                : t("ไม่มีงานค้าง พร้อมรับงาน")}
+      </Typography.Text>
+    </span>
+  );
+}
+
 // Tap-to-choose lists replace long dropdowns. The form submits teamId, or assigneeId plus
 // memberIds when several individuals are ticked.
 export default function AssignmentPicker({
@@ -137,21 +166,24 @@ export default function AssignmentPicker({
           className="ant-checkbox-group assignment-options"
         >
           {shownPeople.map((person) => (
-            <Checkbox
-              key={person.id}
-              value={person.id}
-              checked={!teamId && picked.includes(person.id)}
-              onChange={(e) =>
-                pick(
-                  e.target.checked
-                    ? [...(teamId ? [] : picked), person.id]
-                    : picked.filter((id) => id !== person.id),
-                )
-              }
-            >
-              {person.display_name}
-              {person.gov_role && <Tag className="assignment-rank">{person.gov_role}</Tag>}
-            </Checkbox>
+            <div className="assignment-person" key={person.id}>
+              <Checkbox
+                value={person.id}
+                checked={!teamId && picked.includes(person.id)}
+                aria-describedby={`workload-${person.id}`}
+                onChange={(e) =>
+                  pick(
+                    e.target.checked
+                      ? [...(teamId ? [] : picked), person.id]
+                      : picked.filter((id) => id !== person.id),
+                  )
+                }
+              >
+                {person.display_name}
+                {person.gov_role && <Tag className="assignment-rank">{person.gov_role}</Tag>}
+              </Checkbox>
+              <Workload person={person} />
+            </div>
           ))}
         </div>
         {!shownPeople.length && (

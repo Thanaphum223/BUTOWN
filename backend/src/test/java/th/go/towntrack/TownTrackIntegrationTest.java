@@ -2536,10 +2536,10 @@ class TownTrackIntegrationTest {
             header().string("Content-Disposition", org.hamcrest.Matchers.startsWith("inline")));
     long used = rows.stream().mapToLong(r -> ((Number) r.get("size_bytes")).longValue()).sum();
     var first = rows.getFirst();
-    // Simulate existing large attachments without allocating 1 GB in the test JVM.
+    // Simulate existing large attachments without allocating 300 MB in the test JVM.
     db.run(
         "UPDATE attachment SET size_bytes=size_bytes+? WHERE id=?",
-        FileController.MAX_TOTAL_BYTES - used - mp4.length,
+        FileController.MAX_REPORT_BYTES - used - mp4.length,
         first.get("id"));
     mvc.perform(
             multipart("/api/complaints/" + id + "/files")
@@ -2554,7 +2554,7 @@ class TownTrackIntegrationTest {
                 .with(csrf()))
         .andExpect(status().isPayloadTooLarge());
     assertEquals(
-        FileController.MAX_TOTAL_BYTES,
+        FileController.MAX_REPORT_BYTES,
         ((Number)
                 db.one("SELECT SUM(size_bytes) size FROM attachment WHERE complaint_id=?", id)
                     .get("size"))

@@ -17,6 +17,9 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api")
 public class FileController {
+  static final long MAX_FILE_BYTES = 100_000_000L;
+  // Citizens' own evidence per report; staff evidence counts toward the overall cap only.
+  static final long MAX_REPORT_BYTES = 300_000_000L;
   static final long MAX_TOTAL_BYTES = 1_000_000_000L;
   final Db db;
   final Access access;
@@ -127,18 +130,27 @@ public class FileController {
     if (!allowed) Access.deny();
     // Serialize uploads to the same complaint so concurrent files cannot exceed the quota.
     db.one("SELECT id FROM complaint WHERE id=? FOR UPDATE", id);
+    boolean citizen = r.equals("CITIZEN");
+    long limit = citizen ? MAX_REPORT_BYTES : MAX_TOTAL_BYTES;
     long used =
         ((Number)
                 db.one(
-                        "SELECT COALESCE(SUM(size_bytes),0) used FROM attachment WHERE complaint_id=?",
-                        id)
+                        "SELECT COALESCE(SUM(size_bytes),0) used FROM attachment WHERE complaint_id=?"
+                            + (citizen ? " AND uploaded_by=?" : ""),
+                        citizen ? new Object[] {id, u.get("id")} : new Object[] {id})
                     .get("used"))
             .longValue();
     long size = f.getSize();
     if (size <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ไฟล์ต้องไม่ว่าง");
-    if (size > MAX_TOTAL_BYTES || used > MAX_TOTAL_BYTES - size)
+    if (size > MAX_FILE_BYTES)
       throw new ResponseStatusException(
-          HttpStatus.PAYLOAD_TOO_LARGE, "ไฟล์แนบรวมทั้งหมดต่อคำร้องต้องไม่เกิน 1 GB (1,000 MB)");
+          HttpStatus.PAYLOAD_TOO_LARGE, "ไฟล์แต่ละไฟล์ต้องไม่เกิน 100 MB");
+    String quotaMessage =
+        citizen
+            ? "ไฟล์แนบรวมทั้งหมดต่อคำร้องต้องไม่เกิน 300 MB"
+            : "ไฟล์แนบรวมทั้งหมดต่อคำร้องต้องไม่เกิน 1 GB (1,000 MB)";
+    if (used > limit - size)
+      throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, quotaMessage);
     byte[] data;
     try (InputStream input = f.getInputStream()) {
       data = input.readNBytes(4096);
@@ -200,10 +212,8 @@ public class FileController {
         int n;
         while ((n = input.read(buffer)) != -1) {
           written += n;
-          if (written > size || used > MAX_TOTAL_BYTES - written)
-            throw new ResponseStatusException(
-                HttpStatus.PAYLOAD_TOO_LARGE,
-                "ไฟล์แนบรวมทั้งหมดต่อคำร้องต้องไม่เกิน 1 GB (1,000 MB)");
+          if (written > size || used > limit - written)
+            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, quotaMessage);
           digest.update(buffer, 0, n);
           output.write(buffer, 0, n);
         }

@@ -1,7 +1,6 @@
 import { useLiveQuery } from "./useLiveQuery";
 import { AuthUnavailableError, sessionExpiredEvent, sessionExpiredMessage } from "./api";
 import LanguageToggle from "./LanguageToggle";
-import ThemeSwitcher from "./ThemeSwitcher";
 import { useI18n } from "./i18n/useI18n";
 import { MenuOutlined } from "./icons";
 import GovAuthPage from "./GovAuthPage";
@@ -15,6 +14,7 @@ import NewCase from "./NewCase";
 import { lazy } from "react";
 const EmergencyContacts = lazy(() => import("./EmergencyContacts"));
 const Teams = lazy(() => import("./Teams"));
+const Inventory = lazy(() => import("./Inventory"));
 const Admin = lazy(() => import("./Admin"));
 const Detail = lazy(() => import("./Detail"));
 const CitizenHome = lazy(() => import("./CitizenHome"));
@@ -61,6 +61,7 @@ import {
   TeamOutlined,
   LockOutlined,
   DeleteOutlined,
+  InboxOutlined,
 } from "./icons";
 import { api, post, statusNames, actionNames, roleNames, date } from "./api";
 const { Title, Text } = Typography;
@@ -223,6 +224,9 @@ function TownTrackApp() {
     ...(user.role === "LEADER"
       ? [{ key: "teams", icon: <TeamOutlined />, label: t("ทีมลงพื้นที่") }]
       : []),
+    ...(user.role !== "CITIZEN"
+      ? [{ key: "inventory", icon: <InboxOutlined />, label: t("คลังวัสดุ") }]
+      : []),
     { key: "notifications", icon: <BellOutlined />, label: t("การแจ้งเตือน") },
     ...(user.role === "ADMIN"
       ? [{ key: "admin", icon: <SettingOutlined />, label: t("จัดการระบบ") }]
@@ -347,7 +351,6 @@ function TownTrackApp() {
             </div>
             <Space className="account-controls" wrap>
               <LanguageToggle className="language-switcher" />
-              <ThemeSwitcher />
               {(user.account_role === "ADMIN" || user.role === "ADMIN") && (
                 <>
                   {!screens.lg && (
@@ -498,6 +501,8 @@ function TownTrackApp() {
               <EmergencyContacts />
             ) : view === "teams" ? (
               <Teams />
+            ) : view === "inventory" && user.role !== "CITIZEN" ? (
+              <Inventory admin={user.account_role === "ADMIN"} />
             ) : view === "admin" ? (
               <Admin
                 onDepartmentsChange={(departments) => {

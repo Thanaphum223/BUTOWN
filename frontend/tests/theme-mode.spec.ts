@@ -23,75 +23,30 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("dark mode is chosen from the header and survives a reload", async ({ page }) => {
+test("the interface uses the Gov theme only, with no dark mode switch", async ({ page }) => {
   await page.goto("/");
-
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await page.getByRole("button", { name: "เปลี่ยนเป็นโหมดมืด", exact: true }).click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  const colours = () =>
-    page.evaluate(() => {
-      const style = getComputedStyle(document.body);
-      return [style.backgroundColor, style.color];
-    });
-  const [background, text] = await colours();
-  expect(background).not.toBe(text);
-  expect(background).toBe("rgb(14, 24, 19)");
-  await page.reload();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await page.getByRole("button", { name: "เปลี่ยนเป็นโหมดสว่าง", exact: true }).click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.locator(".theme-switcher")).toHaveCount(0);
+  const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  expect(background).not.toBe("rgb(14, 24, 19)");
 });
 
-test("phone header keeps language, theme, profile and sign-out on one row", async ({ page }) => {
+test("phone header keeps language, profile and sign-out on one row", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 760 });
   await page.goto("/");
   const controls = page.locator(".account-controls");
-  await expect(controls.locator(".theme-switcher")).toBeVisible();
-  const centres = await controls
-    .locator(".language-switcher, .theme-switcher, .ant-btn")
-    .evaluateAll((nodes) =>
-      nodes
-        .filter((node) => (node as HTMLElement).offsetParent)
-        .map((node) => {
-          const box = node.getBoundingClientRect();
-          return Math.round(box.top + box.height / 2);
-        }),
-    );
-  expect(centres.length).toBeGreaterThanOrEqual(4);
+  await expect(controls.locator(".language-switcher")).toBeVisible();
+  const centres = await controls.locator(".language-switcher, .ant-btn").evaluateAll((nodes) =>
+    nodes
+      .filter((node) => (node as HTMLElement).offsetParent)
+      .map((node) => {
+        const box = node.getBoundingClientRect();
+        return Math.round(box.top + box.height / 2);
+      }),
+  );
+  expect(centres.length).toBeGreaterThanOrEqual(3);
   expect(Math.max(...centres) - Math.min(...centres)).toBeLessThanOrEqual(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: "../work/screenshots/phone-header-light.png" });
-  await page.getByRole("button", { name: "เปลี่ยนเป็นโหมดมืด", exact: true }).click();
-  await page.screenshot({ path: "../work/screenshots/phone-header-dark.png" });
-});
-
-test("login page switches to dark mode with readable fields", async ({ page }) => {
-  await page.route("**/api/auth/me", (route) => route.fulfill({ status: 401, json: {} }));
-  await page.route("**/api/public/gov-auth", (route) =>
-    route.fulfill({
-      json: {
-        configured: true,
-        mode: "local",
-        iamAuthUrl: "https://auth.govcenter.co",
-        serviceCode: "ui-test",
-        callbackUrl: new URL(route.request().url()).origin + "/auth/callback",
-      },
-    }),
-  );
-  await page.goto("/");
-  await page.getByRole("button", { name: "เปลี่ยนเป็นโหมดมืด", exact: true }).click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  const background = (selector: string) =>
-    page
-      .locator(selector)
-      .first()
-      .evaluate((el) => getComputedStyle(el).backgroundColor);
-  // Inputs fade between colours, so wait for the dark surface to settle.
-  await expect.poll(() => background(".auth-card input[type=email]")).toBe("rgb(22, 34, 28)");
-  await expect.poll(() => background(".auth-card .ant-input-password")).toBe("rgb(22, 34, 28)");
-  expect(await background(".auth-card .ant-input-password input")).toBe("rgba(0, 0, 0, 0)");
-  await page.screenshot({ path: "../work/screenshots/login-dark.png" });
 });
 
 test("login switches language with TH/EN and refuses Thai in email and password", async ({

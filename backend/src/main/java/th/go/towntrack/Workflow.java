@@ -16,6 +16,7 @@ public class Workflow {
 
   @org.springframework.beans.factory.annotation.Autowired WorkflowPolicy policy;
   @org.springframework.beans.factory.annotation.Autowired DepartmentTransfers transfers;
+  @org.springframework.beans.factory.annotation.Autowired Stock stock;
 
   public Workflow(Db d, Access a) {
     db = d;
@@ -356,6 +357,7 @@ public class Workflow {
                 lat,
                 id,
                 w.get("id"));
+            issueForStart(c, w, b, u);
           }
           case "REQUEST_RESOURCE" -> {
             db.run(
@@ -367,7 +369,7 @@ public class Workflow {
                 w.get("id"),
                 u.get("id"),
                 reason,
-                json.valueToTree(requestedItems(b)).toString());
+                json.valueToTree(fromStock(requestedItems(b), u)).toString());
             notifyUser(c.get("leader_id"), id, "ทีมขอใช้ทรัพยากร กรุณาจัดทำข้อเสนอ");
           }
           case "REPORT" -> {
@@ -401,6 +403,7 @@ public class Workflow {
                 || ((Number) stages.get("a")).longValue() == 0)
               throw new ResponseStatusException(
                   HttpStatus.BAD_REQUEST, "กรุณาแนบภาพก่อนทำ BEFORE และหลังทำ AFTER ให้ครบ");
+            returnLeftovers(c, w, b, u);
             db.run(
                 "INSERT INTO"
                     + " field_report(id,complaint_id,work_order_id,revision,content,submitted_by)"
@@ -494,6 +497,8 @@ public class Workflow {
             line.put("name", want.get("name").asText());
             line.put("quantity", quantity(asked));
             line.put("unit", want.get("unit").asText());
+            if (want.hasNonNull("stockItemId"))
+              line.put("stockItemId", want.get("stockItemId").asText());
             line.put("amount", price);
             lineItems.add(line);
           }
@@ -620,6 +625,7 @@ public class Workflow {
               case "APPROVE" -> to.equals("READY") ? "APPROVED" : "PENDING";
               default -> "DENIED";
             };
+        if (action.equals("APPROVE") && to.equals("READY")) checkStock(r, u);
         if (action.equals("APPROVE")
             && to.equals("READY")
             && "PRE_ASSIGN".equals(r.get("workflow_origin"))) to = "TRIAGED";
@@ -740,6 +746,8 @@ public class Workflow {
       clean.put("name", name.trim());
       clean.put("quantity", quantity(item.get("quantity")));
       clean.put("unit", unit.trim());
+      if (item.get("stockItemId") != null)
+        clean.put("stockItemId", Db.id(item.get("stockItemId")).toString());
       result.add(clean);
     }
     return result;
@@ -757,6 +765,123 @@ public class Workflow {
         || quantity.compareTo(new java.math.BigDecimal("1000000000")) > 0)
       throw new IllegalArgumentException("จำนวนต้องมากกว่า 0 และมีทศนิยมไม่เกินสองตำแหน่ง");
     return quantity;
+  }
+
+  /** Stock-linked request lines take their name and unit from the register. */
+  List<Map<String, Object>> fromStock(List<Map<String, Object>> items, Map<String, Object> u) {
+    for (var item : items) {
+      if (item.get("stockItemId") == null) continue;
+      var registered = stock.item(item.get("stockItemId"), u, false);
+      if (!Boolean.TRUE.equals(registered.get("active")))
+        throw new IllegalArgumentException("วัสดุนี้ปิดใช้งานในคลังแล้ว");
+      item.put("name", registered.get("name"));
+      item.put("unit", registered.get("unit"));
+    }
+    return items;
+  }
+
+  /** Stock lines of the latest approved proposal: stock item id to quantity. */
+  Map<UUID, java.math.BigDecimal> approvedStock(Map<String, Object> r) {
+    var result = new LinkedHashMap<UUID, java.math.BigDecimal>();
+    var rows =
+        db.list(
+            "SELECT line_items::text items FROM resource_revision WHERE resource_id=? ORDER BY"
+                + " revision DESC LIMIT 1",
+            r.get("id"));
+    if (rows.isEmpty() || rows.getFirst().get("items") == null) return result;
+    try {
+      for (var line : json.readTree((String) rows.getFirst().get("items")))
+        if (line.hasNonNull("stockItemId") && line.hasNonNull("quantity"))
+          result.merge(
+              UUID.fromString(line.get("stockItemId").asText()),
+              new java.math.BigDecimal(line.get("quantity").asText()),
+              java.math.BigDecimal::add);
+    } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+      throw new IllegalStateException(e);
+    }
+    return result;
+  }
+
+  // Approval does not move stock (clause 205 records the actual issue), but it must not approve
+  // more than the register holds.
+  void checkStock(Map<String, Object> r, Map<String, Object> u) {
+    for (var line : approvedStock(r).entrySet()) {
+      var item = stock.item(line.getKey(), u, false);
+      if (((java.math.BigDecimal) item.get("on_hand")).compareTo(line.getValue()) < 0)
+        throw new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "คงคลังไม่พอสำหรับคำขอนี้: "
+                + item.get("name")
+                + " เหลือ "
+                + ((java.math.BigDecimal) item.get("on_hand")).stripTrailingZeros().toPlainString()
+                + " "
+                + item.get("unit"));
+    }
+  }
+
+  // Starting work is when items leave the store: approved items, plus anything the team takes
+  // without a prior request (recorded as a retrospective issue for the leader to confirm).
+  void issueForStart(
+      Map<String, Object> c, Map<String, Object> w, Map<String, Object> b, Map<String, Object> u) {
+    UUID id = (UUID) c.get("id");
+    var latest =
+        db.list(
+            "SELECT * FROM resource_request WHERE complaint_id=? AND NOT handed_off ORDER BY created_at"
+                + " DESC LIMIT 1",
+            id);
+    if (!latest.isEmpty()
+        && "APPROVED".equals(latest.getFirst().get("status"))
+        && db.list(
+                "SELECT id FROM stock_movement WHERE resource_id=? AND kind='ISSUE' LIMIT 1",
+                latest.getFirst().get("id"))
+            .isEmpty())
+      for (var line : approvedStock(latest.getFirst()).entrySet())
+        stock.move(
+            u,
+            line.getKey(),
+            "ISSUE",
+            line.getValue().negate(),
+            "เบิกตามคำขอใช้ทรัพยากรที่อนุมัติแล้ว",
+            id,
+            latest.getFirst().get("id"),
+            w.get("id"));
+    var extra = Stock.lines(b.get("stockItems"));
+    for (var line : extra)
+      stock.move(
+          u,
+          line.get("stockItemId"),
+          "ISSUE",
+          ((java.math.BigDecimal) line.get("quantity")).negate(),
+          "เบิกใช้หน้างานโดยไม่ได้ขอใช้ทรัพยากรล่วงหน้า (ใบเบิกย้อนหลัง รอหัวหน้ายืนยัน)",
+          id,
+          null,
+          w.get("id"));
+    if (!extra.isEmpty())
+      notifyUser(
+          c.get("leader_id"),
+          id,
+          "ผู้ลงพื้นที่เบิกวัสดุจากคลังโดยไม่ได้ขอใช้ล่วงหน้า กรุณาตรวจสอบ");
+  }
+
+  // Leftovers come back to the register with the report; the rest counts as used on the job.
+  void returnLeftovers(
+      Map<String, Object> c, Map<String, Object> w, Map<String, Object> b, Map<String, Object> u) {
+    var outstanding = stock.outstanding(w.get("id"));
+    for (var line : Stock.lines(b.get("stockReturns"))) {
+      var held = outstanding.get((UUID) line.get("stockItemId"));
+      var quantity = (java.math.BigDecimal) line.get("quantity");
+      if (held == null || quantity.compareTo(held) > 0)
+        throw new IllegalArgumentException("จำนวนที่คืนต้องไม่เกินจำนวนที่เบิกไป");
+      stock.move(
+          u,
+          line.get("stockItemId"),
+          "RETURN",
+          quantity,
+          "คืนวัสดุที่เหลือหลังปฏิบัติงาน",
+          c.get("id"),
+          null,
+          w.get("id"));
+    }
   }
 
   Map<String, Object> latestReport(UUID id) {

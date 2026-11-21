@@ -17,6 +17,7 @@ import {
   History,
   House,
   Image,
+  Package,
   LayoutGrid,
   Lock,
   LogOut,
@@ -38,6 +39,7 @@ import {
   User,
   UserPlus,
   Users,
+  Video,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -85,6 +87,7 @@ export const FileTextOutlined = icon(FileText, "file-text");
 export const FilterOutlined = icon(Filter, "filter");
 export const HistoryOutlined = icon(History, "history");
 export const HomeOutlined = icon(House, "home");
+export const InboxOutlined = icon(Package, "inbox");
 export const LeftOutlined = icon(ChevronLeft, "left");
 export const LikeOutlined = icon(ThumbsUp, "like");
 export const LockOutlined = icon(Lock, "lock");
@@ -106,3 +109,4 @@ export const TrophyOutlined = icon(Trophy, "trophy");
 export const UploadOutlined = icon(Upload, "upload");
 export const UserAddOutlined = icon(UserPlus, "user-add");
 export const UserOutlined = icon(User, "user");
+export const VideoCameraOutlined = icon(Video, "video-camera");
