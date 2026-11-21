@@ -12,7 +12,7 @@
 5. POST /api/auth/logout ออกจากระบบ; POST /api/auth/password ส่ง currentPassword,newPassword และทำให้ Session ทั้งบัญชีหมดอายุ
 
 ## ยื่นและดำเนินคำร้อง
-POST /complaints: multipart/form-data โดย part `complaint` เป็น application/json มี categoryId,title,description,address,latitude/longitude (ใส่คู่กันหรือ null ทั้งคู่),answers และ part `files` เป็นไฟล์หลักฐานอย่างน้อย 1 ไฟล์ รวมไม่เกิน 1 GB ถ้าไฟล์ไม่ผ่านจะไม่บันทึกคำร้อง
+POST /complaints: multipart/form-data โดย part `complaint` เป็น application/json มี categoryId,title,description,address,latitude/longitude (ใส่คู่กันหรือ null ทั้งคู่),answers และ part `files` เป็นไฟล์หลักฐานอย่างน้อย 1 ไฟล์ ไฟล์ละไม่เกิน 100 MB รวมไม่เกิน 300 MB ถ้าไฟล์ไม่ผ่านจะไม่บันทึกคำร้อง title และ description ไม่บังคับ ถ้าเว้น title ระบบใช้ชื่อประเภทปัญหา
 GET /complaints?page=0&size=10&q=คำค้น&status=NEW: แบ่งหน้าจาก Server ค้นหาในข้อมูลทั้งหมดตามสิทธิ์ ตอบ items,total,page,size,stats (สถิติรวมทั้งขอบเขต)
 GET /complaints/{id}: ข้อมูลตามบทบาท, history, files; บุคลากรได้ workOrders, resources, reports, reviews, approvals, approvalStages และ actions เพิ่ม
 
@@ -33,9 +33,26 @@ POST /complaints/{id}/actions ตัวอย่าง:
 - REPORT ต้องมี content และหลักฐานใหม่ที่ยังไม่ผูกกับรายงานก่อนหน้า
 - SEND_APPROVAL ต้องมี approverIds ตามจำนวนลำดับของ Workflow คนต้องไม่ซ้ำ
 - DENY ยุติทั้งคำร้องทันที ไม่มีเส้นทางให้เริ่มงานต่อ
+- REQUEST_RESOURCE รายการใน items ใส่ stockItemId ได้ ชื่อและหน่วยจะใช้ตามทะเบียนคลัง
+- START รับ stockItems [{stockItemId,quantity}] เพิ่มได้; วัสดุในคำขอที่อนุมัติแล้วถูกตัดจากคลังอัตโนมัติตอนเริ่มงาน
+- REPORT รับ stockReturns [{stockItemId,quantity}] คืนของที่เหลือ ไม่เกินจำนวนที่เบิกไปในงานนั้น
+- APPROVE ขั้นสุดท้ายไม่ผ่านถ้าคลังมีไม่พอ (409)
+
+## คลังวัสดุ
+GET /stock: รายการวัสดุ on_hand, in_use และ keeper (ผู้ใช้นี้แก้ไขคลังได้หรือไม่) สำหรับบุคลากรทุกบทบาท
+POST /stock {name,unit,quantity?,note?}, POST /stock/{id}/movements {kind: RECEIVE|ADJUST, quantity, note}, PATCH /stock/{id} {active}: ผู้ดูแลระบบหรือผู้ดูแลคลังเท่านั้น ยอดติดลบไม่ได้และประวัติแก้ย้อนหลังไม่ได้
+GET /stock/{id}/movements, GET /stock/complaints/{complaintId}: ประวัติเข้า-ออก และสรุปเบิก/คืน/ใช้ไปของคำร้อง
+GET /stock/keepers, PUT /stock/keepers/{userId} {keeper}: ผู้ดูแลระบบกำหนดผู้ดูแลคลัง
+
+## ระยะเวลาดำเนินการ (SLA)
+GET /complaints/{id}/sla: due_at, progress_due_at (15 วันนับจากความเคลื่อนไหวล่าสุด), extensions, canRequest, canDecide นับเป็นวันตามปฏิทิน
+POST /complaints/{id}/sla-extensions {days 1–90, reason}: หัวหน้าที่รับผิดชอบคำร้อง มีคำขอรอพิจารณาได้ครั้งละ 1 รายการ
+POST /complaints/{id}/sla-extensions/{extensionId}/decision {approve, reason}: เจ้าหน้าที่ส่วนกลางหรือผู้ดูแล อนุมัติแล้วเลื่อน due_at และแจ้งผู้แจ้ง
+
+GET /people?role=FIELD ตอบ waiting, accepted, working, active และ current_title เพื่อดูภาระงานก่อนจ่ายงาน; role=APPROVER ตอบ usual_step สำหรับผู้อนุมัติที่เจ้าหน้าที่คนนั้นเลือกบ่อย
 
 ## ไฟล์
-POST /complaints/{id}/files เป็น multipart/form-data ชื่อ field=file รองรับ PNG/JPEG/PDF/MP4/MOV/WebM รวมไฟล์เดิมต่อคำร้องไม่เกิน 1 GB (1024 MB) ตามขั้นตอนและผู้ใช้
+POST /complaints/{id}/files เป็น multipart/form-data ชื่อ field=file รองรับ PNG/JPEG/PDF/MP4/MOV/WebM ไฟล์ละไม่เกิน 100 MB ไฟล์ของผู้แจ้งรวมไม่เกิน 300 MB และไฟล์ทั้งคำร้องรวมเจ้าหน้าที่ไม่เกิน 1 GB ตามขั้นตอนและผู้ใช้
 GET /files/{id} ตรวจสิทธิ์ระดับคำร้องและส่งเป็น attachment ไม่เปิดไฟล์เป็น public URL
 
 ## เคสใกล้เคียง

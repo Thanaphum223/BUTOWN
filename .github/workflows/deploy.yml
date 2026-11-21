@@ -19,13 +19,29 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+      # Forks and backup copies have no deployment secrets: skip instead of failing, and before
+      # spending runner minutes on image builds.
+      - name: Check deployment settings
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          if [ -n "$DEPLOY_HOST" ] && [ -n "$SSH_KEY" ] && [ -n "$KNOWN_HOSTS" ]; then
+            echo "DEPLOY_READY=true" >> "$GITHUB_ENV"
+          else
+            echo "::notice::Deployment secrets are not set for this repository; skipping deploy."
+          fi
       - name: Resolve release
+        if: env.DEPLOY_READY == 'true'
         run: echo "RELEASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
       - name: Build runtime images
+        if: env.DEPLOY_READY == 'true'
         run: |
           docker build -f deploy/Dockerfile.backend -t "towntrack-backend:$RELEASE_SHA" .
           docker build -f deploy/Dockerfile.frontend -t "towntrack-frontend:$RELEASE_SHA" .
       - name: Configure SSH
+        if: env.DEPLOY_READY == 'true'
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
@@ -36,6 +52,7 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
       - name: Transfer and deploy verified release
+        if: env.DEPLOY_READY == 'true'
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
@@ -44,6 +61,7 @@ jobs:
             gzip -1 |
             ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -i ~/.ssh/deploy_key "root@$DEPLOY_HOST" "$RELEASE_SHA"
       - name: Check public HTTPS endpoint
+        if: env.DEPLOY_READY == 'true'
         env:
           DEPLOY_URL: ${{ vars.DEPLOY_URL }}
         run: curl --fail --retry 12 --retry-delay 10 --retry-all-errors "${DEPLOY_URL%/}/healthz"

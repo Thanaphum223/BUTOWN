@@ -1979,7 +1979,7 @@ export default function Detail({
                             readOnly={!!requestItems?.[index]?.stockItemId}
                           />
                         </Form.Item>
-                        {index > 0 && (
+                        {fields.length > 1 && (
                           <Button
                             className="resource-remove"
                             icon={<DeleteOutlined />}
