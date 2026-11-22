@@ -127,27 +127,6 @@ test("SSO button registers matching state before redirect without token entry", 
   expect(seen.callbacks).toEqual([{ code: "gov-after-line-code", state: seen.starts[0].state }]);
   expect(new URL(page.url()).origin).toBe("http://127.0.0.1:5173");
 });
-test("LINE sign-in explains instead of leaving when Gov cannot return to this domain", async ({
-  page,
-}) => {
-  const seen = await boundary(page);
-  await page.route("**/api/public/gov-auth", (route) =>
-    route.fulfill({
-      json: {
-        configured: true,
-        mode: "local",
-        iamAuthUrl: "https://auth.govcenter.co",
-        serviceCode: "towntrack-test",
-        callbackUrl: "https://towntrack.example.sslip.io/auth/callback",
-      },
-    }),
-  );
-  await page.goto("/");
-  await page.getByRole("button", { name: "เข้าสู่ระบบด้วย LINE", exact: true }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "LINE" })).toContainText("govcenter.co");
-  expect(new URL(page.url()).origin).toBe("http://127.0.0.1:5173");
-  expect(seen.starts).toHaveLength(0);
-});
 test("callback removes credentials before config is available and never redeems IAM tickets", async ({
   page,
 }) => {

@@ -30,21 +30,7 @@ function govTransaction(config: GovConfig) {
   callback.searchParams.set("state", state);
   return { callback, state };
 }
-// Gov's callback page forwards the service code only to these domains, so LINE sign-in cannot
-// finish anywhere else (password sign-in still works: our server talks to Gov directly).
-function govForwardsTo(host: string) {
-  const name = host.toLowerCase();
-  return (
-    ["localhost", "127.0.0.1", "::1"].includes(name) ||
-    ["govcenter.co", "gov.co"].some((domain) => name === domain || name.endsWith("." + domain))
-  );
-}
-
 export function govLineLogin(config: GovConfig) {
-  if (!govForwardsTo(new URL(config.callbackUrl).hostname))
-    throw new Error(
-      "เข้าสู่ระบบด้วย LINE ใช้ได้เมื่อเว็บอยู่บนโดเมน govcenter.co หรือ gov.co กรุณาเข้าสู่ระบบด้วยอีเมลและรหัสผ่าน",
-    );
   const { callback, state } = govTransaction(config);
   // Same route as Gov's own LINE button: LINE returns to Gov's callback page, which signs the
   // user in to Gov, creates a code for this service and then forwards it to our callback.
