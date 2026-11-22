@@ -836,6 +836,7 @@ export default function Detail({
             />
           </Card>
         )}
+      {!publicView && <SlaPanel id={id} version={c.version} onChanged={load} />}
       <details
         className={embedded ? "split-section split-extra-info" : "split-full-info"}
         open={embedded ? undefined : true}
@@ -948,7 +949,6 @@ export default function Detail({
                 />
               )}
             </Card>
-            {!publicView && <SlaPanel id={id} version={c.version} onChanged={load} />}
             {!citizen && !publicView && <StockUsage id={id} version={c.version} />}
             {!citizen && (
               <Card style={{ marginTop: 20 }}>

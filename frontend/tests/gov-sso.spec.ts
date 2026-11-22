@@ -107,10 +107,7 @@ test("SSO button registers matching state before redirect without token entry", 
   expect(url.searchParams.get("scope")).toBe("profile openid email");
   const govState = new URLSearchParams(url.searchParams.get("state")!);
   expect(govState.get("service")).toBe("towntrack-test");
-  // LINE returns to Gov's callback page, which forwards a service code to ours.
-  const govCallback = new URL(govState.get("callback")!);
-  expect(govCallback.origin + govCallback.pathname).toBe("https://auth.govcenter.co/auth/callback");
-  const callback = new URL(govCallback.searchParams.get("callback")!);
+  const callback = new URL(govState.get("callback")!);
   expect(callback.origin + callback.pathname).toBe("http://127.0.0.1:5173/auth/callback");
   expect(callback.hash).toBe("");
   expect(callback.searchParams.get("state")).toMatch(/^[a-f0-9]{64}$/);
@@ -535,10 +532,9 @@ test("LINE sign-in after logout refreshes the session token without a page reloa
     await page.getByRole("button", { name: "เข้าสู่ระบบด้วย LINE", exact: true }).click();
     await expect(page.getByRole("heading", { name: "IAM login test boundary" })).toBeVisible();
     const provider = new URL(page.url());
-    const govCallback = new URL(
+    const callback = new URL(
       new URLSearchParams(provider.searchParams.get("state")!).get("callback")!,
     );
-    const callback = new URL(govCallback.searchParams.get("callback")!);
     callback.searchParams.set("code", `one-use-cycle-${cycle}`);
     await page.goto(callback.toString());
   }

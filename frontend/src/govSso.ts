@@ -32,13 +32,9 @@ function govTransaction(config: GovConfig) {
 }
 export function govLineLogin(config: GovConfig) {
   const { callback, state } = govTransaction(config);
-  // Same route as Gov's own LINE button: LINE returns to Gov's callback page, which signs the
-  // user in to Gov, creates a code for this service and then forwards it to our callback.
-  // Returning to our callback directly arrives with no code.
-  const govCallback = new URL("/auth/callback", config.iamAuthUrl);
-  govCallback.searchParams.set("callback", callback.toString());
+  // Gov's web callback page only forwards to Gov domains, so Gov's API must return straight to ours.
   const govState = new URLSearchParams({
-    callback: govCallback.toString(),
+    callback: callback.toString(),
     service: config.serviceCode,
   });
   const url = new URL("https://access.line.me/oauth2/v2.1/authorize");
