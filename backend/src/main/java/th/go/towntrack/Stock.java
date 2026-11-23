@@ -194,6 +194,24 @@ public class Stock {
     return result;
   }
 
+  /** Quantity promised to other complaints' approved requests that have not been issued yet. */
+  public BigDecimal reserved(Object itemId, Object exceptComplaintId) {
+    return (BigDecimal)
+        db.one(
+                "SELECT COALESCE(SUM((l->>'quantity')::numeric),0) q FROM resource_request r JOIN"
+                    + " complaint c ON c.id=r.complaint_id JOIN LATERAL (SELECT line_items FROM"
+                    + " resource_revision v WHERE v.resource_id=r.id ORDER BY revision DESC LIMIT 1)"
+                    + " v ON true CROSS JOIN LATERAL jsonb_array_elements(v.line_items) l WHERE"
+                    + " r.status='APPROVED' AND NOT r.handed_off AND r.complaint_id<>? AND"
+                    + " c.status NOT IN ('CLOSED','REJECTED','TERMINATED') AND"
+                    + " l->>'stockItemId'=? AND NOT EXISTS(SELECT 1 FROM stock_movement m WHERE"
+                    + " m.resource_id=r.id AND m.kind IN ('ISSUE','RETURN') GROUP BY m.resource_id"
+                    + " HAVING SUM(m.delta)<0)",
+                exceptComplaintId,
+                String.valueOf(itemId))
+            .get("q");
+  }
+
   /** Net quantity per stock item issued to a work order and not yet returned. */
   public Map<UUID, BigDecimal> outstanding(Object workOrderId) {
     var result = new LinkedHashMap<UUID, BigDecimal>();

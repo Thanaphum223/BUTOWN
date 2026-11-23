@@ -35,26 +35,35 @@ public class SlaController {
     access.complaint(id, u, false);
     var clocks =
         db.one(
+            // Only updates the reporter is told about restart the progress clock.
             "SELECT c.created_at,c.due_at,c.status,(SELECT max(e.created_at) FROM audit_event e"
-                + " WHERE e.complaint_id=c.id)+make_interval(days=>?) progress_due_at FROM"
-                + " complaint c WHERE c.id=?",
+                + " WHERE e.complaint_id=c.id AND e.to_status IS NOT NULL AND e.action NOT IN"
+                + " ('REQUEST_EXTENSION','REJECT_EXTENSION'))+make_interval(days=>?)"
+                + " progress_due_at FROM complaint c WHERE c.id=?",
             PROGRESS_DAYS,
             id);
     var result = new LinkedHashMap<String, Object>(clocks);
     result.put("progress_days", PROGRESS_DAYS);
     result.put("open", !CLOSED.contains(clocks.get("status")));
+    String role = (String) u.get("role");
     result.put(
         "extensions",
-        db.list(
-            "SELECT x.id,x.reason,x.days,x.previous_due_at,x.requested_due_at,x.status,"
-                + "x.decision_reason,x.decided_at,x.created_at,r.display_name requested_by_name,r.gov_role requested_by_gov_role,"
-                + "d.display_name decided_by_name,d.gov_role decided_by_gov_role FROM sla_extension x JOIN app_user r ON"
-                + " r.id=x.requested_by LEFT JOIN app_user d ON d.id=x.decided_by WHERE"
-                + " x.complaint_id=? ORDER BY x.created_at DESC",
-            id));
+        "CITIZEN".equals(role)
+            ? db.list(
+                "SELECT x.id,x.days,x.previous_due_at,x.requested_due_at,x.status,x.decided_at,"
+                    + "x.created_at FROM sla_extension x WHERE x.complaint_id=? AND"
+                    + " x.status='APPROVED' ORDER BY x.created_at DESC",
+                id)
+            : db.list(
+                "SELECT x.id,x.reason,x.days,x.previous_due_at,x.requested_due_at,x.status,"
+                    + "x.decision_reason,x.decided_at,x.created_at,r.display_name"
+                    + " requested_by_name,r.gov_role requested_by_gov_role,d.display_name"
+                    + " decided_by_name,d.gov_role decided_by_gov_role FROM sla_extension x JOIN"
+                    + " app_user r ON r.id=x.requested_by LEFT JOIN app_user d ON d.id=x.decided_by"
+                    + " WHERE x.complaint_id=? ORDER BY x.created_at DESC",
+                id));
     result.put("maxExtensions", MAX_EXTENSIONS);
     result.put("remainingExtensions", Math.max(0, MAX_EXTENSIONS - used(id)));
-    String role = (String) u.get("role");
     result.put(
         "canRequest",
         "LEADER".equals(role)

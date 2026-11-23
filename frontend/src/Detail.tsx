@@ -399,12 +399,14 @@ export default function Detail({
         const found = await api<D[]>("/people?role=" + role + department);
         setPeople(found);
         if (a === "SEND_APPROVAL") {
-          const usual = found
-            .filter((p) => p.usual_step)
-            .sort((x, y) => x.usual_step - y.usual_step)
-            .map((p) => p.id)
-            .slice(0, data?.approvalStages || 1);
           const stages = data?.approvalStages || 1;
+          // Fill only the unbroken run from step 1 so nobody lands in another step's slot.
+          const usual: string[] = [];
+          for (let step = 1; step <= stages; step++) {
+            const person = found.find((p) => p.usual_step === step);
+            if (!person) break;
+            usual.push(person.id);
+          }
           const fallback = !usual.length && found.length >= stages;
           setApproverFallback(fallback);
           if (usual.length || fallback)

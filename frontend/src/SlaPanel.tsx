@@ -215,11 +215,13 @@ export default function SlaPanel({
                   from: date(x.previous_due_at),
                   to: date(x.requested_due_at),
                 })}
-                <div>
-                  <Typography.Text type="secondary">
-                    {withTitle(x.requested_by_name, x.requested_by_gov_role, t)}: {x.reason}
-                  </Typography.Text>
-                </div>
+                {x.reason && (
+                  <div>
+                    <Typography.Text type="secondary">
+                      {withTitle(x.requested_by_name, x.requested_by_gov_role, t)}: {x.reason}
+                    </Typography.Text>
+                  </div>
+                )}
                 {x.decision_reason && (
                   <div>
                     <Typography.Text type="secondary">
