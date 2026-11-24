@@ -40,8 +40,17 @@ import { ArrowLeftOutlined, UploadOutlined, EnvironmentOutlined } from "./icons"
 import { api, actionNames, date, requiredReasonActions, progressLabel } from "./api";
 import LocationMap from "./LocationMap";
 import { useGeo } from "./GeoContext";
-import { ATTACHMENT_HELP, attachmentError } from "./attachments";
+import { ATTACHMENT_HELP, STAFF_ATTACHMENT_HELP, attachmentError } from "./attachments";
 import SlaPanel from "./SlaPanel";
+import { composeReason } from "./format";
+import ComplaintChat from "./ComplaintChat";
+import {
+  APPROVAL_LIMIT,
+  SPECIFIC_METHOD_LIMIT,
+  govTitleWithLimit,
+  limitedApprover,
+  withTitle,
+} from "./govRoles";
 import StockUsage from "./StockUsage";
 import { StockReturns, StockTaken, stockOptions } from "./StockFields";
 type D = Record<string, any>;
@@ -63,15 +72,47 @@ const denialPresets = [
       "ไม่คุ้มค่าทางวิศวกรรม ให้ยุติการใช้งบประมาณพิเศษและให้กองช่างซ่อมแซมบรรเทาความเดือดร้อนชั่วคราวตามวัสดุคงคลัง",
   },
 ];
-const approvalPresets = [
-  "เอกสารและหลักฐานประกอบครบถ้วน",
-  "ราคาสมเหตุสมผลเทียบราคากลาง",
-  "อยู่ในวงเงินงบประมาณที่ได้รับจัดสรร",
-  "จำเป็นเร่งด่วนต่อความปลอดภัยของประชาชน",
-  "ใช้วัสดุจากคลังของเทศบาลได้",
-];
-const composeReason = (picked: string[], note?: string) =>
-  [picked.join(" / "), note?.trim()].filter(Boolean).join(" — ");
+const reasonPresets: Record<string, string[]> = {
+  APPROVE: [
+    "เอกสารและหลักฐานประกอบครบถ้วน",
+    "ราคาสมเหตุสมผลเทียบราคากลาง",
+    "อยู่ในวงเงินงบประมาณที่ได้รับจัดสรร",
+    "จำเป็นเร่งด่วนต่อความปลอดภัยของประชาชน",
+    "ใช้วัสดุจากคลังของเทศบาลได้",
+    "เป็นไปตามระเบียบพัสดุฯ พ.ศ. 2560",
+    "อยู่ในอำนาจอนุมัติตามวงเงินที่กำหนด",
+  ],
+  REJECT: [
+    "อยู่นอกเขตความรับผิดชอบของเทศบาล",
+    "ข้อมูลหรือหลักฐานไม่เพียงพอต่อการตรวจสอบ",
+    "เป็นเรื่องซ้ำกับคำร้องที่กำลังดำเนินการอยู่",
+    "ไม่อยู่ในอำนาจหน้าที่ของเทศบาล",
+  ],
+  DECLINE: [
+    "ติดภารกิจเร่งด่วนในพื้นที่อื่น",
+    "อุปกรณ์หรือเครื่องจักรไม่พร้อมใช้งาน",
+    "งานเกินขีดความสามารถของทีม",
+  ],
+  RETURN_FIELD: [
+    "ภาพหลังทำไม่ชัดเจนหรือไม่เห็นจุดที่ซ่อม",
+    "งานซ่อมยังไม่เรียบร้อยตามมาตรฐาน",
+    "สรุปผลการปฏิบัติงานไม่ครบถ้วน",
+  ],
+  RETURN_LEADER: [
+    "ภาพถ่ายไม่ชัดเจนสำหรับแจ้งประชาชน",
+    "มีข้อมูลส่วนบุคคลติดในภาพที่ต้องตรวจสอบ",
+    "รายละเอียดสรุปผลไม่ครบถ้วน",
+  ],
+  RETURN_RESOURCE: [
+    "เอกสารแนบไม่ครบถ้วนหรือไม่ชัดเจน",
+    "รายการหรือราคาประมาณการไม่สอดคล้องกัน",
+    "ข้อมูลความจำเป็นไม่เพียงพอ",
+  ],
+  CLOSE: [
+    "ตรวจสอบผลการซ่อมแซมเรียบร้อยตามมาตรฐาน",
+    "แจ้งผลการดำเนินการและหลักฐานให้ประชาชนทราบแล้ว",
+  ],
+};
 const secondaryActions = [
   "REJECT",
   "DENY",
@@ -172,7 +213,8 @@ export default function Detail({
     );
   const [action, setAction] = useState(""),
     [denialTopic, setDenialTopic] = useState<string>(),
-    [approvalPicked, setApprovalPicked] = useState<string[]>([]),
+    [reasonPicked, setReasonPicked] = useState<string[]>([]),
+    [approverFallback, setApproverFallback] = useState(false),
     [stockItems, setStockItems] = useState<D[]>([]),
     [heldStock, setHeldStock] = useState<D[]>([]),
     [teams, setTeams] = useState<D[]>([]),
@@ -189,7 +231,7 @@ export default function Detail({
   const [online, setOnline] = useState(navigator.onLine);
   useEffect(() => {
     setDenialTopic(undefined);
-    setApprovalPicked([]);
+    setReasonPicked([]);
   }, [action]);
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
@@ -204,6 +246,7 @@ export default function Detail({
   useLocalizedFormErrors(form);
   const resourceItems = Form.useWatch("lineItems", form) as D[] | undefined;
   const requestItems = Form.useWatch("items", form) as D[] | undefined;
+  const chosenApprovers = Form.useWatch("approverIds", form) as string[] | undefined;
   const resourceTotal =
     (resourceItems || []).reduce(
       (total: number, item: D) => total + Math.round(Number(item?.amount || 0) * 100),
@@ -265,7 +308,10 @@ export default function Detail({
           setHeldStock(held);
           if (!form.getFieldValue("stockReturns"))
             form.setFieldsValue({
-              stockReturns: held.map((r) => ({ stockItemId: r.stock_item_id, quantity: 0 })),
+              stockReturns: held.map((r) => ({
+                stockItemId: r.stock_item_id,
+                quantity: r.item_type === "EQUIPMENT" ? Number(r.used) : 0,
+              })),
             });
         })
         .catch(() => setHeldStock([]));
@@ -358,7 +404,13 @@ export default function Detail({
             .sort((x, y) => x.usual_step - y.usual_step)
             .map((p) => p.id)
             .slice(0, data?.approvalStages || 1);
-          if (usual.length) form.setFieldsValue({ approverIds: usual });
+          const stages = data?.approvalStages || 1;
+          const fallback = !usual.length && found.length >= stages;
+          setApproverFallback(fallback);
+          if (usual.length || fallback)
+            form.setFieldsValue({
+              approverIds: usual.length ? usual : found.slice(0, stages).map((p) => p.id),
+            });
         }
       } catch (e) {
         message.error(t((e as Error).message));
@@ -377,10 +429,9 @@ export default function Detail({
     }
   }
   async function submit(input: D) {
-    const v: D =
-      action === "APPROVE"
-        ? { ...input, reason: composeReason(approvalPicked, input.reason) }
-        : { ...input };
+    const v: D = reasonPresets[action]
+      ? { ...input, reason: composeReason(reasonPicked, input.reason) }
+      : { ...input };
     // Only lines with an item and a positive amount reach the stock register.
     for (const key of ["stockItems", "stockReturns"])
       if (v[key])
@@ -510,10 +561,10 @@ export default function Detail({
   const startPhotos = startPhotosOf(data, user.id);
   const startedWithPhoto = startPhotos.some((f: D) => f.work_order_id);
   const proposalItemsFixed = fieldRequestedItems(data).length > 0;
-  const pendingBytes = (data.files || []).reduce(
-    (total: number, f: D) => total + Number(f.size_bytes),
-    0,
-  );
+  // Reporter and staff files have separate allowances, as on the server.
+  const pendingBytes = (data.files || [])
+    .filter((f: D) => user.role === "CITIZEN" || f.uploaded_by !== data.complaint.reporter_id)
+    .reduce((total: number, f: D) => total + Number(f.size_bytes), 0);
   const evidenceList = (stage?: string) => (
     <List
       size="small"
@@ -553,6 +604,14 @@ export default function Detail({
   );
   const citizen = user.role === "CITIZEN";
   const latestResource = data.resources?.at(-1);
+  const requestedAmount = Number(JSON.parse(latestResource?.revisions || "[]").at(-1)?.amount || 0);
+  const finalApprover = people.find(
+    (p) => p.id === chosenApprovers?.[(data.approvalStages || 1) - 1],
+  );
+  const overLimit =
+    action === "SEND_APPROVAL" &&
+    requestedAmount > APPROVAL_LIMIT &&
+    limitedApprover(finalApprover?.gov_role);
   const uploadAllowed =
     !publicView &&
     !data.readOnlyHistory &&
@@ -675,7 +734,9 @@ export default function Detail({
           showIcon
           style={{ marginBottom: 20 }}
           message={
-            t("รออนุมัติโดย ") + (latestResource.approver_name || t("ผู้อนุมัติที่ได้รับมอบหมาย"))
+            t("รออนุมัติโดย ") +
+            (withTitle(latestResource.approver_name, latestResource.approver_gov_role, t) ||
+              t("ผู้อนุมัติที่ได้รับมอบหมาย"))
           }
           description={
             latestResource.approver_id === user.id
@@ -837,6 +898,15 @@ export default function Detail({
           </Card>
         )}
       {!publicView && <SlaPanel id={id} version={c.version} onChanged={load} />}
+      {!publicView && !data.limitedHistory && (
+        <ComplaintChat
+          id={id}
+          user={user}
+          readOnly={
+            !!data.readOnlyHistory || ["CLOSED", "REJECTED", "TERMINATED"].includes(c.status)
+          }
+        />
+      )}
       <details
         className={embedded ? "split-section split-extra-info" : "split-full-info"}
         open={embedded ? undefined : true}
@@ -1085,7 +1155,7 @@ export default function Detail({
                               <List.Item>
                                 <Space wrap>
                                   <Text>
-                                    {r.step}. {r.approver_name}
+                                    {r.step}. {withTitle(r.approver_name, r.approver_gov_role, t)}
                                   </Text>
                                   <Tag>
                                     {r.decision
@@ -1187,7 +1257,9 @@ export default function Detail({
                 ) : undefined
               }
             >
-              {uploadAllowed && <Text type="secondary">{t(ATTACHMENT_HELP)}</Text>}
+              {uploadAllowed && (
+                <Text type="secondary">{t(citizen ? ATTACHMENT_HELP : STAFF_ATTACHMENT_HELP)}</Text>
+              )}
               {(citizen ||
                 (data.files || []).some(
                   (f: D) =>
@@ -1587,15 +1659,16 @@ export default function Detail({
                 showSearch
                 optionFilterProp="label"
                 mode={action === "SEND_APPROVAL" ? "multiple" : undefined}
-                options={people.map((p) => ({
-                  value: p.id,
-                  label: p.usual_step
-                    ? t("{{name}} (เลือกบ่อย · ลำดับ {{step}})", {
-                        name: p.display_name,
-                        step: p.usual_step,
-                      })
-                    : p.display_name,
-                }))}
+                options={people.map((p) => {
+                  const title = action === "SEND_APPROVAL" ? govTitleWithLimit(p.gov_role, t) : "";
+                  const name = title ? `${p.display_name} — ${title}` : p.display_name;
+                  return {
+                    value: p.id,
+                    label: p.usual_step
+                      ? t("{{name}} (เลือกบ่อย · ลำดับ {{step}})", { name, step: p.usual_step })
+                      : name,
+                  };
+                })}
               />
             </Form.Item>
           )}
@@ -1607,16 +1680,53 @@ export default function Detail({
               message={t("ระบบเลือกผู้อนุมัติที่คุณส่งให้บ่อยไว้ให้แล้ว เปลี่ยนเป็นคนอื่นได้")}
             />
           )}
-          {action === "APPROVE" && (
-            <section className="approval-presets" aria-label={t("เหตุผลที่อนุมัติ")}>
-              <Text strong>{t("เหตุผลที่อนุมัติ (แตะเลือกได้หลายข้อ)")}</Text>
+          {overLimit && (
+            <Alert
+              type="error"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message={t(
+                "วงเงินเกิน 500,000 บาท เกินอำนาจอนุมัติของผู้อำนวยการกองคลัง/หัวหน้าเจ้าหน้าที่พัสดุ กรุณาเลือกปลัดเทศบาล รองนายกเทศมนตรี หรือนายกเทศมนตรีเป็นผู้อนุมัติลำดับสุดท้าย",
+              )}
+            />
+          )}
+          {action === "SEND_APPROVAL" && requestedAmount > SPECIFIC_METHOD_LIMIT && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message={t(
+                "วงเงินเกิน 50,000,000 บาท กรุณาตรวจอำนาจสั่งซื้อสั่งจ้างโดยวิธีเฉพาะเจาะจงตามระเบียบพัสดุฯ พ.ศ. 2560 ข้อ 86–87 ก่อนส่ง",
+              )}
+            />
+          )}
+          {action === "SEND_APPROVAL" && approverFallback && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message={t(
+                "ระบบเลือกผู้อนุมัติเริ่มต้นตามลำดับชื่อ เปลี่ยนเป็นผู้อนุมัติคนอื่นได้เสมอ",
+              )}
+            />
+          )}
+          {reasonPresets[action] && (
+            <section
+              className="approval-presets"
+              aria-label={action === "APPROVE" ? t("เหตุผลที่อนุมัติ") : t("เหตุผลสำเร็จรูป")}
+            >
+              <Text strong>
+                {action === "APPROVE"
+                  ? t("เหตุผลที่อนุมัติ (แตะเลือกได้หลายข้อ)")
+                  : t("เหตุผล (แตะเลือกได้หลายข้อ)")}
+              </Text>
               <div className="symptom-options">
-                {approvalPresets.map((preset) => (
+                {reasonPresets[action].map((preset) => (
                   <Tag.CheckableTag
                     key={preset}
-                    checked={approvalPicked.includes(preset)}
+                    checked={reasonPicked.includes(preset)}
                     onChange={(checked) => {
-                      setApprovalPicked((picked) =>
+                      setReasonPicked((picked) =>
                         checked ? [...picked, preset] : picked.filter((p) => p !== preset),
                       );
                       void form.validateFields(["reason"]).catch(() => {});
@@ -1859,7 +1969,7 @@ export default function Detail({
               </div>
               <Text type="secondary">
                 {t("ภาพก่อนและหลังต้องเป็น PNG/JPEG ·")}
-                {t(ATTACHMENT_HELP)}
+                {t(citizen ? ATTACHMENT_HELP : STAFF_ATTACHMENT_HELP)}
               </Text>
               <StockReturns held={heldStock} />
             </>
@@ -2053,7 +2163,7 @@ export default function Detail({
                 {
                   required:
                     requiredReasonActions.has(action) &&
-                    !(action === "APPROVE" && approvalPicked.length > 0),
+                    !(reasonPresets[action] && reasonPicked.length > 0),
                   whitespace: true,
                   max: 4000,
                   message: t("กรุณาระบุเหตุผลให้ครบถ้วน"),
@@ -2061,7 +2171,12 @@ export default function Detail({
               ]}
               extra={requiredReasonActions.has(action) ? undefined : t("ไม่บังคับกรอก")}
             >
-              <Input.TextArea rows={3} />
+              <Input.TextArea
+                rows={3}
+                placeholder={
+                  reasonPresets[action] ? t("เหตุผลอื่น ๆ (กรอกเพิ่มเองได้)") : undefined
+                }
+              />
             </Form.Item>
           )}
           <Button
@@ -2069,7 +2184,7 @@ export default function Detail({
             type="primary"
             danger={action === "DENY"}
             loading={busy}
-            disabled={!!error || uploadBusy || (action === "REPORT" && !online)}
+            disabled={!!error || overLimit || uploadBusy || (action === "REPORT" && !online)}
             block
           >
             {t("ยืนยัน{{action}}", { action: actionButton(action) })}

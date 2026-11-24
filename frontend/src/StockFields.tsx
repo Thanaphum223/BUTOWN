@@ -1,20 +1,19 @@
 import { Alert, Button, Form, InputNumber, Select, Typography } from "antd";
 import { DeleteOutlined, PlusOutlined } from "./icons";
+import { amount } from "./format";
 import { useI18n } from "./i18n/useI18n";
 
 type D = Record<string, any>;
-const amount = (value: unknown) =>
-  Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
 export function stockOptions(items: D[], t: (key: string, params?: D) => string) {
   return items.map((item) => ({
     value: item.id,
     label: t("{{name}} · คงเหลือ {{left}} {{unit}}", {
       name: item.name,
-      left: amount(item.on_hand),
+      left: amount(item.available ?? item.on_hand),
       unit: item.unit,
     }),
-    disabled: Number(item.on_hand) <= 0,
+    disabled: Number(item.available ?? item.on_hand) <= 0,
   }));
 }
 
@@ -96,6 +95,16 @@ export function StockReturns({ held }: { held: D[] }) {
       <Typography.Paragraph type="secondary">
         {t("ระบุจำนวนที่เหลือนำกลับคืน ส่วนที่ไม่คืนจะนับเป็นวัสดุที่ใช้ไปในงานนี้")}
       </Typography.Paragraph>
+      {held.some((line) => line.item_type === "EQUIPMENT") && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={t(
+            "รายการครุภัณฑ์ต้องนำส่งคืนคลังให้ครบ หากชำรุด/สูญหายให้ระบุหมายเหตุและแจ้งผู้ดูแลคลัง",
+          )}
+        />
+      )}
       <Form.List name="stockReturns">
         {(fields) =>
           fields.map((field, index) => {

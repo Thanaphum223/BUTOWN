@@ -103,7 +103,7 @@ for (const width of [390, 768, 1024, 1470])
       if (account === "citizen")
         await expect(
           page.getByRole("button", { name: /ขยายขนาดตัวอักษร|ย่อขนาดตัวอักษร|text size/i }),
-        ).toHaveCount(0);
+        ).toHaveCount(2);
       for (const language of ["th", "en"] as const) {
         await page.locator(`.topbar .language-switcher button[lang="${language}"]`).click();
         await expect(page.locator("html")).toHaveAttribute("lang", language);

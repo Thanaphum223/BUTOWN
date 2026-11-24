@@ -43,12 +43,13 @@ public class Bootstrap implements CommandLineRunner {
     for (String category : MunicipalCategories.NAMES)
       db.run(
           "INSERT INTO category(id,municipality_id,department_id,workflow_id,name,sla_hours)"
-              + " VALUES(?,?,?,?,?,72)",
+              + " VALUES(?,?,?,?,?,?)",
           UUID.randomUUID(),
           m,
           dept,
           w,
-          category);
+          category,
+          MunicipalCategories.defaultSlaHours(category));
     create(m, dept, "admin", "ผู้ดูแลระบบ", "ADMIN", password);
     if (!demo.isBlank()) {
       if (demo.length() < 16) throw new IllegalStateException("DEMO_PASSWORD too short");

@@ -18,11 +18,11 @@ import {
 } from "antd";
 import { HistoryOutlined, PlusOutlined } from "./icons";
 import { api, date, post, roleNames } from "./api";
+import { amount } from "./format";
 import { useI18n } from "./i18n/useI18n";
+import StockVerifications from "./StockVerifications";
 
 type D = Record<string, any>;
-const amount = (value: unknown) =>
-  Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 const kindNames: Record<string, string> = {
   RECEIVE: "รับเข้า",
   ISSUE: "เบิกจ่าย",
@@ -40,7 +40,8 @@ const kindColors: Record<string, string> = {
 export default function Inventory({ admin }: { admin: boolean }) {
   const { t } = useI18n();
   const { message } = App.useApp();
-  const [data, setData] = useState<{ keeper: boolean; items: D[] }>();
+  const [data, setData] = useState<{ keeper: boolean; canVerify?: boolean; items: D[] }>();
+  const [issues, setIssues] = useState<D[]>([]);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
   const [adding, setAdding] = useState(false);
@@ -50,10 +51,14 @@ export default function Inventory({ admin }: { admin: boolean }) {
   const [busy, setBusy] = useState(false);
   const [form] = Form.useForm();
   useEffect(() => {
-    api<{ keeper: boolean; items: D[] }>("/stock")
+    api<{ keeper: boolean; canVerify?: boolean; items: D[] }>("/stock")
       .then((value) => {
         setData(value);
         setError("");
+        if (value.canVerify)
+          api<D[]>("/stock/pending-verifications")
+            .then((list) => setIssues(Array.isArray(list) ? list : []))
+            .catch((e) => setError((e as Error).message));
       })
       .catch((e) => setError((e as Error).message));
   }, [revision]);
@@ -106,6 +111,7 @@ export default function Inventory({ admin }: { admin: boolean }) {
           </Typography.Text>
         </div>
         <Space wrap>
+          <Button href="/api/stock/export.csv">{t("ส่งออกรายงานคลัง (CSV)")}</Button>
           {admin && <Button onClick={openKeepers}>{t("กำหนดผู้ดูแลคลัง")}</Button>}
           {keeper && (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setAdding(true)}>
@@ -137,7 +143,11 @@ export default function Inventory({ admin }: { admin: boolean }) {
               dataIndex: "name",
               render: (name, item) => (
                 <>
-                  <strong>{name}</strong> {!item.active && <Tag>{t("ปิดใช้งาน")}</Tag>}
+                  <strong>{name}</strong>{" "}
+                  <Tag color={item.item_type === "EQUIPMENT" ? "blue" : "default"}>
+                    {item.item_type === "EQUIPMENT" ? t("ครุภัณฑ์") : t("วัสดุสิ้นเปลือง")}
+                  </Tag>
+                  {!item.active && <Tag>{t("ปิดใช้งาน")}</Tag>}
                 </>
               ),
             },
@@ -148,6 +158,14 @@ export default function Inventory({ admin }: { admin: boolean }) {
                   {amount(item.on_hand)} {item.unit}
                 </Tag>
               ),
+            },
+            {
+              title: t("จองรอเบิก"),
+              render: (_, item) => `${amount(item.reserved)} ${item.unit}`,
+            },
+            {
+              title: t("พร้อมเบิก"),
+              render: (_, item) => `${amount(item.available ?? item.on_hand)} ${item.unit}`,
             },
             {
               title: t("กำลังใช้งานหน้างาน"),
@@ -197,6 +215,7 @@ export default function Inventory({ admin }: { admin: boolean }) {
           ]}
         />
       </Card>
+      <StockVerifications rows={issues} onChanged={() => setRevision((v) => v + 1)} />
       <Modal
         open={adding || !!moving}
         destroyOnHidden
@@ -217,9 +236,22 @@ export default function Inventory({ admin }: { admin: boolean }) {
           form.resetFields();
         }}
       >
-        <Form form={form} layout="vertical" onFinish={save} initialValues={{ direction: "OUT" }}>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={save}
+          initialValues={{ direction: "OUT", itemType: "CONSUMABLE" }}
+        >
           {adding && (
             <>
+              <Form.Item name="itemType" label={t("ประเภท")}>
+                <Segmented
+                  options={[
+                    { value: "CONSUMABLE", label: t("วัสดุสิ้นเปลือง") },
+                    { value: "EQUIPMENT", label: t("ครุภัณฑ์") },
+                  ]}
+                />
+              </Form.Item>
               <Form.Item
                 name="name"
                 label={t("ชื่อวัสดุ")}

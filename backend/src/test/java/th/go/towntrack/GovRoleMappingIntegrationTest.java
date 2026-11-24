@@ -140,6 +140,33 @@ class GovRoleMappingIntegrationTest {
   }
 
   @Test
+  void signInKeepsAnAssignedPositionWhenGovSendsOnlyAGeneralRole() throws Exception {
+    configure("", List.of(rule("APPROVER", "APPROVER", null), rule("MAYOR", "APPROVER", null)));
+    var account =
+        identities.sync(
+            town, verified("kept", "APPROVER", "towntrack-test", "gov-town", true), null);
+    db.run("UPDATE app_user SET gov_role='FINANCE_DIRECTOR' WHERE id=?", account.get("id"));
+    identities.sync(town, verified("kept", "APPROVER", "towntrack-test", "gov-town", true), null);
+    assertEquals(
+        "FINANCE_DIRECTOR",
+        db.one("SELECT gov_role FROM app_user WHERE id=?", account.get("id")).get("gov_role"));
+    identities.sync(town, verified("kept", "MAYOR", "towntrack-test", "gov-town", true), null);
+    assertEquals(
+        "MAYOR",
+        db.one("SELECT gov_role FROM app_user WHERE id=?", account.get("id")).get("gov_role"));
+  }
+
+  @Test
+  void defaultsIncludeMunicipalPositions() throws Exception {
+    mvc.perform(get("/api/admin/gov-roles").with(user(adminName).roles("ADMIN")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.mappings.length()").value(17))
+        .andExpect(jsonPath("$.mappings[?(@.govRole=='MAYOR')].role").value("APPROVER"))
+        .andExpect(jsonPath("$.mappings[?(@.govRole=='SARABAN_OFFICER')].role").value("OFFICER"))
+        .andExpect(jsonPath("$.mappings[?(@.govRole=='IT_ADMIN')].role").value("ADMIN"));
+  }
+
+  @Test
   void defaultsDoNotTreatGlobalOrMunicipalAdminAsTownTrackAuthority() {
     var account =
         identities.sync(

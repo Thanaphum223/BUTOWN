@@ -193,6 +193,7 @@ export const actionNames: Record<string, string> = {
   REQUEST_EXTENSION: "ขอขยายระยะเวลาดำเนินการ",
   APPROVE_EXTENSION: "อนุมัติการขยายเวลา",
   REJECT_EXTENSION: "ไม่อนุมัติการขยายเวลา",
+  VERIFY_STOCK_ISSUE: "รับรองการเบิกหน้างาน",
 };
 export const roleNames: Record<string, string> = {
   CITIZEN: "ประชาชน",

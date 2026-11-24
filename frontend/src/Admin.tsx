@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   App,
   Alert,
+  AutoComplete,
   Button,
   Card,
   Form,
@@ -19,6 +20,7 @@ import {
 } from "antd";
 import { DeleteOutlined } from "./icons";
 import { api, post, roleNames } from "./api";
+import { govRolesByRole, govTitle, govTitleWithLimit } from "./govRoles";
 import DepartmentPeople from "./DepartmentPeople";
 import AccountDeletion from "./AccountDeletion";
 import GovRoleSettings from "./GovRoleSettings";
@@ -89,10 +91,13 @@ export default function Admin({
           throw new Error(t("รูปแบบ JSON ของช่องข้อมูลไม่ถูกต้อง"));
         }
       }
+      const govRole = v.govRole?.trim().toUpperCase() || null;
+      const currentGovRole = data?.users.find((u: D) => u.id === v.userId)?.gov_role || null;
       if (kind === "roles")
         await post("/admin/users/" + v.userId + "/role", {
           role: v.role,
           departmentId: v.departmentId || null,
+          ...(govRole !== currentGovRole ? { govRole } : {}),
         });
       else await post("/admin/" + kind, v);
       message.success(t("บันทึกแล้ว"));
@@ -190,6 +195,11 @@ export default function Admin({
                         render: (v) => t(roleNames[v]),
                       },
                       {
+                        title: t("ตำแหน่งราชการ"),
+                        dataIndex: "gov_role",
+                        render: (code) => govTitle(code, t) || "—",
+                      },
+                      {
                         title: t("หน่วยงาน"),
                         dataIndex: "department_id",
                         render: (id: string) =>
@@ -207,6 +217,7 @@ export default function Admin({
                                   userId: r.id,
                                   role: r.role,
                                   departmentId: r.department_id || undefined,
+                                  govRole: r.gov_role || undefined,
                                 });
                                 setKind("roles");
                               }}
@@ -396,6 +407,7 @@ export default function Admin({
                     form.setFieldsValue({
                       role: u?.role,
                       departmentId: u?.department_id || undefined,
+                      govRole: u?.gov_role || undefined,
                     });
                   }}
                 />
@@ -429,7 +441,28 @@ export default function Admin({
                   onChange={(role) => {
                     if (!["LEADER", "FIELD"].includes(role))
                       form.setFieldValue("departmentId", undefined);
+                    form.setFieldValue("govRole", undefined);
                   }}
+                />
+              </Form.Item>
+              <Form.Item
+                name="govRole"
+                label={t("ตำแหน่งราชการในเทศบาล (ไม่บังคับ)")}
+                hidden={selectedRole === "CITIZEN"}
+                rules={[
+                  {
+                    pattern: /^[\p{L}\p{N}_ .-]{1,100}$/u,
+                    message: t("รหัสบทบาท Gov Center ไม่ถูกต้อง"),
+                  },
+                ]}
+              >
+                <AutoComplete
+                  allowClear
+                  placeholder={t("เลือกหรือพิมพ์รหัสตำแหน่ง")}
+                  options={(govRolesByRole[selectedRole] || []).map((code) => ({
+                    value: code,
+                    label: govTitleWithLimit(code, t),
+                  }))}
                 />
               </Form.Item>
               <Form.Item

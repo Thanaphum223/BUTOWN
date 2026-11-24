@@ -18,19 +18,19 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 25px;
+  font-size: calc(25px * var(--tt-font-scale, 1));
   font-weight: 700;
   color: var(--gov-brand-primary);
   padding: 28px 22px;
   letter-spacing: -1px;
 }
 .brand .anticon {
-  font-size: 30px;
+  font-size: calc(30px * var(--tt-font-scale, 1));
 }
 .nav-label {
   padding: 10px 24px 18px;
   color: var(--gov-text-placeholder);
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
 }
 .sidebar .ant-menu {
   border-inline-end: 0 !important;
@@ -41,7 +41,7 @@ body {
 }
 .sidebar-bottom {
   padding: 24px;
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   color: var(--gov-text-tertiary);
   margin-top: 80px;
   line-height: 1.8;
@@ -73,7 +73,7 @@ body {
   color: var(--gov-text-primary);
 }
 .eyebrow {
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
   font-weight: 700;
   letter-spacing: 2px;
   color: var(--gov-text-tertiary);
@@ -91,7 +91,7 @@ body {
   color: var(--gov-brand-primary);
   padding: 12px;
   border-radius: var(--gov-radius-control);
-  font-size: 22px;
+  font-size: calc(22px * var(--tt-font-scale, 1));
 }
 .stat-1,
 .stat-2,
@@ -113,12 +113,12 @@ body {
   font-weight: 600;
 }
 .small {
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
 }
 .footer {
   text-align: center;
   color: var(--gov-text-placeholder);
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
   background: transparent;
 }
 .submit-bar {
@@ -159,27 +159,27 @@ body {
 }
 .auth-heading h1.ant-typography {
   margin: 0 0 8px;
-  font-size: 24px;
+  font-size: calc(24px * var(--tt-font-scale, 1));
   font-weight: 700;
   color: var(--gov-brand-primary);
 }
 .auth-heading .ant-typography:last-child {
   margin: 0;
   color: var(--gov-text-tertiary);
-  font-size: 14px;
+  font-size: calc(14px * var(--tt-font-scale, 1));
 }
 .auth-card .ant-form-item {
   margin-bottom: 20px;
 }
 .auth-card .ant-form-item-label > label {
-  font-size: 14px;
+  font-size: calc(14px * var(--tt-font-scale, 1));
   font-weight: 600;
   color: var(--gov-text-primary);
 }
 .auth-card .ant-input,
 .auth-card .ant-input-affix-wrapper,
 .auth-card .ant-btn {
-  font-size: 14px;
+  font-size: calc(14px * var(--tt-font-scale, 1));
 }
 .auth-card .ant-input,
 .auth-card .ant-input-affix-wrapper {
@@ -218,7 +218,7 @@ body {
   color: var(--gov-text-tertiary);
   background: transparent;
   font: inherit;
-  font-size: 14px;
+  font-size: calc(14px * var(--tt-font-scale, 1));
   font-weight: 600;
   cursor: pointer;
 }
@@ -242,7 +242,7 @@ body {
   border-radius: 8px;
 }
 .auth-card .ant-form-item-extra {
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
 }
 .auth-card .gov-line-login {
   background: #06c755;
@@ -258,12 +258,12 @@ body {
 .auth-card .auth-divider {
   margin: 24px 0;
   color: var(--gov-text-placeholder);
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
 }
 .auth-switch {
   margin: 20px 0 8px;
   text-align: center;
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
   color: var(--gov-text-tertiary);
 }
 .auth-switch .ant-btn {
@@ -305,7 +305,7 @@ body {
     flex-direction: column;
   }
   .page-heading h2 {
-    font-size: 23px;
+    font-size: calc(23px * var(--tt-font-scale, 1));
   }
   .submit-bar {
     align-items: stretch;
@@ -349,7 +349,7 @@ a:focus-visible {
   min-height: 58px;
 }
 .ant-card-head-title {
-  font-size: 16px;
+  font-size: calc(16px * var(--tt-font-scale, 1));
   color: var(--municipal-ink);
 }
 .ant-btn {
@@ -384,7 +384,7 @@ h3,
 .eyebrow {
   color: var(--gov-brand-primary);
   letter-spacing: 0.09em;
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
 }
 .topbar {
   height: 72px;
@@ -406,12 +406,12 @@ h3,
 }
 .header-identity strong {
   color: inherit;
-  font-size: 15px;
+  font-size: calc(15px * var(--tt-font-scale, 1));
 }
 .header-identity small {
   display: block;
   color: #fff;
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   margin-top: 3px;
 }
 .municipal-mark {
@@ -423,7 +423,7 @@ h3,
   background: var(--gov-brand-dark);
   color: white;
   border-radius: var(--gov-radius-control);
-  font-size: 18px;
+  font-size: calc(18px * var(--tt-font-scale, 1));
   font-weight: 750;
 }
 .account-controls {
@@ -433,7 +433,7 @@ h3,
   max-width: 100%;
 }
 .account-name {
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
   color: white;
   max-width: 180px;
   display: block;
@@ -442,7 +442,7 @@ h3,
   text-overflow: ellipsis;
 }
 .page-heading h2 {
-  font-size: 28px;
+  font-size: calc(28px * var(--tt-font-scale, 1));
   line-height: 1.5;
   margin-top: 8px !important;
 }
@@ -454,7 +454,7 @@ h3,
 }
 .footer {
   color: var(--municipal-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
 }
 .staff-shell .sidebar {
   background: var(--municipal-dark) !important;
@@ -472,7 +472,7 @@ h3,
   line-height: 1.5;
   padding: 14px 12px !important;
   white-space: normal;
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
 }
 .staff-shell .sidebar .ant-menu-item-selected {
   background: var(--gov-brand-primary) !important;
@@ -487,13 +487,13 @@ h3,
   color: white;
   padding: 20px 18px;
   gap: 10px;
-  font-size: 19px;
+  font-size: calc(19px * var(--tt-font-scale, 1));
   letter-spacing: 0;
   border-bottom: 1px solid #ffffff16;
 }
 .staff-shell .brand small {
   display: block;
-  font-size: 10px;
+  font-size: calc(10px * var(--tt-font-scale, 1));
   font-weight: 400;
   color: #a9c8b8;
 }
@@ -501,7 +501,7 @@ h3,
   background: var(--gov-brand-primary);
   width: 35px;
   height: 35px;
-  font-size: 15px;
+  font-size: calc(15px * var(--tt-font-scale, 1));
 }
 .staff-shell .nav-label {
   color: #9ebdaa;
@@ -512,7 +512,7 @@ h3,
   padding: 20px 0;
   border-top: 1px solid var(--gov-brand-primary);
   color: #c3d8cb;
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
 }
 .staff-shell .sidebar-bottom .ant-tag {
   background: var(--gov-brand-primary);
@@ -526,7 +526,7 @@ h3,
   max-width: 1600px;
 }
 .staff-shell .page-heading h2 {
-  font-size: 26px;
+  font-size: calc(26px * var(--tt-font-scale, 1));
 }
 .workspace-stats {
   display: grid;
@@ -541,11 +541,11 @@ h3,
   padding: 18px 20px;
 }
 .workspace-stats .ant-statistic-title {
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
   color: var(--municipal-muted);
 }
 .workspace-stats .ant-statistic-content {
-  font-size: 29px;
+  font-size: calc(29px * var(--tt-font-scale, 1));
   line-height: 1.5;
   font-weight: 650;
   color: var(--gov-brand-primary);
@@ -564,7 +564,7 @@ h3,
 }
 .control-label {
   display: block;
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   font-weight: 650;
   margin: 14px 0 8px;
   color: var(--gov-brand-primary);
@@ -581,7 +581,7 @@ h3,
   background: var(--gov-surface-soft);
   border-radius: var(--gov-radius-control);
   color: var(--gov-brand-primary);
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
   font-weight: 650;
 }
 .queue-items {
@@ -611,14 +611,14 @@ h3,
   justify-content: space-between;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: calc(10px * var(--tt-font-scale, 1));
 }
 .queue-item-top .ant-tag {
-  font-size: 10px;
+  font-size: calc(10px * var(--tt-font-scale, 1));
   white-space: normal;
 }
 .queue-item-top .ant-typography {
-  font-size: 10px;
+  font-size: calc(10px * var(--tt-font-scale, 1));
   white-space: nowrap;
 }
 .queue-title.ant-btn {
@@ -630,7 +630,7 @@ h3,
   word-break: break-word;
   text-align: left;
   color: var(--gov-text-primary);
-  font-size: 15px;
+  font-size: calc(15px * var(--tt-font-scale, 1));
   font-weight: 650;
   width: 100%;
 }
@@ -639,13 +639,13 @@ h3,
 }
 .queue-meta,
 .queue-due {
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
   color: var(--municipal-muted);
   margin-top: 5px;
   overflow-wrap: anywhere;
 }
 .queue-due {
-  font-size: 10px;
+  font-size: calc(10px * var(--tt-font-scale, 1));
 }
 .queue-panel .ant-pagination {
   display: flex;
@@ -670,14 +670,14 @@ h3,
   border-radius: var(--gov-radius-card);
   background: var(--gov-surface-soft);
   color: var(--gov-brand-primary);
-  font-size: 32px;
+  font-size: calc(32px * var(--tt-font-scale, 1));
 }
 .workspace-welcome h3 {
-  font-size: 23px;
+  font-size: calc(23px * var(--tt-font-scale, 1));
 }
 .workspace-welcome p {
   color: var(--municipal-muted);
-  font-size: 14px;
+  font-size: calc(14px * var(--tt-font-scale, 1));
   line-height: 1.9;
 }
 .welcome-process {
@@ -685,7 +685,7 @@ h3,
   justify-content: center;
   align-items: center;
   gap: 10px;
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
   margin-top: 26px;
   color: var(--gov-brand-primary);
 }
@@ -710,7 +710,7 @@ h3,
   color: #8f3b40;
 }
 .attention-panel p {
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
   margin: 6px 0 0;
   color: #94646a;
 }
@@ -725,7 +725,7 @@ h3,
   margin-bottom: 16px;
 }
 .workspace-detail .page-heading h3 {
-  font-size: 21px;
+  font-size: calc(21px * var(--tt-font-scale, 1));
   margin: 0 0 10px;
   line-height: 1.6;
 }
@@ -733,26 +733,26 @@ h3,
   align-items: flex-start;
 }
 .workspace-detail .page-heading > .ant-btn {
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   padding: 6px;
   min-height: 36px;
 }
 .workspace-detail .ant-steps-item-title {
-  font-size: 10px !important;
+  font-size: calc(10px * var(--tt-font-scale, 1)) !important;
   line-height: 1.5 !important;
   white-space: normal;
 }
 .workspace-detail .ant-steps-item-icon {
   width: 24px;
   height: 24px;
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
   line-height: 24px;
 }
 .workspace-detail .ant-steps-item-tail {
   top: 12px;
 }
 .workspace-detail .ant-descriptions-item-label {
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
 }
 .workspace-detail .ant-card-body {
   padding: 18px;
@@ -764,7 +764,7 @@ h3,
   margin-bottom: 20px;
 }
 .embedded-actions .ant-btn {
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
 }
 .workspace-detail .ant-steps-item-title:after {
   top: 12px;
@@ -797,7 +797,7 @@ h3,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 16px;
+  font-size: calc(16px * var(--tt-font-scale, 1));
   color: white;
 }
 .citizen-shell .header-identity small {
@@ -853,10 +853,10 @@ h3,
   display: none;
 }
 .citizen-shell .page-heading h2 {
-  font-size: 30px;
+  font-size: calc(30px * var(--tt-font-scale, 1));
 }
 .community-lead {
-  font-size: 18px;
+  font-size: calc(18px * var(--tt-font-scale, 1));
   font-weight: 600;
   color: var(--gov-brand-primary);
   margin: 4px 0 8px;
@@ -886,13 +886,13 @@ h3,
   min-width: 0;
 }
 .community-metrics strong {
-  font-size: 30px;
+  font-size: calc(30px * var(--tt-font-scale, 1));
   color: var(--gov-brand-primary);
   line-height: 1.3;
 }
 .community-metrics > div > span:last-child {
   grid-column: 1 / -1;
-  font-size: 14px;
+  font-size: calc(14px * var(--tt-font-scale, 1));
   color: var(--municipal-muted);
   overflow-wrap: anywhere;
 }
@@ -917,14 +917,14 @@ h3,
 }
 .metric-symbol {
   color: var(--gov-brand-primary);
-  font-size: 20px;
+  font-size: calc(20px * var(--tt-font-scale, 1));
 }
 .citizen-notice {
   padding: 12px 16px;
   background: var(--gov-surface-soft);
   border-radius: var(--gov-radius-control);
   color: var(--gov-text-tertiary);
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -945,7 +945,7 @@ h3,
   padding: 16px;
 }
 .community-toolbar .ant-typography {
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
 }
 .community-explorer {
   display: grid;
@@ -966,20 +966,20 @@ h3,
   border-bottom: 0;
 }
 .community-map-panel .ant-card-head .ant-typography {
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
 }
 .community-map-panel .ant-card-body {
   padding-top: 0;
 }
 .map-caption {
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   color: var(--municipal-muted);
 }
 .map-legend {
   display: flex;
   flex-wrap: wrap;
   gap: var(--gov-space-2);
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
   margin-top: 16px;
   color: var(--gov-text-tertiary);
 }
@@ -1014,17 +1014,17 @@ h3,
 }
 .row-title h4 {
   margin: 0;
-  font-size: 18px;
+  font-size: calc(18px * var(--tt-font-scale, 1));
 }
 .community-issue {
   margin-bottom: 16px;
 }
 .community-issue h4 {
-  font-size: 20px;
+  font-size: calc(20px * var(--tt-font-scale, 1));
   margin: 14px 0 6px;
 }
 .community-issue .ant-typography-secondary {
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
 }
 .issue-top {
   display: flex;
@@ -1039,14 +1039,14 @@ h3,
   width: 44px;
   height: 44px;
   border-radius: var(--gov-radius-control);
-  font-size: 23px;
+  font-size: calc(23px * var(--tt-font-scale, 1));
 }
 .issue-privacy {
   margin: 16px 0;
   padding: 12px;
   background: var(--gov-surface-soft);
   color: var(--gov-text-tertiary);
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   border-radius: var(--gov-radius-control);
 }
 .nearby-empty .ant-card-body {
@@ -1054,7 +1054,7 @@ h3,
   text-align: center;
 }
 .nearby-empty .ant-typography {
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
 }
 .citizen-bottom-nav {
   position: fixed;
@@ -1081,10 +1081,10 @@ h3,
   text-decoration: none;
   min-height: 60px;
   border-radius: var(--gov-radius-control);
-  font-size: 22px;
+  font-size: calc(22px * var(--tt-font-scale, 1));
 }
 .citizen-bottom-nav a span:last-child {
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
   font-weight: 550;
 }
 .citizen-bottom-nav a[aria-current="page"] {
@@ -1158,19 +1158,19 @@ h3,
     gap: 8px;
   }
   .header-identity strong {
-    font-size: 13px;
+    font-size: calc(13px * var(--tt-font-scale, 1));
   }
   .header-identity small {
-    font-size: 12px;
+    font-size: calc(12px * var(--tt-font-scale, 1));
   }
   .municipal-mark {
     width: 36px;
     height: 36px;
-    font-size: 16px;
+    font-size: calc(16px * var(--tt-font-scale, 1));
   }
   .account-name {
     max-width: 80px;
-    font-size: 12px;
+    font-size: calc(12px * var(--tt-font-scale, 1));
   }
   .citizen-shell .account-name {
     display: none;
@@ -1182,7 +1182,7 @@ h3,
   }
   /* 44px keeps header actions comfortably tappable on phones. */
   .shell .topbar .ant-btn {
-    font-size: 12px;
+    font-size: calc(12px * var(--tt-font-scale, 1));
     padding: 6px 10px;
     min-width: 44px;
     min-height: 44px;
@@ -1208,7 +1208,7 @@ h3,
     padding: 20px 16px;
   }
   .citizen-shell .page-heading h2 {
-    font-size: 25px;
+    font-size: calc(25px * var(--tt-font-scale, 1));
   }
   .community-heading {
     display: block;
@@ -1218,7 +1218,7 @@ h3,
     margin-top: 18px;
   }
   .community-lead {
-    font-size: 16px;
+    font-size: calc(16px * var(--tt-font-scale, 1));
   }
   .community-metrics {
     gap: 8px;
@@ -1231,15 +1231,15 @@ h3,
   }
   .community-metrics strong {
     display: block;
-    font-size: 27px;
+    font-size: calc(27px * var(--tt-font-scale, 1));
   }
   .community-metrics > div > span:last-child {
     display: block;
-    font-size: 12px;
+    font-size: calc(12px * var(--tt-font-scale, 1));
     margin-top: 5px;
   }
   .citizen-notice {
-    font-size: 12px;
+    font-size: calc(12px * var(--tt-font-scale, 1));
     padding: 12px;
   }
   .community-toolbar {
@@ -1274,7 +1274,7 @@ h3,
     height: 300px !important;
   }
   .community-map-panel .ant-card-extra .ant-typography {
-    font-size: 10px;
+    font-size: calc(10px * var(--tt-font-scale, 1));
   }
   .community-map-panel .ant-card-head {
     padding: 0 14px;
@@ -1292,10 +1292,10 @@ h3,
   }
   .citizen-bottom-nav a {
     min-height: 56px;
-    font-size: 20px;
+    font-size: calc(20px * var(--tt-font-scale, 1));
   }
   .citizen-bottom-nav a span:last-child {
-    font-size: 12px;
+    font-size: calc(12px * var(--tt-font-scale, 1));
     white-space: nowrap;
   }
   .workspace-stats {
@@ -1306,22 +1306,22 @@ h3,
     padding: 14px !important;
   }
   .workspace-stats .ant-statistic-title {
-    font-size: 12px;
+    font-size: calc(12px * var(--tt-font-scale, 1));
   }
   .workspace-stats .ant-statistic-content {
-    font-size: 27px;
+    font-size: calc(27px * var(--tt-font-scale, 1));
   }
   .staff-shell .content {
     padding: 20px 14px;
   }
   .staff-shell .page-heading h2 {
-    font-size: 23px;
+    font-size: calc(23px * var(--tt-font-scale, 1));
   }
   .workspace-detail > .page-heading {
     padding: 16px;
   }
   .workspace-detail .page-heading h3 {
-    font-size: 20px;
+    font-size: calc(20px * var(--tt-font-scale, 1));
   }
   .workspace-welcome {
     min-height: 280px;
@@ -1336,7 +1336,7 @@ h3,
     padding: 16px;
   }
   .attention-panel p {
-    font-size: 12px;
+    font-size: calc(12px * var(--tt-font-scale, 1));
   }
 }
 
@@ -1364,7 +1364,7 @@ h3,
   flex: 1;
   border-top: 4px solid var(--gov-border-neutral);
   padding-top: 8px;
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   color: var(--gov-text-tertiary);
 }
 .report-stepper li.active {
@@ -1373,7 +1373,7 @@ h3,
   font-weight: 650;
 }
 .report-wizard h2 {
-  font-size: 28px;
+  font-size: calc(28px * var(--tt-font-scale, 1));
   margin: 0 0 8px;
 }
 .report-categories {
@@ -1402,7 +1402,7 @@ h3,
   padding: 17px 13px;
 }
 .report-categories button > span {
-  font-size: 24px;
+  font-size: calc(24px * var(--tt-font-scale, 1));
 }
 .wizard-actions {
   display: flex;
@@ -1421,11 +1421,11 @@ h3,
 }
 .report-context p {
   margin: 6px 0 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
 }
 .map-help {
   display: block;
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   color: var(--gov-text-tertiary);
   margin-top: 12px;
 }
@@ -1436,7 +1436,7 @@ h3,
 }
 .coordinate-details summary {
   cursor: pointer;
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   margin-bottom: 8px;
 }
 .receipt-check {
@@ -1447,7 +1447,7 @@ h3,
   background: var(--gov-surface-soft);
   border-radius: 50%;
   color: var(--gov-brand-primary);
-  font-size: 34px;
+  font-size: calc(34px * var(--tt-font-scale, 1));
   margin: 26px auto;
 }
 .report-receipt {
@@ -1471,14 +1471,14 @@ h3,
     padding: 0 0 22px;
   }
   .report-wizard h2 {
-    font-size: 25px;
+    font-size: calc(25px * var(--tt-font-scale, 1));
   }
   .report-categories {
     gap: 8px;
     margin: 14px 0;
   }
   .report-categories button {
-    font-size: 13px;
+    font-size: calc(13px * var(--tt-font-scale, 1));
     min-height: 56px;
     padding: 10px;
     gap: 8px;
@@ -1487,7 +1487,7 @@ h3,
     padding: 9px;
   }
   .report-categories button > span {
-    font-size: 20px;
+    font-size: calc(20px * var(--tt-font-scale, 1));
   }
   .report-wizard .ant-form-item {
     margin-bottom: 14px;
@@ -1517,7 +1517,7 @@ h3,
   align-items: center;
   gap: 10px;
   color: var(--gov-status-danger);
-  font-size: 30px;
+  font-size: calc(30px * var(--tt-font-scale, 1));
 }
 .emergency-call:hover {
   color: #7e1717;
@@ -1528,7 +1528,7 @@ h3,
 .emergency-hotlines a:not(.emergency-call) {
   display: inline-block;
   margin-top: 10px;
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
 }
 .emergency-utilities {
   margin: 22px 0;
@@ -1555,7 +1555,7 @@ h3,
   overflow-wrap: anywhere;
 }
 .emergency-attribution {
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   color: var(--gov-text-tertiary);
   margin-top: 20px;
 }
@@ -1568,7 +1568,7 @@ h3,
     grid-template-columns: 1fr;
   }
   .emergency-call {
-    font-size: 26px;
+    font-size: calc(26px * var(--tt-font-scale, 1));
   }
 }
 
@@ -1600,7 +1600,7 @@ h3,
     flex-shrink: 0;
   }
   .citizen-bottom-nav a span:last-child {
-    font-size: 16px;
+    font-size: calc(16px * var(--tt-font-scale, 1));
   }
   .citizen-shell .footer {
     padding-bottom: 24px;
@@ -1616,7 +1616,7 @@ h3,
   border: 2px solid white;
   border-radius: 50%;
   color: white;
-  font-size: 23px;
+  font-size: calc(23px * var(--tt-font-scale, 1));
   font-weight: bold;
   box-shadow: 0 2px 6px #0004;
 }
@@ -1648,11 +1648,11 @@ h3,
   margin-bottom: 12px;
 }
 .ranking-heading h4.ant-typography {
-  font-size: 18px;
+  font-size: calc(18px * var(--tt-font-scale, 1));
   margin: 4px 0 0;
 }
 .ranking-heading .eyebrow {
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
 }
 .community-home .ranking-row {
   display: flex;
@@ -1689,17 +1689,17 @@ h3,
 }
 .ranking-copy strong {
   display: block;
-  font-size: 14px;
+  font-size: calc(14px * var(--tt-font-scale, 1));
   line-height: 1.5;
   margin-bottom: 6px;
   overflow-wrap: anywhere;
 }
 .ranking-copy .ant-tag {
-  font-size: 10px;
+  font-size: calc(10px * var(--tt-font-scale, 1));
   margin-right: 5px;
 }
 .mock-label {
-  font-size: 10px;
+  font-size: calc(10px * var(--tt-font-scale, 1));
   color: var(--gov-text-tertiary);
 }
 
@@ -1736,7 +1736,7 @@ h3,
   padding: 20px;
 }
 .community-all-results .community-issue h4 {
-  font-size: 17px;
+  font-size: calc(17px * var(--tt-font-scale, 1));
   line-height: 1.5;
   margin: 12px 0 8px;
   min-height: 51px;
@@ -1750,7 +1750,7 @@ h3,
   padding-top: 18px;
 }
 .issue-card-footer > .ant-tag {
-  font-size: 10px;
+  font-size: calc(10px * var(--tt-font-scale, 1));
   margin: 0;
 }
 .community-all-results .ant-pagination {
@@ -1777,10 +1777,10 @@ h3,
     border-radius: 7px;
   }
   .ranking-copy strong {
-    font-size: 13px;
+    font-size: calc(13px * var(--tt-font-scale, 1));
   }
   .ranking-heading h4.ant-typography {
-    font-size: 16px;
+    font-size: calc(16px * var(--tt-font-scale, 1));
   }
   .community-home .community-map-panel .location-map {
     height: 300px !important;
@@ -1841,7 +1841,7 @@ h3,
   height: 44px;
   padding: 0 8px;
   border-radius: var(--gov-radius-control);
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   font-weight: 600;
   gap: 5px;
   box-shadow: none;
@@ -1867,7 +1867,7 @@ h3,
   }
   :is(.community-home, .nearby-issues) .community-issue-actions > .ant-btn {
     padding: 0 5px;
-    font-size: 11px;
+    font-size: calc(11px * var(--tt-font-scale, 1));
     gap: 4px;
   }
 }
@@ -1956,7 +1956,7 @@ h3,
   border-radius: 6px;
   background: #173e32dc;
   color: #fff;
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
 }
 .issue-media-placeholder {
   height: 100%;
@@ -1968,7 +1968,7 @@ h3,
   color: var(--gov-brand-primary);
 }
 .issue-media-placeholder .anticon {
-  font-size: 42px;
+  font-size: calc(42px * var(--tt-font-scale, 1));
 }
 .issue-media-empty {
   cursor: default;
@@ -1992,7 +1992,7 @@ h3,
 }
 .evidence-pair h4 {
   margin: 0;
-  font-size: 14px;
+  font-size: calc(14px * var(--tt-font-scale, 1));
 }
 .evidence-pair .evidence-gallery {
   grid-template-columns: minmax(0, 1fr);
@@ -2019,7 +2019,7 @@ h3,
 }
 .evidence-gallery figcaption {
   padding: 8px;
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
   overflow-wrap: anywhere;
 }
 @media (max-width: 600px) {
@@ -2154,7 +2154,7 @@ h3,
   .staff-shell .ant-input,
   .staff-shell .ant-select-selection-item,
   .workflow-modal .ant-input {
-    font-size: 16px;
+    font-size: calc(16px * var(--tt-font-scale, 1));
   }
   .staff-shell .queue-items {
     max-height: none;
@@ -2219,12 +2219,12 @@ h3,
     padding: 10px 6px;
   }
   .field-workspace .workspace-stats .ant-statistic-title {
-    font-size: 10px;
+    font-size: calc(10px * var(--tt-font-scale, 1));
     min-height: 28px;
     line-height: 1.4;
   }
   .field-workspace .workspace-stats .ant-statistic-content {
-    font-size: 20px;
+    font-size: calc(20px * var(--tt-font-scale, 1));
   }
   .staff-shell .ant-table-wrapper {
     max-width: 100%;
@@ -2300,7 +2300,7 @@ h3,
   border-bottom: 1px solid var(--gov-border-neutral);
 }
 .resource-total .ant-typography:last-child {
-  font-size: 20px;
+  font-size: calc(20px * var(--tt-font-scale, 1));
   color: var(--gov-brand-primary);
 }
 .resource-revision-items {
@@ -2369,7 +2369,7 @@ h3,
 }
 .attachment-name > .anticon {
   color: var(--gov-brand-primary);
-  font-size: 22px;
+  font-size: calc(22px * var(--tt-font-scale, 1));
 }
 .attachment-name > div {
   min-width: 0;
@@ -2469,24 +2469,24 @@ button.queue-item .queue-item-top {
 }
 button.queue-item .queue-item-top .ant-tag {
   margin: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   padding: 2px 8px;
   border-radius: 7px;
 }
 .queue-reference {
   color: var(--gov-text-tertiary);
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   white-space: nowrap;
 }
 .queue-card-title {
   display: block;
-  font-size: 17px;
+  font-size: calc(17px * var(--tt-font-scale, 1));
   font-weight: 650;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .queue-card-category {
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   color: var(--gov-text-tertiary);
   line-height: 1.5;
 }
@@ -2494,7 +2494,7 @@ button.queue-item .queue-item-top .ant-tag {
   display: flex;
   align-items: flex-start;
   gap: 7px;
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
   color: var(--gov-text-tertiary);
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -2518,7 +2518,7 @@ button.queue-item .queue-item-top .ant-tag {
   gap: 6px;
   align-items: flex-start;
   color: var(--gov-text-tertiary);
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   line-height: 1.5;
   flex: 1 1 180px;
 }
@@ -2533,13 +2533,13 @@ button.queue-item .queue-item-top .ant-tag {
   gap: 5px;
   align-items: center;
   color: var(--gov-brand-primary);
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   font-weight: 650;
   white-space: nowrap;
 }
 .queue-card-votes {
   display: block;
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
   color: var(--gov-text-tertiary);
 }
 @media (max-width: 600px) {
@@ -2549,10 +2549,10 @@ button.queue-item .queue-item-top .ant-tag {
     gap: 9px;
   }
   .queue-card-title {
-    font-size: 16px;
+    font-size: calc(16px * var(--tt-font-scale, 1));
   }
   .queue-card-category {
-    font-size: 12px;
+    font-size: calc(12px * var(--tt-font-scale, 1));
   }
 }
 
@@ -2576,7 +2576,7 @@ button.queue-item .queue-item-top .ant-tag {
   gap: 16px;
 }
 .staff-shell .header-identity small {
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2590,15 +2590,15 @@ button.queue-item .queue-item-top .ant-tag {
   gap: 10px !important;
 }
 .staff-shell .admin-role-controls .ant-select {
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
 }
 .staff-shell .sidebar .brand {
-  font-size: 23px;
+  font-size: calc(23px * var(--tt-font-scale, 1));
   padding: 26px 20px;
 }
 .staff-shell .sidebar .nav-label {
   padding: 22px 22px 10px;
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
 }
 .staff-shell .sidebar .ant-menu-item {
   height: 48px;
@@ -2606,11 +2606,11 @@ button.queue-item .queue-item-top .ant-tag {
   margin: 5px 12px;
   width: calc(100% - 24px);
   border-radius: var(--gov-radius-control);
-  font-size: 14px;
+  font-size: calc(14px * var(--tt-font-scale, 1));
 }
 .staff-shell .sidebar-bottom {
   margin: 28px 20px 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   line-height: 1.8;
 }
 .staff-shell .page-heading {
@@ -2619,18 +2619,18 @@ button.queue-item .queue-item-top .ant-tag {
 }
 .staff-shell .page-heading h2 {
   margin: 4px 0 6px;
-  font-size: 26px;
+  font-size: calc(26px * var(--tt-font-scale, 1));
   line-height: 1.45;
 }
 .staff-shell .page-heading h3 {
   margin: 10px 0;
-  font-size: 22px;
+  font-size: calc(22px * var(--tt-font-scale, 1));
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .staff-shell .eyebrow {
   letter-spacing: 1px;
-  font-size: 10px;
+  font-size: calc(10px * var(--tt-font-scale, 1));
 }
 .staff-shell .ant-card {
   border-color: var(--staff-border);
@@ -2644,7 +2644,7 @@ button.queue-item .queue-item-top .ant-tag {
 }
 .staff-shell .ant-card-head-title {
   white-space: normal;
-  font-size: 15px;
+  font-size: calc(15px * var(--tt-font-scale, 1));
   line-height: 1.6;
 }
 .staff-shell .ant-card-body {
@@ -2652,7 +2652,7 @@ button.queue-item .queue-item-top .ant-tag {
 }
 .staff-shell .ant-btn {
   border-radius: var(--gov-radius-control);
-  font-size: 14px;
+  font-size: calc(14px * var(--tt-font-scale, 1));
   min-height: 42px;
   font-weight: 550;
   box-shadow: none;
@@ -2680,10 +2680,10 @@ button.queue-item .queue-item-top .ant-tag {
 }
 .staff-shell .ant-table-thead > tr > th {
   background: var(--gov-page-surface);
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
 }
 .staff-shell .ant-table-tbody > tr > td {
-  font-size: 14px;
+  font-size: calc(14px * var(--tt-font-scale, 1));
   padding: 14px;
 }
 .staff-shell .workspace-stats {
@@ -2694,7 +2694,7 @@ button.queue-item .queue-item-top .ant-tag {
   padding: 16px 20px;
 }
 .staff-shell .workspace-stats .ant-statistic-content {
-  font-size: 28px;
+  font-size: calc(28px * var(--tt-font-scale, 1));
 }
 .staff-shell .attention-panel {
   padding: 14px 18px;
@@ -2725,7 +2725,7 @@ button.queue-item .queue-item-top .ant-tag {
   cursor: pointer;
   padding: 12px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2745,7 +2745,7 @@ button.queue-item .queue-item-top .ant-tag {
   padding: 8px 0;
   background: none;
   margin-top: 12px;
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
 }
 .staff-shell .queue-items {
   max-height: calc(100dvh - 380px);
@@ -2759,30 +2759,30 @@ button.queue-item .queue-item-top .ant-tag {
   gap: 9px;
 }
 .staff-shell .queue-card-title {
-  font-size: 15px;
+  font-size: calc(15px * var(--tt-font-scale, 1));
   line-height: 1.65;
 }
 .staff-shell .queue-card-category {
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
 }
 .staff-shell .queue-reference {
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
 }
 .staff-shell .queue-card-location {
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
 }
 .staff-shell .queue-card-footer {
   gap: 10px;
   flex-wrap: wrap;
 }
 .staff-shell .queue-card-due {
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
 }
 .staff-shell .workspace-welcome {
   min-height: 390px;
 }
 .staff-shell .workspace-welcome h3 {
-  font-size: 23px;
+  font-size: calc(23px * var(--tt-font-scale, 1));
 }
 .staff-shell .workspace-detail .page-heading {
   background: #fff;
@@ -2801,7 +2801,7 @@ button.queue-item .queue-item-top .ant-tag {
   min-width: 480px;
 }
 .staff-shell .workspace-detail .ant-steps-item-title {
-  font-size: 11px !important;
+  font-size: calc(11px * var(--tt-font-scale, 1)) !important;
 }
 .staff-shell .embedded-actions .ant-space {
   display: flex;
@@ -2819,14 +2819,14 @@ button.queue-item .queue-item-top .ant-tag {
   padding: 24px;
 }
 .workflow-modal .ant-modal-title {
-  font-size: 20px;
+  font-size: calc(20px * var(--tt-font-scale, 1));
   padding-right: 24px;
 }
 .workflow-modal .ant-form-item {
   margin-bottom: 20px;
 }
 .workflow-modal .ant-form-item-label > label {
-  font-size: 14px;
+  font-size: calc(14px * var(--tt-font-scale, 1));
   height: auto;
 }
 .workflow-modal .ant-btn {
@@ -2858,7 +2858,7 @@ button.queue-item .queue-item-top .ant-tag {
     flex: 1;
   }
   .staff-shell .header-identity strong {
-    font-size: 14px;
+    font-size: calc(14px * var(--tt-font-scale, 1));
   }
   .staff-shell .account-controls {
     width: 100%;
@@ -2885,10 +2885,10 @@ button.queue-item .queue-item-top .ant-tag {
     display: none;
   }
   .staff-shell .page-heading h2 {
-    font-size: 23px;
+    font-size: calc(23px * var(--tt-font-scale, 1));
   }
   .staff-shell .page-heading .ant-typography-secondary {
-    font-size: 13px;
+    font-size: calc(13px * var(--tt-font-scale, 1));
   }
   .staff-shell .ant-card-body {
     padding: 16px;
@@ -2903,7 +2903,7 @@ button.queue-item .queue-item-top .ant-tag {
     padding: 16px;
   }
   .staff-shell .workspace-detail .page-heading h3 {
-    font-size: 20px;
+    font-size: calc(20px * var(--tt-font-scale, 1));
   }
   .staff-shell .ant-list-item {
     flex-wrap: wrap;
@@ -2923,10 +2923,10 @@ button.queue-item .queue-item-top .ant-tag {
   }
   .staff-shell .workspace-stats .ant-statistic-title {
     min-height: 0;
-    font-size: 12px;
+    font-size: calc(12px * var(--tt-font-scale, 1));
   }
   .staff-shell .workspace-stats .ant-statistic-content {
-    font-size: 25px;
+    font-size: calc(25px * var(--tt-font-scale, 1));
   }
   .staff-shell .page-heading {
     margin-bottom: 16px;
@@ -2937,7 +2937,7 @@ button.queue-item .queue-item-top .ant-tag {
   }
   .staff-shell .ant-input,
   .staff-shell .ant-select-selection-item {
-    font-size: 16px;
+    font-size: calc(16px * var(--tt-font-scale, 1));
   }
   .staff-shell .embedded-actions .ant-space-item {
     flex: 1 1 160px;
@@ -2972,7 +2972,7 @@ button.queue-item .queue-item-top .ant-tag {
   padding: 10px 16px;
 }
 .staff-shell .viewing-work > .workspace-stats .ant-statistic-content {
-  font-size: 23px;
+  font-size: calc(23px * var(--tt-font-scale, 1));
 }
 @media (max-width: 991px) {
   .staff-shell .workflow-progress .ant-steps {
@@ -3011,7 +3011,7 @@ button.queue-item .queue-item-top .ant-tag {
   border: 0;
 }
 .staff-shell .split-workspace .queue-panel .ant-card-head-title {
-  font-size: 21px;
+  font-size: calc(21px * var(--tt-font-scale, 1));
 }
 .staff-shell .split-workspace .queue-panel .ant-card-body {
   padding: 12px 0 0;
@@ -3030,7 +3030,7 @@ button.queue-item .queue-item-top .ant-tag {
   box-shadow: inset 4px 0 var(--gov-brand-primary);
 }
 .staff-shell .split-workspace .queue-card-title {
-  font-size: 17px;
+  font-size: calc(17px * var(--tt-font-scale, 1));
   line-height: 1.5;
 }
 .staff-shell .split-workspace .queue-card-category,
@@ -3053,7 +3053,7 @@ button.queue-item .queue-item-top .ant-tag {
 .staff-shell .split-workspace .queue-quick-status .ant-btn {
   min-height: 34px;
   height: 34px;
-  font-size: 11px;
+  font-size: calc(11px * var(--tt-font-scale, 1));
   padding: 5px 9px;
   flex-shrink: 0;
   border-radius: 7px;
@@ -3074,11 +3074,11 @@ button.queue-item .queue-item-top .ant-tag {
   border-bottom: 1px solid var(--gov-border-neutral);
 }
 .staff-shell .split-workspace .workspace-detail .page-heading h3 {
-  font-size: 27px;
+  font-size: calc(27px * var(--tt-font-scale, 1));
   line-height: 1.45;
 }
 .staff-shell .split-workspace .workspace-detail > .page-heading .ant-btn {
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   min-height: 34px;
 }
 .staff-shell .split-case-summary {
@@ -3087,7 +3087,7 @@ button.queue-item .queue-item-top .ant-tag {
 .staff-shell .split-case-facts {
   display: grid;
   gap: 9px;
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
   line-height: 1.7;
   color: var(--gov-text-tertiary);
 }
@@ -3095,11 +3095,11 @@ button.queue-item .queue-item-top .ant-tag {
   margin-right: 7px;
 }
 .staff-shell .split-case-summary h3 {
-  font-size: 18px;
+  font-size: calc(18px * var(--tt-font-scale, 1));
   margin: 22px 0 12px;
 }
 .staff-shell .split-case-summary .ant-typography {
-  font-size: 15px;
+  font-size: calc(15px * var(--tt-font-scale, 1));
   line-height: 1.85;
 }
 .staff-shell .split-case-summary .evidence-gallery {
@@ -3118,7 +3118,7 @@ button.queue-item .queue-item-top .ant-tag {
   border-radius: 9px;
 }
 .staff-shell .split-case-summary .evidence-gallery figcaption {
-  font-size: 10px;
+  font-size: calc(10px * var(--tt-font-scale, 1));
   overflow-wrap: anywhere;
 }
 .staff-shell .split-section {
@@ -3133,7 +3133,7 @@ button.queue-item .queue-item-top .ant-tag {
   gap: 10px;
   cursor: pointer;
   padding: 14px 16px;
-  font-size: 14px;
+  font-size: calc(14px * var(--tt-font-scale, 1));
   font-weight: 600;
   list-style: none;
 }
@@ -3213,10 +3213,10 @@ button.queue-item .queue-item-top .ant-tag {
     max-height: none;
   }
   .staff-shell .split-workspace .queue-card-title {
-    font-size: 17px;
+    font-size: calc(17px * var(--tt-font-scale, 1));
   }
   .staff-shell .split-workspace .workspace-detail .page-heading h3 {
-    font-size: 24px;
+    font-size: calc(24px * var(--tt-font-scale, 1));
   }
   .staff-shell .split-workspace.viewing-work .work-grid {
     border: 0;
@@ -3229,7 +3229,7 @@ button.queue-item .queue-item-top .ant-tag {
     height: 115px;
   }
   .staff-shell .split-case-facts {
-    font-size: 13px;
+    font-size: calc(13px * var(--tt-font-scale, 1));
   }
   .staff-shell .split-action-dock {
     padding-bottom: env(safe-area-inset-bottom);
@@ -3348,7 +3348,7 @@ button.queue-item .queue-item-top .ant-tag {
 }
 .tracking-card h4.ant-typography {
   margin: 0;
-  font-size: 20px;
+  font-size: calc(20px * var(--tt-font-scale, 1));
   overflow-wrap: anywhere;
 }
 .tracking-dates {
@@ -3356,7 +3356,7 @@ button.queue-item .queue-item-top .ant-tag {
   flex-direction: column;
   gap: 6px;
   color: var(--gov-text-secondary);
-  font-size: 14px;
+  font-size: calc(14px * var(--tt-font-scale, 1));
 }
 .tracking-card-actions {
   margin-top: auto;
@@ -3370,7 +3370,7 @@ button.queue-item .queue-item-top .ant-tag {
   overflow-wrap: anywhere;
 }
 .tracking-address {
-  font-size: 14px;
+  font-size: calc(14px * var(--tt-font-scale, 1));
   overflow-wrap: anywhere;
 }
 .citizen-outcome {
@@ -3468,7 +3468,7 @@ button.queue-item .queue-item-top .ant-tag {
 }
 .terminal-subtitle {
   display: block;
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
   overflow-wrap: anywhere;
 }
 .workflow-modal .ant-modal-content {
@@ -3663,7 +3663,7 @@ button.queue-item .queue-item-top .ant-tag {
   align-items: center;
 }
 .approver-overview .overview-summary h3 {
-  font-size: 17px;
+  font-size: calc(17px * var(--tt-font-scale, 1));
   margin: 4px 0;
 }
 .approver-overview .ant-pagination {
@@ -3715,7 +3715,7 @@ button.queue-item .queue-item-top .ant-tag {
 }
 .workflow-progress .ant-steps-item-title {
   max-width: 100%;
-  font-size: 13px !important;
+  font-size: calc(13px * var(--tt-font-scale, 1)) !important;
   line-height: 1.65;
   white-space: normal !important;
   overflow: visible !important;
@@ -3774,7 +3774,7 @@ button.queue-item .queue-item-top .ant-tag {
 }
 .assignment-members {
   display: block;
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
 }
 
 /* Button hierarchy: primary = solid, secondary = outlined, cancel/back in dialogs = ghost. */
@@ -3827,7 +3827,7 @@ button.queue-item .queue-item-top .ant-tag {
   background: #fff;
 }
 .member-hint {
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
 }
 .member-chips {
   display: flex;
@@ -3911,7 +3911,7 @@ button.queue-item .queue-item-top .ant-tag {
   align-items: center;
   border: 1px solid var(--gov-border-neutral);
   border-radius: 999px;
-  font-size: 15px;
+  font-size: calc(15px * var(--tt-font-scale, 1));
   line-height: 1.3;
   white-space: normal;
   background: var(--gov-surface);
@@ -3941,7 +3941,7 @@ button.queue-item .queue-item-top .ant-tag {
   margin: 12px 0;
 }
 .video-recorder-time {
-  font-size: 18px;
+  font-size: calc(18px * var(--tt-font-scale, 1));
 }
 .video-recorder-actions {
   width: 100%;
@@ -3978,7 +3978,7 @@ button.queue-item .queue-item-top .ant-tag {
   align-items: center;
   gap: 4px 8px;
   margin: 6px 0 0 28px;
-  font-size: 13px;
+  font-size: calc(13px * var(--tt-font-scale, 1));
 }
 .assignment-workload .ant-tag {
   margin: 0;
@@ -4035,4 +4035,54 @@ button.queue-item .queue-item-top .ant-tag {
     min-width: 0;
     width: 100%;
   }
+}
+.font-size-control {
+  display: flex;
+  gap: 4px;
+}
+.shell .topbar .font-size-control .ant-btn {
+  min-width: 44px;
+  height: 44px;
+  padding: 0 8px;
+}
+.shell .topbar .font-size-control .ant-btn:disabled {
+  color: #ffffff99;
+}
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+.chat-message {
+  align-self: flex-start;
+  max-width: 88%;
+  padding: 10px 14px;
+  border-radius: var(--gov-radius-control);
+  background: var(--gov-brand-surface);
+}
+.chat-message.is-mine {
+  align-self: flex-end;
+  background: var(--gov-brand-soft);
+}
+.chat-message p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.chat-send {
+  margin-top: 12px;
+}
+.stock-verification {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sla-panel .ant-tag {
+  max-width: 100%;
+  white-space: normal;
 }

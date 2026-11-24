@@ -43,6 +43,17 @@ public class GovRoleMapping {
         defaults.add(new Mapping(role, role, null));
       defaults.add(new Mapping("USER", "CITIZEN", null));
       defaults.add(new Mapping("MEMBER", "CITIZEN", null));
+      for (String code :
+          List.of(
+              "MAYOR",
+              "DEPUTY_MAYOR",
+              "MUNICIPAL_CLERK",
+              "DEPUTY_CLERK",
+              "FINANCE_DIRECTOR",
+              "SUPPLY_HEAD")) defaults.add(new Mapping(code, "APPROVER", null));
+      for (String code : List.of("CENTRAL_OFFICER", "SARABAN_OFFICER"))
+        defaults.add(new Mapping(code, "OFFICER", null));
+      defaults.add(new Mapping("IT_ADMIN", "ADMIN", null));
       return new Settings("", "", defaults);
     }
     var row = rows.getFirst();
@@ -167,6 +178,11 @@ public class GovRoleMapping {
     } catch (RuntimeException e) {
       return null;
     }
+  }
+
+  /** Codes that name a TownTrack role rather than an official position. */
+  static boolean generic(String code) {
+    return code == null || ROLES.contains(code) || Set.of("USER", "MEMBER").contains(code);
   }
 
   Codes codes(JsonNode user, Settings config) {

@@ -120,8 +120,8 @@ export default function LeafletLocationMap({
         item.status === "CLOSED"
           ? govTokens["brand-primary"]
           : item.status === "NEW"
-            ? "#b76a0a"
-            : "#2874a6";
+            ? govTokens["status-warning"]
+            : govTokens["semantic-verified"];
       icon.setAttribute("aria-label", name || t("ปัญหาที่แจ้ง"));
       const dot = item.categoryName
         ? L.marker([Number(item.latitude), Number(item.longitude)], {
@@ -137,7 +137,8 @@ export default function LeafletLocationMap({
             radius: 8,
             color: "#fff",
             weight: 2,
-            fillColor: item.status === "NEW" ? "#dd932c" : "#397cb8",
+            fillColor:
+              item.status === "NEW" ? govTokens["status-warning"] : govTokens["semantic-verified"],
             fillOpacity: 1,
           });
       const label = document.createElement("span");

@@ -264,13 +264,9 @@ const messages: Record<string, string> = {
     "Location access was denied. Place a pin or enter an address.",
   "ไม่สามารถระบุตำแหน่งได้ กรุณาลองใหม่หรือปักหมุดเอง":
     "Could not find your location. Retry or place a pin.",
-  "รูปภาพ PNG/JPEG, PDF และวิดีโอ MP4/MOV/WebM รวมทั้งหมดต่อคำร้องไม่เกิน 1 GB (1,000 MB)":
-    "PNG/JPEG images, PDF, and MP4/MOV/WebM videos; up to 1 GB (1,000 MB) in total per report",
   "รองรับรูปภาพ PNG/JPEG, PDF และวิดีโอ MP4/MOV/WebM":
     "PNG/JPEG images, PDF, and MP4/MOV/WebM videos are supported",
   ไฟล์ต้องไม่ว่าง: "The file must not be empty",
-  "ไฟล์แนบรวมทั้งหมดต่อคำร้องต้องไม่เกิน 1 GB (1,000 MB)":
-    "Attachments must total no more than 1 GB (1,000 MB) per report",
   "พบ {{count}} เคสใกล้เคียง": "Found {{count}} nearby reports",
   "พบ {{count}} ประเภทปัญหา": "Found {{count}} problem categories",
   "ทั้งหมด {{count}} ประเภทปัญหา": "Total problem categories: {{count}}",

@@ -32,6 +32,92 @@ public class Stock {
         u.get("municipality_id"));
   }
 
+  /** Locks items in one global order so concurrent jobs cannot deadlock. */
+  public void lock(Map<String, Object> u, Collection<UUID> items) {
+    for (UUID id : new TreeSet<>(items)) item(id, u, true);
+  }
+
+  /** Quantity held for approved requests that have not started. */
+  public BigDecimal reserved(Object itemId) {
+    return (BigDecimal)
+        db.one(
+                "SELECT COALESCE(SUM(quantity),0) reserved FROM stock_reservation WHERE"
+                    + " stock_item_id=? AND status='ACTIVE'",
+                itemId)
+            .get("reserved");
+  }
+
+  public BigDecimal available(Map<String, Object> item) {
+    return ((BigDecimal) item.get("on_hand")).subtract(reserved(item.get("id")));
+  }
+
+  /** Refuses to take more than what other approved jobs have left unreserved. */
+  public void requireAvailable(Map<String, Object> u, Object itemId, BigDecimal quantity) {
+    var item = item(itemId, u, true);
+    var available = available(item);
+    if (available.compareTo(quantity) < 0)
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT,
+          "คงคลังไม่พอ: "
+              + item.get("name")
+              + " เหลือ "
+              + available.max(BigDecimal.ZERO).stripTrailingZeros().toPlainString()
+              + " "
+              + item.get("unit"));
+  }
+
+  public void reserve(Map<String, Object> u, Object resourceId, Map<UUID, BigDecimal> lines) {
+    lock(u, lines.keySet());
+    for (var line : lines.entrySet()) {
+      requireAvailable(u, line.getKey(), line.getValue());
+      db.run(
+          "INSERT INTO stock_reservation(id,resource_id,stock_item_id,municipality_id,quantity)"
+              + " VALUES(?,?,?,?,?)",
+          UUID.randomUUID(),
+          resourceId,
+          line.getKey(),
+          u.get("municipality_id"),
+          line.getValue());
+    }
+  }
+
+  public void release(Object complaintId) {
+    db.run(
+        "UPDATE stock_reservation SET status='RELEASED',resolved_at=now() WHERE status='ACTIVE' AND"
+            + " resource_id IN (SELECT id FROM resource_request WHERE complaint_id=?)",
+        complaintId);
+  }
+
+  /** Puts back everything a job still holds, keeping each request's share separate. */
+  public void returnAll(
+      Map<String, Object> u, Object complaintId, Object workOrderId, String note) {
+    lock(u, outstanding(workOrderId).keySet());
+    for (var row :
+        db.list(
+            "SELECT stock_item_id,resource_id,-SUM(delta) net FROM stock_movement WHERE"
+                + " work_order_id=? AND kind IN ('ISSUE','RETURN') GROUP BY"
+                + " stock_item_id,resource_id HAVING -SUM(delta)>0",
+            workOrderId)) {
+      move(
+          u,
+          row.get("stock_item_id"),
+          "RETURN",
+          (BigDecimal) row.get("net"),
+          note,
+          complaintId,
+          row.get("resource_id"),
+          workOrderId);
+      if (row.get("resource_id") != null)
+        db.run(
+            "UPDATE stock_reservation s SET status='ACTIVE',resolved_at=NULL WHERE s.resource_id=?"
+                + " AND s.stock_item_id=? AND s.status='FULFILLED' AND EXISTS(SELECT 1 FROM"
+                + " resource_request r WHERE r.id=s.resource_id AND r.status='APPROVED' AND NOT"
+                + " r.handed_off)",
+            row.get("resource_id"),
+            row.get("stock_item_id"));
+    }
+  }
+
   /** Records one movement; a negative delta that exceeds the balance is refused. */
   public Map<String, Object> move(
       Map<String, Object> u,

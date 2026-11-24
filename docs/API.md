@@ -39,20 +39,25 @@ POST /complaints/{id}/actions ตัวอย่าง:
 - APPROVE ขั้นสุดท้ายไม่ผ่านถ้าคลังมีไม่พอ (409)
 
 ## คลังวัสดุ
-GET /stock: รายการวัสดุ on_hand, in_use และ keeper (ผู้ใช้นี้แก้ไขคลังได้หรือไม่) สำหรับบุคลากรทุกบทบาท
-POST /stock {name,unit,quantity?,note?}, POST /stock/{id}/movements {kind: RECEIVE|ADJUST, quantity, note}, PATCH /stock/{id} {active}: ผู้ดูแลระบบหรือผู้ดูแลคลังเท่านั้น ยอดติดลบไม่ได้และประวัติแก้ย้อนหลังไม่ได้
+GET /stock: รายการวัสดุ on_hand, reserved, available, in_use (เฉพาะงานที่ยังไม่ปิด), item_type และ keeper (ผู้ใช้นี้แก้ไขคลังได้หรือไม่) สำหรับบุคลากรทุกบทบาท
+POST /stock {name,unit,itemType?: CONSUMABLE|EQUIPMENT,quantity?,note?}, POST /stock/{id}/movements {kind: RECEIVE|ADJUST, quantity, note}, PATCH /stock/{id} {active}: ผู้ดูแลระบบหรือผู้ดูแลคลังเท่านั้น ยอดติดลบไม่ได้และประวัติแก้ย้อนหลังไม่ได้
 GET /stock/{id}/movements, GET /stock/complaints/{complaintId}: ประวัติเข้า-ออก และสรุปเบิก/คืน/ใช้ไปของคำร้อง
+GET /stock/pending-verifications, GET /stock/complaints/{complaintId}/verifications, POST /stock/movements/{movementId}/verify {note?}: หัวหน้าและผู้ดูแลคลังรับรองใบเบิกหน้างานย้อนหลัง
+GET /stock/export.csv?from=YYYY-MM-DD&to=YYYY-MM-DD: รายงานคลัง (UTF-8 BOM)
 GET /stock/keepers, PUT /stock/keepers/{userId} {keeper}: ผู้ดูแลระบบกำหนดผู้ดูแลคลัง
 
 ## ระยะเวลาดำเนินการ (SLA)
 GET /complaints/{id}/sla: due_at, progress_due_at (15 วันนับจากความเคลื่อนไหวล่าสุด), extensions, canRequest, canDecide นับเป็นวันตามปฏิทิน
-POST /complaints/{id}/sla-extensions {days 1–90, reason}: หัวหน้าที่รับผิดชอบคำร้อง มีคำขอรอพิจารณาได้ครั้งละ 1 รายการ
-POST /complaints/{id}/sla-extensions/{extensionId}/decision {approve, reason}: เจ้าหน้าที่ส่วนกลางหรือผู้ดูแล อนุมัติแล้วเลื่อน due_at และแจ้งผู้แจ้ง
+POST /complaints/{id}/sla-extensions {days 1–15, reason}: หัวหน้าที่รับผิดชอบคำร้อง มีคำขอรอพิจารณาได้ครั้งละ 1 รายการ
+POST /complaints/{id}/sla-extensions/{extensionId}/decision {approve, reason}: ผู้อนุมัติหรือผู้ดูแลระบบ อนุมัติแล้วเลื่อน due_at และแจ้งผู้แจ้ง
 
 GET /people?role=FIELD ตอบ waiting, accepted, working, active และ current_title เพื่อดูภาระงานก่อนจ่ายงาน; role=APPROVER ตอบ usual_step สำหรับผู้อนุมัติที่เจ้าหน้าที่คนนั้นเลือกบ่อย
 
+## แชตสอบถามข้อมูล
+GET/POST /complaints/{id}/messages {body 1–2000 ตัวอักษร}: เฉพาะผู้แจ้งและบุคลากรที่รับผิดชอบ ผู้ติดตามไม่เห็น คำร้องที่ปิดแล้วอ่านได้อย่างเดียว
+
 ## ไฟล์
-POST /complaints/{id}/files เป็น multipart/form-data ชื่อ field=file รองรับ PNG/JPEG/PDF/MP4/MOV/WebM ไฟล์ละไม่เกิน 100 MB ไฟล์ของผู้แจ้งรวมไม่เกิน 300 MB และไฟล์ทั้งคำร้องรวมเจ้าหน้าที่ไม่เกิน 1 GB ตามขั้นตอนและผู้ใช้
+POST /complaints/{id}/files เป็น multipart/form-data ชื่อ field=file รองรับ PNG/JPEG/PDF/MP4/MOV/WebM ไฟล์ละไม่เกิน 100 MB ไฟล์ของผู้แจ้งรวมไม่เกิน 300 MB และไฟล์ของเจ้าหน้าที่รวมไม่เกิน 300 MB (นับแยกกัน รวมสูงสุด 600 MB ต่อคำร้อง) ตามขั้นตอนและผู้ใช้
 GET /files/{id} ตรวจสิทธิ์ระดับคำร้องและส่งเป็น attachment ไม่เปิดไฟล์เป็น public URL
 
 ## เคสใกล้เคียง

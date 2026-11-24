@@ -6,6 +6,8 @@ export const ATTACHMENT_ACCEPT =
   "image/jpeg,image/png,application/pdf,video/mp4,video/quicktime,video/webm,.png,.jpg,.jpeg,.pdf,.mp4,.mov,.webm";
 export const ATTACHMENT_HELP =
   "รูปภาพ PNG/JPEG, PDF และวิดีโอ MP4/MOV/WebM ไฟล์ละไม่เกิน 100 MB รวมทั้งหมดต่อคำร้องไม่เกิน 300 MB";
+export const STAFF_ATTACHMENT_HELP =
+  "รูปภาพ PNG/JPEG, PDF และวิดีโอ MP4/MOV/WebM ไฟล์ละไม่เกิน 100 MB ไฟล์ของเจ้าหน้าที่รวมไม่เกิน 300 MB ต่อคำร้อง (ไม่นับไฟล์ของผู้แจ้ง)";
 const mb = (bytes: number) => (bytes / 1_000_000).toFixed(1);
 export function attachmentError(file: File, used: number): string | undefined {
   if (

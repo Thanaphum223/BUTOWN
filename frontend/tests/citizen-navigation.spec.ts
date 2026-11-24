@@ -73,7 +73,7 @@ for (const width of [320, 440, 1280]) {
     await expect(page.getByText(`สวัสดี, ${name}`, { exact: true })).toBeVisible();
     await expect(
       page.getByRole("button", { name: /ขยายขนาดตัวอักษร|ย่อขนาดตัวอักษร/ }),
-    ).toHaveCount(0);
+    ).toHaveCount(2);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
     ).toBeTruthy();

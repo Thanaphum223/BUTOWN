@@ -114,5 +114,7 @@ const messages: Record<string, string> = {
     "The Gov Center role data has no municipality ID. Ask an administrator to check the permissions in Gov Center.",
   "กรุณาให้ผู้ดูแลระบุรหัสเทศบาล Gov Center ในหน้าจับคู่บทบาทก่อนให้บุคลากรเข้าสู่ระบบ":
     "Ask an administrator to enter the Gov Center municipality ID in role mappings before staff sign in.",
+  "ไฟล์แนบมีขนาดเกินกำหนด (ไฟล์ละไม่เกิน 100 MB และรวมต่อคำร้องฝั่งประชาชนไม่เกิน 300 MB)":
+    "Attachments are too large (up to 100 MB per file and 300 MB in total per citizen report)",
 };
 export default messages;

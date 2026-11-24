@@ -3,9 +3,11 @@ import { App, Alert, Button, Card, Descriptions, Input, List, Modal, Tag, Typogr
 import { ClockCircleOutlined } from "./icons";
 import { api, date, post } from "./api";
 import { useI18n } from "./i18n/useI18n";
+import { composeReason } from "./format";
+import { withTitle } from "./govRoles";
 
 type D = Record<string, any>;
-const dayOptions = [3, 7, 15, 30];
+const dayOptions = [3, 5, 7, 15];
 const extensionReasons = [
   "รอวัสดุหรืองบประมาณ",
   "สภาพอากาศไม่เอื้ออำนวย",
@@ -55,9 +57,6 @@ function Choices({
   );
 }
 
-const joinReason = (picked: string[], note: string) =>
-  [picked.join(" / "), note.trim()].filter(Boolean).join(" — ");
-
 export default function SlaPanel({
   id,
   version,
@@ -89,13 +88,15 @@ export default function SlaPanel({
   const overdue = sla.open && new Date(sla.due_at).getTime() < now;
   const progressLate = sla.open && new Date(sla.progress_due_at).getTime() < now;
   const pending = (sla.extensions || []).find((x: D) => x.status === "PENDING");
+  const max = Number(sla.maxExtensions ?? 2);
+  const remaining = Number(sla.remainingExtensions ?? max);
   const reset = () => {
     setPicked([]);
     setNote("");
     setDays(7);
   };
   async function send() {
-    const reason = joinReason(picked, note);
+    const reason = composeReason(picked, note);
     if (!reason) return message.error(t("กรุณาเลือกหรือระบุเหตุผล"));
     setBusy(true);
     try {
@@ -128,7 +129,8 @@ export default function SlaPanel({
       }
       extra={
         sla.canRequest &&
-        !pending && <Button onClick={() => setRequesting(true)}>{t("ขอขยายเวลา")}</Button>
+        !pending &&
+        remaining > 0 && <Button onClick={() => setRequesting(true)}>{t("ขอขยายเวลา")}</Button>
       }
     >
       <Descriptions
@@ -171,6 +173,11 @@ export default function SlaPanel({
             : []),
         ]}
       />
+      {(sla.canRequest || sla.canDecide) && (
+        <Typography.Text type="secondary">
+          {t("ขอขยายเวลาไปแล้ว {{used}}/{{max}} ครั้ง", { used: max - remaining, max })}
+        </Typography.Text>
+      )}
       {(sla.extensions || []).length > 0 && (
         <List
           size="small"
@@ -179,7 +186,7 @@ export default function SlaPanel({
           renderItem={(x: D) => (
             <List.Item
               actions={
-                x.status === "PENDING" && sla.canDecide
+                x.status === "PENDING" && sla.canDecide && sla.open
                   ? [
                       <Button
                         key="approve"
@@ -210,13 +217,13 @@ export default function SlaPanel({
                 })}
                 <div>
                   <Typography.Text type="secondary">
-                    {x.requested_by_name}: {x.reason}
+                    {withTitle(x.requested_by_name, x.requested_by_gov_role, t)}: {x.reason}
                   </Typography.Text>
                 </div>
                 {x.decision_reason && (
                   <div>
                     <Typography.Text type="secondary">
-                      {x.decided_by_name}: {x.decision_reason}
+                      {withTitle(x.decided_by_name, x.decided_by_gov_role, t)}: {x.decision_reason}
                     </Typography.Text>
                   </div>
                 )}
@@ -262,7 +269,7 @@ export default function SlaPanel({
               type="info"
               showIcon
               style={{ marginBottom: 16 }}
-              message={t("เจ้าหน้าที่จะพิจารณา เมื่ออนุมัติระบบจะแจ้งกำหนดใหม่ให้ผู้แจ้งทราบ")}
+              message={t("ผู้อนุมัติจะพิจารณา เมื่ออนุมัติระบบจะแจ้งกำหนดใหม่ให้ผู้แจ้งทราบ")}
             />
           </>
         )}

@@ -227,10 +227,13 @@ public class ComplaintController {
                       + " wm.user_id=?)) AND NOT w.handed_off AND w.status NOT IN"
                       + " ('DECLINED','CANCELLED'))";
               case "APPROVER" ->
-                  "EXISTS(SELECT 1 FROM resource_request r WHERE r.complaint_id=c.id AND"
+                  "(EXISTS(SELECT 1 FROM resource_request r WHERE r.complaint_id=c.id AND"
                       + (Access.approvalOverview(u)
                           ? " NOT r.handed_off AND r.approver_id IS NOT NULL)"
-                          : " NOT r.handed_off AND r.approver_id=?)");
+                          : " NOT r.handed_off AND r.approver_id=?)")
+                      + " OR EXISTS(SELECT 1 FROM sla_extension x WHERE x.complaint_id=c.id"
+                      + (activeOnly ? " AND x.status='PENDING'" : "")
+                      + "))";
               default -> "false";
             };
     var args = new ArrayList<Object>();
@@ -303,7 +306,11 @@ public class ComplaintController {
             "SELECT c.id,c.title,c.address,c.status,c.created_at,c.due_at,c.version,k.name"
                 + " category_name,(SELECT count(*) FROM complaint_vote v WHERE v.complaint_id=c.id)"
                 + " votes,EXISTS(SELECT 1 FROM resource_request r WHERE r.complaint_id=c.id AND NOT"
-                + " r.handed_off AND r.approver_id=?) can_open"
+                + " r.handed_off AND r.approver_id=?)"
+                + ("APPROVER".equals(u.get("role"))
+                    ? " OR EXISTS(SELECT 1 FROM sla_extension x WHERE x.complaint_id=c.id)"
+                    : "")
+                + " can_open"
                 + base
                 + " ORDER BY "
                 + order
@@ -386,7 +393,7 @@ public class ComplaintController {
     result.put(
         "resources",
         db.list(
-            "SELECT r.requested_items::text requested_items,r.*,u.display_name approver_name,requester.display_name"
+            "SELECT r.requested_items::text requested_items,r.*,u.display_name approver_name,u.gov_role approver_gov_role,requester.display_name"
                 + " requester_name,COALESCE((SELECT json_agg(v ORDER BY v.revision) FROM"
                 + " resource_revision v WHERE v.resource_id=r.id),'[]'::json)::text revisions FROM"
                 + " resource_request r LEFT JOIN app_user u ON u.id=r.approver_id LEFT JOIN"
@@ -419,7 +426,7 @@ public class ComplaintController {
     result.put(
         "approvals",
         db.list(
-            "SELECT aa.step,aa.decision,aa.reason,aa.decided_at,u.display_name approver_name FROM"
+            "SELECT aa.step,aa.decision,aa.reason,aa.decided_at,u.display_name approver_name,u.gov_role approver_gov_role FROM"
                 + " approval_assignment aa JOIN resource_request r ON r.id=aa.resource_id JOIN"
                 + " app_user u ON u.id=aa.approver_id WHERE r.complaint_id=? ORDER BY aa.step",
             id));
@@ -433,7 +440,13 @@ public class ComplaintController {
                 .isEmpty();
     boolean approvalRecipient =
         !"APPROVER".equals(u.get("role"))
-            || u.get("id").equals(workflow.resource(id).get("approver_id"));
+            || db
+                .list(
+                    "SELECT approver_id FROM resource_request WHERE complaint_id=? ORDER BY"
+                        + " created_at DESC LIMIT 1",
+                    id)
+                .stream()
+                .anyMatch(r -> u.get("id").equals(r.get("approver_id")));
     result.put(
         "actions",
         !historyOnly && representative && approvalRecipient ? policy.actions(c, u) : List.of());

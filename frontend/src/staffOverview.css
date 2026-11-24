@@ -8,7 +8,7 @@
   align-items: flex-start;
 }
 .staff-overview .page-heading h2 {
-  font-size: 24px;
+  font-size: calc(24px * var(--tt-font-scale, 1));
   margin: 0 0 8px !important;
 }
 .overview-summary-cards {
@@ -21,7 +21,7 @@
 }
 .overview-summary-cards .ant-statistic-content {
   color: var(--gov-brand-primary);
-  font-size: 32px;
+  font-size: calc(32px * var(--tt-font-scale, 1));
 }
 .overview-summary-cards .ant-btn {
   padding-inline: 0;
@@ -76,7 +76,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
 }
 .overview-case > .anticon {
   position: absolute;
@@ -86,7 +86,7 @@
 }
 .overview-case-address {
   color: var(--gov-text-secondary);
-  font-size: 12px;
+  font-size: calc(12px * var(--tt-font-scale, 1));
 }
 @media (max-width: 767px) {
   .staff-overview > .page-heading {
@@ -102,6 +102,13 @@
     padding: 12px;
   }
   .overview-summary-cards .ant-statistic-content {
-    font-size: 28px;
+    font-size: calc(28px * var(--tt-font-scale, 1));
   }
+}
+.staff-overview .ant-card .ant-btn-link {
+  max-width: 100%;
+  height: auto;
+  min-height: 44px;
+  padding-inline: 0;
+  white-space: normal;
 }

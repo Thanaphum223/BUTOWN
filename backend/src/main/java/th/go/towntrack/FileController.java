@@ -20,7 +20,8 @@ public class FileController {
   static final long MAX_FILE_BYTES = 100_000_000L;
   // Citizens' own evidence per report; staff evidence counts toward the overall cap only.
   static final long MAX_REPORT_BYTES = 300_000_000L;
-  static final long MAX_TOTAL_BYTES = 1_000_000_000L;
+  // Staff evidence has its own allowance and never counts against the reporter's files.
+  static final long MAX_STAFF_BYTES = 300_000_000L;
   final Db db;
   final Access access;
   final Path root;
@@ -131,13 +132,14 @@ public class FileController {
     // Serialize uploads to the same complaint so concurrent files cannot exceed the quota.
     db.one("SELECT id FROM complaint WHERE id=? FOR UPDATE", id);
     boolean citizen = r.equals("CITIZEN");
-    long limit = citizen ? MAX_REPORT_BYTES : MAX_TOTAL_BYTES;
+    long limit = citizen ? MAX_REPORT_BYTES : MAX_STAFF_BYTES;
     long used =
         ((Number)
                 db.one(
                         "SELECT COALESCE(SUM(size_bytes),0) used FROM attachment WHERE complaint_id=?"
-                            + (citizen ? " AND uploaded_by=?" : ""),
-                        citizen ? new Object[] {id, u.get("id")} : new Object[] {id})
+                            + (citizen ? " AND uploaded_by=?" : " AND uploaded_by<>?"),
+                        id,
+                        citizen ? u.get("id") : c.get("reporter_id"))
                     .get("used"))
             .longValue();
     long size = f.getSize();
@@ -148,7 +150,7 @@ public class FileController {
     String quotaMessage =
         citizen
             ? "ไฟล์แนบรวมทั้งหมดต่อคำร้องต้องไม่เกิน 300 MB"
-            : "ไฟล์แนบรวมทั้งหมดต่อคำร้องต้องไม่เกิน 1 GB (1,000 MB)";
+            : "ไฟล์แนบของเจ้าหน้าที่ต่อคำร้องต้องไม่เกิน 300 MB";
     if (used > limit - size)
       throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, quotaMessage);
     byte[] data;

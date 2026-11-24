@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, App, Button, Card, Form, Input, Select, Space, Typography } from "antd";
 import { DeleteOutlined, PlusOutlined } from "./icons";
 import { api, post, roleNames } from "./api";
+import { govRoleNames, govRolesByRole } from "./govRoles";
 
 type Mapping = { govRole: string; role: string; departmentId: string | null };
 type Settings = { municipalityId: string; serviceId: string; mappings: Mapping[] };
@@ -69,6 +70,22 @@ export default function GovRoleSettings({
         description={t(
           "ใช้บทบาทของบริการ TownTrack ที่ Gov ยืนยันแล้ว บัญชีที่มีอยู่จะคงบทบาทและกองที่ผู้ดูแลตั้งไว้ในระบบนี้",
         )}
+      />
+      <Alert
+        type="info"
+        style={{ marginBottom: 20 }}
+        message={t("ตัวอย่างรหัสตำแหน่งราชการของเทศบาล")}
+        description={
+          <>
+            {Object.entries(govRolesByRole).map(([role, codes]) => (
+              <div key={role}>
+                <strong>{t(roleNames[role])}</strong>:{" "}
+                {codes.map((code) => `${code} = ${t(govRoleNames[code])}`).join(", ")}
+              </div>
+            ))}
+            {t("ตำแหน่งระดับกองต้องเลือกกองในการจับคู่แต่ละรายการ")}
+          </>
+        }
       />
       {error && <Alert type="error" showIcon message={t(error)} style={{ marginBottom: 16 }} />}
       {!saved ? (

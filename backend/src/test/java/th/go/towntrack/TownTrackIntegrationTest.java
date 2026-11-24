@@ -850,8 +850,9 @@ class TownTrackIntegrationTest {
   }
 
   @Test
-  void decimalGigabyteLimitMatchesSrs() {
-    assertEquals(1_000_000_000L, FileController.MAX_TOTAL_BYTES);
+  void reporterAndStaffEachHaveThreeHundredMegabytes() {
+    assertEquals(300_000_000L, FileController.MAX_REPORT_BYTES);
+    assertEquals(300_000_000L, FileController.MAX_STAFF_BYTES);
   }
 
   @Test
@@ -2562,21 +2563,41 @@ class TownTrackIntegrationTest {
   }
 
   @Test
-  void uploadQuotaIncludesEarlierRevisionsAndOtherUploaders() throws Exception {
+  void staffQuotaCoversAllStaffButNotTheReportersFiles() throws Exception {
     UUID id = create();
     requestResource(id);
     long used =
         ((Number)
-                db.one("SELECT SUM(size_bytes) used FROM attachment WHERE complaint_id=?", id)
+                db.one(
+                        "SELECT SUM(a.size_bytes) used FROM attachment a JOIN complaint c ON"
+                            + " c.id=a.complaint_id WHERE c.id=? AND a.uploaded_by<>c.reporter_id",
+                        id)
                     .get("used"))
             .longValue();
+    db.run(
+        "INSERT INTO attachment(id,complaint_id,uploaded_by,original_name,storage_key,content_type,"
+            + "size_bytes,sha256) SELECT ?,id,reporter_id,'video.mp4',?,'video/mp4',?,repeat('0',64) FROM complaint WHERE"
+            + " id=?",
+        UUID.randomUUID(),
+        UUID.randomUUID() + ".mp4",
+        FileController.MAX_REPORT_BYTES,
+        id);
+    byte[] pdf = "%PDF-1.4 test".getBytes();
+    mvc.perform(
+            as(
+                multipart("/api/complaints/" + id + "/files")
+                    .file(new MockMultipartFile("file", "fits.pdf", "application/pdf", pdf))
+                    .with(csrf()),
+                "ADMIN"))
+        .andExpect(status().isOk());
+    used += pdf.length;
     var linked =
         db.one(
             "SELECT id FROM attachment WHERE complaint_id=? AND resource_id IS NOT NULL LIMIT 1",
             id);
     db.run(
         "UPDATE attachment SET size_bytes=size_bytes+? WHERE id=?",
-        FileController.MAX_TOTAL_BYTES - used,
+        FileController.MAX_STAFF_BYTES - used,
         linked.get("id"));
     mvc.perform(
             as(

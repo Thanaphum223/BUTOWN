@@ -134,8 +134,8 @@ export default function MapboxLocationMap({
             "CLOSED",
             govTokens["brand-primary"],
             "NEW",
-            "#b76a0a",
-            "#2874a6",
+            govTokens["status-warning"],
+            govTokens["semantic-verified"],
           ],
         },
       });

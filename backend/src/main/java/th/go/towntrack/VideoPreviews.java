@@ -8,13 +8,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
- * iPhones record HEVC, which many Android browsers cannot decode. After upload, HEVC clips get an
- * H.264 MP4 rendition stored as the attachment's thumbnail_key, which the in-page player uses;
+ * iPhones record HEVC and Android records WebM, which the other cannot always play. These clips get
+ * an H.264 MP4 rendition stored as the attachment's thumbnail_key, which the in-page player uses;
  * downloads keep the original. Disabled automatically when ffmpeg is not installed.
  */
 @Service
 public class VideoPreviews {
   static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(VideoPreviews.class);
+  // Codecs some phones cannot play: HEVC on Android, WebM codecs and AV1 on iOS Safari.
+  static final Set<String> CONVERTED = Set.of("hevc", "vp8", "vp9", "av1");
   final Db db;
   final String ffmpeg, ffprobe;
   final boolean available;
@@ -36,7 +38,7 @@ public class VideoPreviews {
     this.ffmpeg = ffmpeg;
     this.ffprobe = ffprobe;
     available = enabled && runs(ffmpeg) && runs(ffprobe);
-    log.info("HEVC video previews {}", available ? "enabled" : "disabled (ffmpeg not found)");
+    log.info("Video previews {}", available ? "enabled" : "disabled (ffmpeg not found)");
   }
 
   @jakarta.annotation.PreDestroy
@@ -56,7 +58,7 @@ public class VideoPreviews {
   void convert(UUID fileId, Path source, ObjectStorage cloud) {
     Path out = source.resolveSibling(fileId + "-preview.mp4");
     try {
-      if (!"hevc".equals(codec(source))) return;
+      if (!CONVERTED.contains(codec(source))) return;
       // Only local files are read; -protocol_whitelist stops a crafted file reaching the network.
       exec(
           900,

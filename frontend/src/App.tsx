@@ -1,6 +1,8 @@
 import { useLiveQuery } from "./useLiveQuery";
 import { AuthUnavailableError, sessionExpiredEvent, sessionExpiredMessage } from "./api";
 import LanguageToggle from "./LanguageToggle";
+import FontSizeControl from "./FontSizeControl";
+import { formatRoleTitle } from "./govRoles";
 import { useI18n } from "./i18n/useI18n";
 import { MenuOutlined } from "./icons";
 import GovAuthPage from "./GovAuthPage";
@@ -292,7 +294,7 @@ function TownTrackApp() {
               }}
             />
             <div className="sidebar-bottom">
-              <Tag color="green">{t(roleNames[user.role])}</Tag>
+              <Tag color="green">{formatRoleTitle(user.role, user.gov_role, t)}</Tag>
             </div>
           </Layout.Sider>
         )}
@@ -340,17 +342,22 @@ function TownTrackApp() {
                   title={
                     user.role === "CITIZEN"
                       ? undefined
-                      : t("งานบริการประชาชน · {{role}}", { role: t(roleNames[user.role]) })
+                      : t("งานบริการประชาชน · {{role}}", {
+                          role: formatRoleTitle(user.role, user.gov_role, t),
+                        })
                   }
                 >
                   {user.role === "CITIZEN"
                     ? t("บริการประชาชน · TownTrack")
-                    : t("งานบริการประชาชน · {{role}}", { role: t(roleNames[user.role]) })}
+                    : t("งานบริการประชาชน · {{role}}", {
+                        role: formatRoleTitle(user.role, user.gov_role, t),
+                      })}
                 </small>
               </div>
             </div>
             <Space className="account-controls" wrap>
               <LanguageToggle className="language-switcher" />
+              <FontSizeControl />
               {(user.account_role === "ADMIN" || user.role === "ADMIN") && (
                 <>
                   {!screens.lg && (

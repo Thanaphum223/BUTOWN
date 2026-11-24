@@ -251,8 +251,8 @@ test("stock register, workload, SLA extension and stock issue/return work on thi
   });
   await signOut(page);
 
-  // The case is now with the field team, so the officer reaches it from the notification.
-  await signIn(page, "officer");
+  // The case is now with the field team, so the approver reaches it from the notification.
+  await signIn(page, "approver");
   await menu(page, "การแจ้งเตือน");
   await page
     .locator(".ant-list-item")
@@ -261,7 +261,7 @@ test("stock register, workload, SLA extension and stock issue/return work on thi
     .getByRole("button", { name: "ดูคำร้อง", exact: true })
     .tap();
   await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
-  await fits(page, "officer case from notification");
+  await fits(page, "approver case from notification");
   await sla.getByRole("button", { name: "อนุมัติ", exact: true }).tap();
   const decide = page.getByRole("dialog", { name: "อนุมัติการขยายเวลา" });
   await waitForSettledDialog(decide);

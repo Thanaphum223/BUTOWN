@@ -580,6 +580,9 @@ public class Workflow {
                 i + 1,
                 target.get("id"));
           }
+          checkApprovalAuthority(
+              (UUID) r.get("id"),
+              db.one("SELECT gov_role FROM app_user WHERE id=?", Db.id(ids.getLast())));
           db.run(
               "UPDATE resource_request SET approver_id=? WHERE id=?",
               Db.id(ids.getFirst()),
@@ -615,7 +618,7 @@ public class Workflow {
                   r.get("id"));
               notifyUser(
                   next.getFirst().get("approver_id"), id, "มีคำขอทรัพยากรรออนุมัติลำดับถัดไป");
-            }
+            } else checkApprovalAuthority((UUID) r.get("id"), u);
           }
         }
         String state =
@@ -694,6 +697,7 @@ public class Workflow {
       case "UNDO_START" -> {
         var w = active(id);
         if (!u.get("id").equals(w.get("assignee_id"))) Access.deny();
+        stock.returnAll(u, id, w.get("id"), "คืนวัสดุอัตโนมัติจากการยกเลิกการเริ่มปฏิบัติงาน");
         db.run(
             "UPDATE work_order SET status='ACCEPTED',start_latitude=NULL,start_longitude=NULL,"
                 + "start_accuracy_m=NULL,start_distance_m=NULL WHERE id=?",
@@ -704,6 +708,9 @@ public class Workflow {
       default ->
           throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ไม่รองรับการดำเนินการนี้");
     }
+    // A new request replaces the approved one, so its hold must not outlive it.
+    if (List.of("TRANSFER_DEPARTMENT", "REQUEST_RESOURCE").contains(action)
+        || SlaController.CLOSED.contains(to)) stock.release(id);
     db.run("UPDATE complaint SET status=?,version=version+1,updated_at=now() WHERE id=?", to, id);
     var assignmentAudit = new LinkedHashMap<String, Object>();
     if (action.equals("REASSIGN_LEADER")) {
@@ -802,21 +809,10 @@ public class Workflow {
     return result;
   }
 
-  // Approval does not move stock (clause 205 records the actual issue), but it must not approve
-  // more than the register holds.
+  // Approval does not move stock (clause 205 records the actual issue), but it holds the approved
+  // quantity so no other job can take it.
   void checkStock(Map<String, Object> r, Map<String, Object> u) {
-    for (var line : approvedStock(r).entrySet()) {
-      var item = stock.item(line.getKey(), u, false);
-      if (((java.math.BigDecimal) item.get("on_hand")).compareTo(line.getValue()) < 0)
-        throw new ResponseStatusException(
-            HttpStatus.CONFLICT,
-            "คงคลังไม่พอสำหรับคำขอนี้: "
-                + item.get("name")
-                + " เหลือ "
-                + ((java.math.BigDecimal) item.get("on_hand")).stripTrailingZeros().toPlainString()
-                + " "
-                + item.get("unit"));
-    }
+    stock.reserve(u, r.get("id"), approvedStock(r));
   }
 
   // Starting work is when items leave the store: approved items, plus anything the team takes
@@ -829,13 +825,29 @@ public class Workflow {
             "SELECT * FROM resource_request WHERE complaint_id=? AND NOT handed_off ORDER BY created_at"
                 + " DESC LIMIT 1",
             id);
+    Map<UUID, java.math.BigDecimal> approved = Map.of();
     if (!latest.isEmpty()
         && "APPROVED".equals(latest.getFirst().get("status"))
-        && db.list(
-                "SELECT id FROM stock_movement WHERE resource_id=? AND kind='ISSUE' LIMIT 1",
-                latest.getFirst().get("id"))
-            .isEmpty())
-      for (var line : approvedStock(latest.getFirst()).entrySet())
+        && ((java.math.BigDecimal)
+                    db.one(
+                            "SELECT COALESCE(-SUM(delta),0) net FROM stock_movement WHERE"
+                                + " resource_id=? AND kind IN ('ISSUE','RETURN')",
+                            latest.getFirst().get("id"))
+                        .get("net"))
+                .signum()
+            == 0) approved = approvedStock(latest.getFirst());
+    var extra = Stock.lines(b.get("stockItems"));
+    var items = new HashSet<>(approved.keySet());
+    for (var line : extra) items.add((UUID) line.get("stockItemId"));
+    stock.lock(u, items);
+    if (!approved.isEmpty()) {
+      // Free this request's own hold first so the check below only protects other jobs.
+      db.run(
+          "UPDATE stock_reservation SET status='FULFILLED',resolved_at=now() WHERE resource_id=?"
+              + " AND status='ACTIVE'",
+          latest.getFirst().get("id"));
+      for (var line : approved.entrySet()) {
+        stock.requireAvailable(u, line.getKey(), line.getValue());
         stock.move(
             u,
             line.getKey(),
@@ -845,8 +857,11 @@ public class Workflow {
             id,
             latest.getFirst().get("id"),
             w.get("id"));
-    var extra = Stock.lines(b.get("stockItems"));
-    for (var line : extra)
+      }
+    }
+    for (var line : extra) {
+      stock.requireAvailable(
+          u, line.get("stockItemId"), (java.math.BigDecimal) line.get("quantity"));
       stock.move(
           u,
           line.get("stockItemId"),
@@ -856,6 +871,7 @@ public class Workflow {
           id,
           null,
           w.get("id"));
+    }
     if (!extra.isEmpty())
       notifyUser(
           c.get("leader_id"),
@@ -867,6 +883,7 @@ public class Workflow {
   void returnLeftovers(
       Map<String, Object> c, Map<String, Object> w, Map<String, Object> b, Map<String, Object> u) {
     var outstanding = stock.outstanding(w.get("id"));
+    stock.lock(u, outstanding.keySet());
     for (var line : Stock.lines(b.get("stockReturns"))) {
       var held = outstanding.get((UUID) line.get("stockItemId"));
       var quantity = (java.math.BigDecimal) line.get("quantity");
@@ -882,6 +899,39 @@ public class Workflow {
           null,
           w.get("id"));
     }
+    boolean equipmentMissing = false;
+    for (UUID item : stock.outstanding(w.get("id")).keySet())
+      equipmentMissing |= "EQUIPMENT".equals(stock.item(item, u, false).get("item_type"));
+    if (!equipmentMissing) return;
+    var recipients = new LinkedHashSet<Object>();
+    recipients.add(c.get("leader_id"));
+    for (var keeper :
+        db.list(
+            "SELECT id FROM app_user WHERE municipality_id=? AND stock_keeper=true AND enabled=true",
+            u.get("municipality_id"))) recipients.add(keeper.get("id"));
+    for (Object recipient : recipients)
+      notifyUser(
+          recipient,
+          (UUID) c.get("id"),
+          "ครุภัณฑ์ที่เบิกไปยังคืนคลังไม่ครบ กรุณาตรวจสอบกับผู้ลงพื้นที่");
+  }
+
+  // Procurement regulation 2560, clause 79: these positions may not give final approval above this.
+  static final java.math.BigDecimal LIMITED_APPROVAL = new java.math.BigDecimal("500000.00");
+  static final Set<String> LIMITED_APPROVERS = Set.of("FINANCE_DIRECTOR", "SUPPLY_HEAD");
+
+  void checkApprovalAuthority(UUID resourceId, Map<String, Object> finalApprover) {
+    Object govRole = finalApprover.get("gov_role");
+    if (govRole == null || !LIMITED_APPROVERS.contains(govRole)) return;
+    var latest =
+        db.list(
+            "SELECT amount FROM resource_revision WHERE resource_id=? ORDER BY revision DESC LIMIT 1",
+            resourceId);
+    if (!latest.isEmpty()
+        && ((java.math.BigDecimal) latest.getFirst().get("amount")).compareTo(LIMITED_APPROVAL) > 0)
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST,
+          "วงเงินเกิน 500,000 บาท เกินอำนาจอนุมัติของผู้อำนวยการกองคลัง/หัวหน้าเจ้าหน้าที่พัสดุ กรุณาเลือกปลัดเทศบาล รองนายกเทศมนตรี หรือนายกเทศมนตรีเป็นผู้อนุมัติลำดับสุดท้าย");
   }
 
   Map<String, Object> latestReport(UUID id) {

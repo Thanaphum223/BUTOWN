@@ -35,7 +35,9 @@ public class RoleQueues {
               new Group(
                   "work", "ปฏิบัติงาน / แก้ไขรายงาน", List.of("IN_PROGRESS", "FIELD_REVISION")));
       case "APPROVER" ->
-          List.of(new Group("decisions", "รอพิจารณาทรัพยากร", List.of("RESOURCE_APPROVAL")));
+          List.of(
+              new Group("decisions", "รอพิจารณาทรัพยากร", List.of("RESOURCE_APPROVAL")),
+              new Group("sla", "รอพิจารณาขยายเวลา SLA", List.of()));
       case "ADMIN" ->
           List.of(
               new Group(
@@ -68,6 +70,9 @@ public class RoleQueues {
 
   String predicate(String role, String queue) {
     var states = statuses(role, queue);
+    if ("APPROVER".equals(role) && "sla".equals(queue))
+      return "(c.status NOT IN ('CLOSED','REJECTED','TERMINATED') AND EXISTS(SELECT 1 FROM"
+          + " sla_extension x WHERE x.complaint_id=c.id AND x.status='PENDING'))";
     String statuses =
         "c.status IN ("
             + String.join(",", states.stream().map(state -> "'" + state + "'").toList())

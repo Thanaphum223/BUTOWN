@@ -18,7 +18,7 @@ public class Access {
     if (a == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
     var user =
         db.one(
-            "SELECT id,municipality_id,department_id,username,display_name,role FROM app_user WHERE"
+            "SELECT id,municipality_id,department_id,username,display_name,role,gov_role FROM app_user WHERE"
                 + " username=? AND enabled=true",
             a.getName());
     if ("ADMIN".equals(user.get("role"))) {
@@ -81,12 +81,14 @@ public class Access {
                   .isEmpty();
           case "APPROVER" ->
               !db.list(
-                      "SELECT id FROM resource_request WHERE complaint_id=? AND "
-                          + (approvalOverview(u)
-                              ? "NOT handed_off AND approver_id IS NOT NULL"
-                              : "NOT handed_off AND approver_id=?"),
-                      approvalOverview(u) ? new Object[] {id} : new Object[] {id, u.get("id")})
-                  .isEmpty();
+                          "SELECT id FROM resource_request WHERE complaint_id=? AND "
+                              + (approvalOverview(u)
+                                  ? "NOT handed_off AND approver_id IS NOT NULL"
+                                  : "NOT handed_off AND approver_id=?"),
+                          approvalOverview(u) ? new Object[] {id} : new Object[] {id, u.get("id")})
+                      .isEmpty()
+                  || !db.list("SELECT id FROM sla_extension WHERE complaint_id=? LIMIT 1", id)
+                      .isEmpty();
           default -> false;
         };
     if (!ok) deny();

@@ -57,7 +57,7 @@ public class AdminController {
         db.one("SELECT id,name FROM municipality WHERE id=?", u.get("municipality_id")),
         "users",
         db.list(
-            "SELECT id,username,display_name,role,department_id,enabled FROM app_user WHERE"
+            "SELECT id,username,display_name,role,gov_role,department_id,enabled FROM app_user WHERE"
                 + " municipality_id=? AND deleted_at IS NULL ORDER BY created_at",
             u.get("municipality_id")),
         "departments",
@@ -258,7 +258,7 @@ public class AdminController {
     var u = lockedAdmin(a);
     var target =
         db.one(
-            "SELECT id,username,role,department_id FROM app_user WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR UPDATE",
+            "SELECT id,username,role,gov_role,department_id FROM app_user WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR UPDATE",
             id,
             u.get("municipality_id"));
     String role = Workflow.text(b, "role", 20);
@@ -275,10 +275,21 @@ public class AdminController {
           "SELECT id FROM department WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR SHARE",
           department,
           u.get("municipality_id"));
+    // Older clients leave the position out, which keeps the current one.
+    Object govRole = target.get("gov_role");
+    if (b.containsKey("govRole")) {
+      Object requested = b.get("govRole");
+      if (requested == null) govRole = null;
+      else if (requested instanceof String code)
+        govRole = code.isBlank() ? null : GovRoleMapping.roleCode(code);
+      else throw new IllegalArgumentException();
+    }
+    if (role.equals("CITIZEN")) govRole = null;
     db.run(
-        "UPDATE app_user SET role=?,department_id=? WHERE id=? AND municipality_id=?",
+        "UPDATE app_user SET role=?,department_id=?,gov_role=? WHERE id=? AND municipality_id=?",
         role,
         department,
+        govRole,
         id,
         u.get("municipality_id"));
     sessions.revoke(target.get("username").toString());
@@ -297,7 +308,11 @@ public class AdminController {
             + " department="
             + target.get("department_id")
             + "->"
-            + department);
+            + department
+            + " govRole="
+            + target.get("gov_role")
+            + "->"
+            + govRole);
   }
 
   @PostMapping("/users/{id}/enabled")

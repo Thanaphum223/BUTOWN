@@ -282,7 +282,7 @@ class StockAndSlaIntegrationTest {
   }
 
   @Test
-  void leadersAskForMoreTimeAndOfficersDecide() throws Exception {
+  void leadersAskForMoreTimeAndApproversDecide() throws Exception {
     UUID id = complaint("TRIAGED");
     var before =
         ((java.sql.Timestamp) db.one("SELECT due_at FROM complaint WHERE id=?", id).get("due_at"))
@@ -319,7 +319,27 @@ class StockAndSlaIntegrationTest {
             "OFFICER",
             () -> post("/api/complaints/" + id + "/sla-extensions/" + extension + "/decision"),
             Map.of("approve", true, "reason", "Justified"))
+        .andExpect(status().isForbidden());
+    // The approver has no resource request here: the extension alone opens the case and queue.
+    mvc.perform(get("/api/complaints/" + id).with(user(names.get("APPROVER"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.actions").isEmpty());
+    mvc.perform(get("/api/complaints/" + id + "/sla").with(user(names.get("APPROVER"))))
+        .andExpect(jsonPath("$.canDecide").value(true))
+        .andExpect(jsonPath("$.remainingExtensions").value(1));
+    mvc.perform(get("/api/complaints?activeOnly=true&queue=sla").with(user(names.get("APPROVER"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].id").value(id.toString()))
+        .andExpect(jsonPath("$.items[0].can_open").value(true));
+    assertEquals(1, notified("APPROVER", "รอพิจารณา"));
+    assertEquals(1, notified("OFFICER", "รอพิจารณา"));
+    send(
+            "APPROVER",
+            () -> post("/api/complaints/" + id + "/sla-extensions/" + extension + "/decision"),
+            Map.of("approve", true, "reason", "Justified"))
         .andExpect(status().isOk());
+    mvc.perform(get("/api/complaints?activeOnly=true").with(user(names.get("APPROVER"))))
+        .andExpect(jsonPath("$.total").value(0));
     var after =
         ((java.sql.Timestamp) db.one("SELECT due_at FROM complaint WHERE id=?", id).get("due_at"))
             .toInstant();
@@ -334,6 +354,305 @@ class StockAndSlaIntegrationTest {
         .andExpect(jsonPath("$.canRequest").value(false))
         .andExpect(jsonPath("$.extensions[0].status").value("APPROVED"))
         .andExpect(jsonPath("$.progress_days").value(15));
+  }
+
+  int notified(String role, String text) {
+    return db.list(
+            "SELECT id FROM notification WHERE user_id=? AND message LIKE ?",
+            users.get(role),
+            "%" + text + "%")
+        .size();
+  }
+
+  String extension(UUID id, int days) throws Exception {
+    var result =
+        send(
+                "LEADER",
+                () -> post("/api/complaints/" + id + "/sla-extensions"),
+                Map.of("days", days, "reason", "Waiting"))
+            .andExpect(status().isOk())
+            .andReturn();
+    return json.readTree(result.getResponse().getContentAsString()).get("id").asText();
+  }
+
+  ResultActions decide(UUID id, String extension, boolean approve) throws Exception {
+    return send(
+        "APPROVER",
+        () -> post("/api/complaints/" + id + "/sla-extensions/" + extension + "/decision"),
+        Map.of("approve", approve, "reason", "Considered"));
+  }
+
+  @Test
+  void extensionsAreLimitedToFifteenDaysAndTwicePerCase() throws Exception {
+    UUID id = complaint("TRIAGED");
+    send(
+            "LEADER",
+            () -> post("/api/complaints/" + id + "/sla-extensions"),
+            Map.of("days", 16, "reason", "Too long"))
+        .andExpect(status().isBadRequest());
+    // A refused request does not use up one of the two.
+    decide(id, extension(id, 1), false).andExpect(status().isOk());
+    decide(id, extension(id, 15), true).andExpect(status().isOk());
+    decide(id, extension(id, 15), true).andExpect(status().isOk());
+    send(
+            "LEADER",
+            () -> post("/api/complaints/" + id + "/sla-extensions"),
+            Map.of("days", 3, "reason", "Third"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.message").value("ขอขยายเวลาครบจำนวนสูงสุด 2 ครั้งต่อคำร้องแล้ว"));
+    mvc.perform(get("/api/complaints/" + id + "/sla").with(user(names.get("LEADER"))))
+        .andExpect(jsonPath("$.remainingExtensions").value(0));
+
+    UUID closed = complaint("TRIAGED");
+    String pending = extension(closed, 5);
+    db.run("UPDATE complaint SET status='CLOSED' WHERE id=?", closed);
+    decide(closed, pending, true).andExpect(status().isConflict());
+  }
+
+  @Test
+  void quietCasesRemindStaffBeforeTheProgressDeadlineOnce() {
+    UUID id = complaint("TRIAGED");
+    db.run(
+        "INSERT INTO audit_event(id,complaint_id,municipality_id,actor_id,action,to_status,reason,"
+            + "created_at) VALUES(?,?,?,?,'CREATE','NEW','',now()-interval '13 days')",
+        UUID.randomUUID(),
+        id,
+        town,
+        users.get("CITIZEN"));
+    var reminder = new SlaReminder(db, workflow);
+    // The shared test database may hold other quiet cases; each pass handles up to 100.
+    for (int i = 0; i < 20 && notified("OFFICER", "ใกล้ครบ 15 วัน") == 0; i++)
+      reminder.remindProgress();
+    for (int i = 0; i < 20 && notified("LEADER", "ใกล้ครบ 15 วัน") == 0; i++)
+      reminder.remindProgress();
+    reminder.remindProgress();
+    assertEquals(1, notified("OFFICER", "ใกล้ครบ 15 วัน"));
+    assertEquals(1, notified("LEADER", "ใกล้ครบ 15 วัน"));
+  }
+
+  UUID approved(UUID item, int quantity) throws Exception {
+    UUID id = accepted();
+    UUID pending = resource(id, "PENDING", item, quantity);
+    db.run(
+        "INSERT INTO approval_assignment(resource_id,step,approver_id) VALUES(?,1,?)",
+        pending,
+        users.get("APPROVER"));
+    db.run("UPDATE complaint SET status='RESOURCE_APPROVAL' WHERE id=?", id);
+    return id;
+  }
+
+  String reservation(UUID complaint) {
+    return (String)
+        db.one(
+                "SELECT s.status FROM stock_reservation s JOIN resource_request r ON"
+                    + " r.id=s.resource_id WHERE r.complaint_id=?",
+                complaint)
+            .get("status");
+  }
+
+  ResultActions balance(String field, double value) throws Exception {
+    return mvc.perform(get("/api/stock").with(user(names.get("OFFICER"))))
+        .andExpect(jsonPath("$.items[0]." + field).value(value));
+  }
+
+  @Test
+  void approvalReservesStockAndUndoingTheStartRestoresIt() throws Exception {
+    UUID cement = item("Cement", 10);
+    UUID first = approved(cement, 8), second = approved(cement, 8);
+    action(first, "APPROVER", "APPROVE", Map.of("reason", "Fine")).andExpect(status().isOk());
+    assertEquals(10, onHand(cement));
+    assertEquals("ACTIVE", reservation(first));
+    balance("reserved", 8).andExpect(jsonPath("$.items[0].available").value(2.0));
+    action(second, "APPROVER", "APPROVE", Map.of("reason", "Fine"))
+        .andExpect(status().isConflict());
+    send(
+            "OFFICER",
+            () -> post("/api/stock/" + cement + "/movements"),
+            Map.of("kind", "ADJUST", "quantity", -3, "note", "Count"))
+        .andExpect(status().isConflict());
+    UUID other = accepted();
+    photo(other, "BEFORE");
+    action(
+            other,
+            "FIELD",
+            "START",
+            Map.of("stockItems", List.of(Map.of("stockItemId", cement, "quantity", 3))))
+        .andExpect(status().isConflict());
+
+    photo(first, "BEFORE");
+    for (int round = 0; round < 2; round++) {
+      action(
+              first,
+              "FIELD",
+              "START",
+              Map.of("stockItems", List.of(Map.of("stockItemId", cement, "quantity", 1))))
+          .andExpect(status().isOk());
+      assertEquals(1, onHand(cement));
+      assertEquals("FULFILLED", reservation(first));
+      balance("in_use", 9);
+      if (round == 1) break;
+      action(first, "FIELD", "UNDO_START", Map.of("reason", "Rain")).andExpect(status().isOk());
+      assertEquals(10, onHand(cement));
+      assertEquals("ACTIVE", reservation(first));
+      balance("in_use", 0);
+    }
+  }
+
+  @Test
+  void deniedCasesReleaseTheirReservation() throws Exception {
+    UUID cement = item("Cement", 10);
+    UUID id = approved(cement, 4);
+    action(id, "APPROVER", "APPROVE", Map.of("reason", "Fine")).andExpect(status().isOk());
+    db.run("UPDATE complaint SET status='RESOURCE_APPROVAL' WHERE id=?", id);
+    db.run(
+        "UPDATE approval_assignment SET decision=NULL,decided_at=NULL WHERE resource_id=?",
+        workflow.resource(id).get("id"));
+    action(id, "APPROVER", "DENY", Map.of("reason", "No")).andExpect(status().isOk());
+    assertEquals("RELEASED", reservation(id));
+    balance("reserved", 0);
+  }
+
+  UUID startedWith(UUID item, int quantity) throws Exception {
+    UUID id = accepted();
+    photo(id, "BEFORE");
+    action(
+            id,
+            "FIELD",
+            "START",
+            Map.of("stockItems", List.of(Map.of("stockItemId", item, "quantity", quantity))))
+        .andExpect(status().isOk());
+    return id;
+  }
+
+  @Test
+  void closedJobsNoLongerCountAsInUse() throws Exception {
+    UUID cement = item("Cement", 10);
+    UUID id = startedWith(cement, 4);
+    balance("in_use", 4);
+    photo(id, "AFTER");
+    action(id, "FIELD", "REPORT", Map.of("content", "Done")).andExpect(status().isOk());
+    action(id, "LEADER", "FORWARD_REPORT", Map.of()).andExpect(status().isOk());
+    action(id, "OFFICER", "VERIFY", Map.of()).andExpect(status().isOk());
+    action(id, "OFFICER", "CLOSE", Map.of("reason", "Done")).andExpect(status().isOk());
+    balance("in_use", 0);
+    assertEquals(6, onHand(cement));
+  }
+
+  @Test
+  void missingEquipmentAlertsTheLeaderAndKeepers() throws Exception {
+    var created =
+        send(
+                "OFFICER",
+                () -> post("/api/stock"),
+                Map.of("name", "Drill", "unit", "pcs", "quantity", 2, "itemType", "EQUIPMENT"))
+            .andExpect(status().isOk())
+            .andReturn();
+    UUID drill =
+        UUID.fromString(
+            json.readTree(created.getResponse().getContentAsString()).get("id").asText());
+    send(
+            "OFFICER",
+            () -> post("/api/stock"),
+            Map.of("name", "Bad", "unit", "pcs", "itemType", "OTHER"))
+        .andExpect(status().isBadRequest());
+    mvc.perform(get("/api/stock").with(user(names.get("FIELD"))))
+        .andExpect(jsonPath("$.items[0].item_type").value("EQUIPMENT"));
+    UUID id = startedWith(drill, 2);
+    photo(id, "AFTER");
+    action(
+            id,
+            "FIELD",
+            "REPORT",
+            Map.of(
+                "content",
+                "Done",
+                "stockReturns",
+                List.of(Map.of("stockItemId", drill, "quantity", 1))))
+        .andExpect(status().isOk());
+    assertEquals(1, notified("LEADER", "ครุภัณฑ์"));
+    assertEquals(1, notified("OFFICER", "ครุภัณฑ์"));
+  }
+
+  @Test
+  void leadersAndKeepersConfirmItemsTakenWithoutARequest() throws Exception {
+    UUID cement = item("Cement", 10);
+    UUID id = startedWith(cement, 2);
+    var issue =
+        db.one("SELECT id FROM stock_movement WHERE complaint_id=? AND kind='ISSUE'", id).get("id");
+    var opening =
+        db.one("SELECT id FROM stock_movement WHERE stock_item_id=? AND kind='RECEIVE'", cement)
+            .get("id");
+    mvc.perform(get("/api/stock/pending-verifications").with(user(names.get("FIELD"))))
+        .andExpect(status().isForbidden());
+    mvc.perform(get("/api/stock/pending-verifications").with(user(names.get("LEADER"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].id").value(issue.toString()))
+        .andExpect(jsonPath("$[0].verify_as").value("LEADER"));
+    send("FIELD", () -> post("/api/stock/movements/" + issue + "/verify"), Map.of())
+        .andExpect(status().isForbidden());
+    send("OFFICER", () -> post("/api/stock/movements/" + opening + "/verify"), Map.of())
+        .andExpect(status().isNotFound());
+    send("LEADER", () -> post("/api/stock/movements/" + issue + "/verify"), Map.of("note", "Seen"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.verifierRole").value("LEADER"));
+    send("LEADER", () -> post("/api/stock/movements/" + issue + "/verify"), Map.of())
+        .andExpect(status().isConflict());
+    send("OFFICER", () -> post("/api/stock/movements/" + issue + "/verify"), Map.of())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.verifierRole").value("KEEPER"));
+    mvc.perform(get("/api/stock/pending-verifications").with(user(names.get("OFFICER"))))
+        .andExpect(jsonPath("$").isEmpty());
+    mvc.perform(
+            get("/api/stock/complaints/" + id + "/verifications").with(user(names.get("FIELD"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].leader_note").value("Seen"))
+        .andExpect(jsonPath("$[0].keeper_verified_by").value("Test OFFICER"));
+    assertEquals(
+        2,
+        db.list(
+                "SELECT id FROM audit_event WHERE complaint_id=? AND action='VERIFY_STOCK_ISSUE'",
+                id)
+            .size());
+  }
+
+  @Test
+  void stockReportOpensInSpreadsheetsWithoutRunningFormulas() throws Exception {
+    UUID cement = item("=HYPERLINK(1)", 10);
+    startedWith(cement, 4);
+    mvc.perform(get("/api/stock/export.csv").with(user(names.get("CITIZEN"))))
+        .andExpect(status().isForbidden());
+    var bytes =
+        mvc.perform(get("/api/stock/export.csv").with(user(names.get("APPROVER"))))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Type", "text/csv; charset=UTF-8"))
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    String csv = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+    assertTrue(csv.startsWith("\uFEFFชื่อวัสดุ,ประเภท,หน่วย,สถานะ,"));
+    assertTrue(
+        csv.contains("\"'=HYPERLINK(1)\",วัสดุสิ้นเปลือง,\"bags\",ใช้งาน,6,0,6,4,10,4,0,4"), csv);
+    for (String formula : List.of("=1", "+1", "-1", "@A", "\t=1"))
+      assertEquals("\"'" + formula + "\"", StockController.cell(formula));
+    String earlier =
+        mvc.perform(get("/api/stock/export.csv?to=2000-01-01").with(user(names.get("OFFICER"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+    assertTrue(earlier.contains(",6,0,6,4,0,0,0,0"), earlier);
+    mvc.perform(
+            get("/api/stock/export.csv?from=2026-02-01&to=2026-01-01")
+                .with(user(names.get("OFFICER"))))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void everyDefaultCategoryHasOneOfTheFourServiceLevels() {
+    var counts = new TreeMap<Integer, Integer>();
+    for (String name : MunicipalCategories.NAMES)
+      counts.merge(MunicipalCategories.defaultSlaHours(name), 1, Integer::sum);
+    assertEquals(Map.of(24, 5, 72, 8, 168, 8, 360, 3), counts);
   }
 
   @Test
