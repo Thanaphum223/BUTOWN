@@ -108,8 +108,9 @@ public class StaffPlacementController {
                     + " department_id IS NOT NULL AND enabled=true AND deleted_at IS NULL",
                 town)
             : db.list(
-                "SELECT id FROM app_user WHERE municipality_id=? AND role='APPROVER' AND gov_role IN"
-                    + " ('MAYOR','MUNICIPAL_CLERK') AND enabled=true AND deleted_at IS NULL",
+                "SELECT id FROM app_user WHERE municipality_id=? AND role='APPROVER' AND gov_role IN ('"
+                    + String.join("','", HEAD_PLACERS)
+                    + "') AND enabled=true AND deleted_at IS NULL",
                 town);
     if (recipients.isEmpty())
       recipients =

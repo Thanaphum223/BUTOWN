@@ -2,7 +2,7 @@ import { useLiveQuery } from "./useLiveQuery";
 import { AuthUnavailableError, sessionExpiredEvent, sessionExpiredMessage } from "./api";
 import LanguageToggle from "./LanguageToggle";
 import FontSizeControl from "./FontSizeControl";
-import { formatRoleTitle } from "./govRoles";
+import { canPlaceStaff, formatRoleTitle } from "./govRoles";
 import { useI18n } from "./i18n/useI18n";
 import { MenuOutlined } from "./icons";
 import GovAuthPage from "./GovAuthPage";
@@ -13,7 +13,6 @@ import CitizenTracking from "./CitizenTracking";
 import PrivacyGate from "./PrivacyGate";
 import NewCase from "./NewCase";
 import PendingDepartment from "./PendingDepartment";
-import { canPlaceStaff } from "./govRoles";
 import { lazy } from "react";
 const EmergencyContacts = lazy(() => import("./EmergencyContacts"));
 const StaffPlacement = lazy(() => import("./StaffPlacement"));
@@ -33,7 +32,6 @@ import {
   Badge,
   Button,
   Card,
-  Col,
   Drawer,
   Grid,
   Form,
@@ -42,12 +40,9 @@ import {
   List,
   Menu,
   Modal,
-  Row,
   Select,
   Space,
   Spin,
-  Statistic,
-  Table,
   Tag,
   Typography,
 } from "antd";
@@ -68,26 +63,8 @@ import {
   InboxOutlined,
 } from "./icons";
 import { api, post, statusNames, actionNames, roleNames, date } from "./api";
-const { Title, Text } = Typography;
+const { Title } = Typography;
 type RowData = Record<string, any>;
-function StateTag({ value }: { value: string }) {
-  const { t } = useI18n();
-  return (
-    <Tag
-      color={
-        ["CLOSED", "RESOLVED"].includes(value)
-          ? "success"
-          : ["REJECTED", "TERMINATED"].includes(value)
-            ? "error"
-            : value.includes("REVISION")
-              ? "warning"
-              : "processing"
-      }
-    >
-      {t(statusNames[value] || value)}
-    </Tag>
-  );
-}
 function useData<T>(url: string, refresh = 0) {
   return useLiveQuery<T>(url, refresh);
 }
@@ -112,8 +89,7 @@ function TownTrackApp() {
   const [departmentError, setDepartmentError] = useState(false);
   const [user, setUser] = useState<RowData | null>(),
     [view, setView] = useState("dashboard"),
-    [selected, setSelected] = useState(""),
-    [refresh, setRefresh] = useState(0);
+    [selected, setSelected] = useState("");
   const [selectedPublic, setSelectedPublic] = useState(false);
   const [workspaceQueue, setWorkspaceQueue] = useState<string>();
   const [workspaceCase, setWorkspaceCase] = useState("");
@@ -179,7 +155,6 @@ function TownTrackApp() {
       setPendingAdminRole(null);
       setView("dashboard");
       setSelected("");
-      setRefresh((x) => x + 1);
     } catch (e) {
       message.error(t((e as Error).message));
     } finally {
@@ -501,18 +476,9 @@ function TownTrackApp() {
               />
             ) : view === "cases" && user.role === "CITIZEN" ? (
               <CitizenTracking key="mine" open={open} />
-            ) : view === "dashboard" || view === "cases" ? (
-              <CaseList
-                user={user}
-                dashboard={view === "dashboard"}
-                refresh={refresh}
-                open={open}
-                onNew={() => setView("new")}
-              />
             ) : view === "new" ? (
               <NewCase
                 onDone={(id) => {
-                  setRefresh((x) => x + 1);
                   open(id);
                 }}
               />
@@ -591,161 +557,6 @@ function TownTrackApp() {
         )}
       </Layout>
     </PrivacyGate>
-  );
-}
-function CaseList({
-  user,
-  dashboard,
-  refresh,
-  open,
-  onNew,
-}: {
-  user: RowData;
-  dashboard: boolean;
-  refresh: number;
-  open: (id: string) => void;
-  onNew: () => void;
-}) {
-  const { t } = useI18n();
-  const [page, setPage] = useState(1),
-    [size, setSize] = useState(10);
-  const [search, setSearch] = useState(""),
-    [query, setQuery] = useState(""),
-    [status, setStatus] = useState<string>();
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setQuery(search);
-      setPage(1);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-  const { data, error } = useData<RowData>(
-    "/complaints?page=" +
-      (page - 1) +
-      "&size=" +
-      size +
-      "&q=" +
-      encodeURIComponent(query) +
-      "&status=" +
-      encodeURIComponent(status || ""),
-    refresh,
-  );
-  const rows: RowData[] = data?.items || [];
-  return (
-    <>
-      <div className="page-heading">
-        <div>
-          <Text className="eyebrow">TOWNTRACK / WORKSPACE</Text>
-          <Title level={2}>{dashboard ? t("ภาพรวมการดำเนินงาน") : t("งานและคำร้อง")}</Title>
-          <Text type="secondary">
-            {user.role === "CITIZEN"
-              ? t("ติดตามปัญหาที่คุณแจ้งและดูความคืบหน้า")
-              : t("ติดตามคำร้องและงานที่อยู่ในขอบเขตความรับผิดชอบ")}
-          </Text>
-        </div>
-        <Space>
-          {user.role === "CITIZEN" && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={onNew}>
-              {t("แจ้งปัญหา")}
-            </Button>
-          )}
-        </Space>
-      </div>
-      <ErrorBox error={error} />
-      {dashboard && (
-        <Row gutter={[16, 16]} className="stats">
-          {[
-            [t("คำร้องทั้งหมด"), data?.stats.total || 0],
-            [t("กำลังดำเนินการ"), data?.stats.in_progress || 0],
-            [t("ปิดเรื่องสำเร็จ"), data?.stats.closed || 0],
-          ].map(([label, n], i) => (
-            <Col xs={12} xl={6} key={i}>
-              <Card>
-                <div className={"stat-icon stat-" + i}>
-                  <FileTextOutlined />
-                </div>
-                <Statistic title={label} value={n} />
-              </Card>
-            </Col>
-          ))}
-        </Row>
-      )}
-      <Card
-        title={t("รายการคำร้อง")}
-        extra={
-          <Text type="secondary">{t("พบ {{count}} รายการ", { count: data?.total || 0 })}</Text>
-        }
-      >
-        <Space wrap className="filters">
-          <Input.Search
-            placeholder={t("ค้นหาหัวข้อหรือเลขคำร้อง")}
-            allowClear
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 280 }}
-          />
-          <Select
-            placeholder={t("ทุกสถานะ")}
-            allowClear
-            style={{ width: 230 }}
-            value={status}
-            onChange={(value) => {
-              setStatus(value);
-              setPage(1);
-            }}
-            options={Object.entries(statusNames).map(([value, label]) => ({
-              value,
-              label: t(label),
-            }))}
-          />
-        </Space>
-        <Table
-          rowKey="id"
-          loading={!data && !error}
-          dataSource={rows}
-          scroll={{ x: 850 }}
-          pagination={{
-            current: page,
-            pageSize: size,
-            total: data?.total || 0,
-            showSizeChanger: true,
-            onChange: (p, s) => {
-              setPage(p);
-              setSize(s);
-            },
-          }}
-          columns={[
-            {
-              title: t("คำร้อง"),
-              dataIndex: "title",
-              render: (v, r) => (
-                <>
-                  <Button type="link" className="case-link" onClick={() => open(r.id)}>
-                    {v}
-                  </Button>
-                  <div>
-                    <Text type="secondary" className="small">
-                      #{r.id.slice(0, 8).toUpperCase()}
-                    </Text>
-                  </div>
-                </>
-              ),
-            },
-            { title: t("ประเภท"), dataIndex: "category_name" },
-            {
-              title: t("สถานะ"),
-              dataIndex: "status",
-              render: (v) => <StateTag value={v} />,
-            },
-            { title: t("วันที่แจ้ง"), dataIndex: "created_at", render: date },
-            {
-              title: "",
-              render: (_, r) => <Button onClick={() => open(r.id)}>{t("ดูรายละเอียด")}</Button>,
-            },
-          ]}
-        />
-      </Card>
-    </>
   );
 }
 function Notifications({

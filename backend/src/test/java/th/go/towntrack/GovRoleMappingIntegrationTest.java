@@ -191,15 +191,15 @@ class GovRoleMappingIntegrationTest {
   @Test
   void unknownStaffRoleFailsWithoutCreatingAccount() throws Exception {
     configure("", List.of(rule("LEADER", "LEADER", null)));
-    for (String role : List.of("UNMAPPED_REVIEWER")) {
-      var error =
-          assertThrows(
-              org.springframework.web.server.ResponseStatusException.class,
-              () ->
-                  identities.sync(
-                      town, verified(role, role, "towntrack-test", "gov-town", true), null));
-      assertEquals(503, error.getStatusCode().value());
-    }
+    var error =
+        assertThrows(
+            org.springframework.web.server.ResponseStatusException.class,
+            () ->
+                identities.sync(
+                    town,
+                    verified("unmapped", "UNMAPPED_REVIEWER", "towntrack-test", "gov-town", true),
+                    null));
+    assertEquals(503, error.getStatusCode().value());
     assertEquals(
         1L, db.one("SELECT count(*) n FROM app_user WHERE municipality_id=?", town).get("n"));
   }
