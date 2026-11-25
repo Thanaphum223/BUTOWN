@@ -322,8 +322,8 @@ const messages: Record<string, string> = {
     "Staff attachments for one report must total no more than 300 MB",
   "รูปภาพ PNG/JPEG, PDF และวิดีโอ MP4/MOV/WebM ไฟล์ละไม่เกิน 100 MB ไฟล์ของเจ้าหน้าที่รวมไม่เกิน 300 MB ต่อคำร้อง (ไม่นับไฟล์ของผู้แจ้ง)":
     "PNG/JPEG images, PDFs and MP4/MOV/WebM videos, up to 100 MB per file and 300 MB of staff files per report (the reporter's files are not counted)",
-  "วงเงินเกิน 500,000 บาท เกินอำนาจอนุมัติของผู้อำนวยการกองคลัง/หัวหน้าเจ้าหน้าที่พัสดุ กรุณาเลือกปลัดเทศบาล รองนายกเทศมนตรี หรือนายกเทศมนตรีเป็นผู้อนุมัติลำดับสุดท้าย":
-    "The amount exceeds 500,000 baht, above the authority of the Finance Director or Chief Procurement Officer. Choose the Municipal Clerk, a Deputy Mayor or the Mayor as the final approver.",
+  "วงเงินเกิน 500,000 บาท เกินอำนาจอนุมัติของผู้อำนวยการกองคลัง/หัวหน้าเจ้าหน้าที่พัสดุ กรุณาเลือกปลัดเทศบาล รองปลัดเทศบาล รองนายกเทศมนตรี หรือนายกเทศมนตรีเป็นผู้อนุมัติลำดับสุดท้าย":
+    "The amount exceeds 500,000 baht, above the authority of the Finance Director or Chief Procurement Officer. Choose the Municipal Clerk, a Deputy Municipal Clerk, a Deputy Mayor or the Mayor as the final approver.",
   "วงเงินเกิน 50,000,000 บาท กรุณาตรวจอำนาจสั่งซื้อสั่งจ้างโดยวิธีเฉพาะเจาะจงตามระเบียบพัสดุฯ พ.ศ. 2560 ข้อ 86–87 ก่อนส่ง":
     "The amount exceeds 50,000,000 baht. Check the specific-method procurement authority under clauses 86–87 of the 2017 (B.E. 2560) regulation before sending.",
   "{{title}} (อนุมัติได้ ≤ 500,000 บาท)": "{{title}} (may approve ≤ 500,000 baht)",
@@ -344,8 +344,25 @@ const messages: Record<string, string> = {
   "นายช่าง / ผู้ลงพื้นที่": "Field Technician",
   นักวิชาการคอมพิวเตอร์: "Computer Technical Officer",
   ตัวอย่างรหัสตำแหน่งราชการของเทศบาล: "Example municipal position codes",
-  ตำแหน่งระดับกองต้องเลือกกองในการจับคู่แต่ละรายการ:
-    "Division-level positions need a division in each mapping",
+  "ตำแหน่งระดับกองที่ไม่ได้เลือกกอง จะเข้าสู่ระบบได้แต่ต้องรอผู้มีสิทธิ์กำหนดกองให้":
+    "Division-level positions without a division can sign in but wait for an authorised person to choose one",
+  รอกำหนดกอง: "Awaiting division",
+  บัญชีของคุณรอกำหนดกอง: "Your account is waiting for a division",
+  "หัวหน้าผู้ลงพื้นที่จะรับคุณเข้ากอง ระบบแจ้งให้ทราบแล้ว หน้านี้จะเปิดให้ใช้งานเองเมื่อกำหนดเสร็จ":
+    "A team leader will accept you into a division. They have been notified, and this page opens by itself once that is done.",
+  "นายกเทศมนตรีหรือปลัดเทศบาลจะกำหนดกองให้คุณ ระบบแจ้งให้ทราบแล้ว หน้านี้จะเปิดให้ใช้งานเองเมื่อกำหนดเสร็จ":
+    "The Mayor or Municipal Clerk will choose your division. They have been notified, and this page opens by itself once that is done.",
+  "รับผู้ลงพื้นที่เข้ากองของคุณ: {{name}}": "Accept field workers into your division: {{name}}",
+  เลือกกองให้หัวหน้าผู้ลงพื้นที่ที่เข้าสู่ระบบครั้งแรก:
+    "Choose a division for team leaders who signed in for the first time",
+  ไม่มีผู้รอกำหนดกอง: "Nobody is waiting for a division",
+  "เลือกกองให้ {{name}}": "Choose a division for {{name}}",
+  รับเข้ากอง: "Accept",
+  กำหนดกอง: "Assign division",
+  กำหนดกองแล้ว: "Division assigned",
+  "บัญชีนี้มีกองแล้ว กรุณาโหลดใหม่": "This account already has a division. Please reload.",
+  "บัญชีของคุณรอกำหนดกอง จึงยังใช้งานส่วนนี้ไม่ได้":
+    "Your account is waiting for a division, so this is not available yet.",
   ตำแหน่งราชการ: "Official position",
   "ตำแหน่งราชการในเทศบาล (ไม่บังคับ)": "Official municipal position (optional)",
   เลือกหรือพิมพ์รหัสตำแหน่ง: "Choose or type a position code",

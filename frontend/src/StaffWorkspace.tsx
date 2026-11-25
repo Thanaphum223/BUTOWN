@@ -33,11 +33,13 @@ export default function StaffWorkspace({
   dashboard,
   history = false,
   initialQueue,
+  initialSelected = "",
 }: {
   user: D;
   dashboard: boolean;
   history?: boolean;
   initialQueue?: string;
+  initialSelected?: string;
 }) {
   const { t } = useI18n();
   const metadataCache = useRef(new Map<string, CardMetadata>());
@@ -56,7 +58,7 @@ export default function StaffWorkspace({
   const [search, setSearch] = useState(""),
     [query, setQuery] = useState(""),
     [status, setStatus] = useState<string | undefined>(history ? undefined : initialQueue),
-    [selected, setSelected] = useState(""),
+    [selected, setSelected] = useState(initialSelected),
     [page, setPage] = useState(1);
   useEffect(() => {
     if (search === query) return;
@@ -85,7 +87,7 @@ export default function StaffWorkspace({
   useEffect(() => {
     metadataCache.current.clear();
     setMetadata({});
-    setSelected("");
+    setSelected(initialSelected);
     setOpenMap("");
   }, [user.id, user.role, history]);
   // Polls may update card text without changing the metadata each card needs.

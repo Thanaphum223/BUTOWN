@@ -18,9 +18,24 @@ public class GovRoleMapping {
   final GovCenterSsoClient provider;
   final Workflow workflow;
 
+  // Set once at installation; it then replaces the value administrators may enter.
+  @org.springframework.beans.factory.annotation.Value("${GOV_CENTER_MUNICIPALITY_ID:}")
+  String serverMunicipality = "";
+
+  @jakarta.annotation.PostConstruct
+  void checkServerMunicipality() {
+    serverMunicipality = identifier(serverMunicipality);
+  }
+
   record Mapping(String govRole, String role, UUID departmentId) {}
 
   record Settings(String municipalityId, String serviceId, List<Mapping> mappings) {}
+
+  record SettingsView(
+      String municipalityId,
+      String serviceId,
+      List<Mapping> mappings,
+      boolean municipalityLocked) {}
 
   record Initial(String role, UUID department) {}
 
@@ -53,8 +68,12 @@ public class GovRoleMapping {
               "SUPPLY_HEAD")) defaults.add(new Mapping(code, "APPROVER", null));
       for (String code : List.of("CENTRAL_OFFICER", "SARABAN_OFFICER"))
         defaults.add(new Mapping(code, "OFFICER", null));
+      for (String code : List.of("ENG_DIRECTOR", "DEPT_HEAD", "ENG_HEAD", "HEALTH_HEAD"))
+        defaults.add(new Mapping(code, "LEADER", null));
+      for (String code : List.of("ENG_FIELD", "HEALTH_FIELD", "FIELD_TECH"))
+        defaults.add(new Mapping(code, "FIELD", null));
       defaults.add(new Mapping("IT_ADMIN", "ADMIN", null));
-      return new Settings("", "", defaults);
+      return new Settings(serverMunicipality, "", defaults);
     }
     var row = rows.getFirst();
     var mappings =
@@ -71,13 +90,20 @@ public class GovRoleMapping {
                         (UUID) m.get("department_id")))
             .toList();
     return new Settings(
-        (String) row.get("gov_municipality_id"), (String) row.get("gov_service_id"), mappings);
+        serverMunicipality.isEmpty() ? (String) row.get("gov_municipality_id") : serverMunicipality,
+        (String) row.get("gov_service_id"),
+        mappings);
   }
 
   @GetMapping
   @Transactional
-  public Settings get(Authentication a) {
-    return settings((UUID) admin.admin(a).get("municipality_id"));
+  public SettingsView get(Authentication a) {
+    var config = settings((UUID) admin.admin(a).get("municipality_id"));
+    return new SettingsView(
+        config.municipalityId(),
+        config.serviceId(),
+        config.mappings(),
+        !serverMunicipality.isEmpty());
   }
 
   @PostMapping
@@ -85,7 +111,10 @@ public class GovRoleMapping {
   public void save(@RequestBody Settings body, Authentication a) {
     var actor = admin.lockedAdmin(a);
     UUID town = (UUID) actor.get("municipality_id");
-    String municipality = identifier(body.municipalityId()), service = identifier(body.serviceId());
+    String
+        municipality =
+            serverMunicipality.isEmpty() ? identifier(body.municipalityId()) : serverMunicipality,
+        service = identifier(body.serviceId());
     if (body.mappings() == null || body.mappings().size() > 100)
       throw new IllegalArgumentException("ตั้งค่าบทบาทได้ไม่เกิน 100 รายการ");
     var seen = new HashSet<String>();
@@ -247,8 +276,6 @@ public class GovRoleMapping {
     if (!mapping.role().equals("CITIZEN") && config.municipalityId().isEmpty())
       throw setup(
           "กรุณาให้ผู้ดูแลระบุรหัสเทศบาล Gov Center ในหน้าจับคู่บทบาทก่อนให้บุคลากรเข้าสู่ระบบ");
-    if (Access.departmentRole(mapping.role()) && mapping.departmentId() == null)
-      throw setup("กรุณาให้ผู้ดูแลเลือกกองสำหรับบทบาท Gov Center: " + code);
     if (mapping.departmentId() != null)
       db.one(
           "SELECT id FROM department WHERE id=? AND municipality_id=? AND deleted_at IS NULL FOR SHARE",

@@ -40,6 +40,14 @@ export const SPECIFIC_METHOD_LIMIT = 50_000_000;
 export const limitedApprover = (govRole?: string | null) =>
   ["FINANCE_DIRECTOR", "SUPPLY_HEAD"].includes(govRole || "");
 
+// Must match the server's StaffPlacementController.placeable.
+export function canPlaceStaff(user: Record<string, any>) {
+  return (
+    (user.role === "LEADER" && !!user.department_id) ||
+    (user.role === "APPROVER" && ["MAYOR", "MUNICIPAL_CLERK"].includes(user.gov_role))
+  );
+}
+
 const systemCodes = ["USER", "MEMBER", ...Object.keys(roleNames)];
 
 /** The official position, or "" when the account only carries a TownTrack role. */

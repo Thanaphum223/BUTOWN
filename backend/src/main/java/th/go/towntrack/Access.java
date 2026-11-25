@@ -34,6 +34,9 @@ public class Access {
           user.put("department_id", session.getAttribute("admin_department"));
         }
       }
+    } else if (departmentRole((String) user.get("role")) && user.get("department_id") == null) {
+      user = new HashMap<>(user);
+      user.put("pending_department", true);
     }
     return user;
   }
@@ -42,11 +45,23 @@ public class Access {
     return Set.of("LEADER", "FIELD").contains(role);
   }
 
+  /** Signed in with a department role, but nobody has chosen the department yet. */
+  public static boolean pendingDepartment(Map<String, Object> user) {
+    return Boolean.TRUE.equals(user.get("pending_department"));
+  }
+
+  static void denyPending(Map<String, Object> user) {
+    if (pendingDepartment(user))
+      throw new ResponseStatusException(
+          HttpStatus.FORBIDDEN, "บัญชีของคุณรอกำหนดกอง จึงยังใช้งานส่วนนี้ไม่ได้");
+  }
+
   public static boolean approvalOverview(Map<String, Object> user) {
     return "APPROVER".equals(user.get("role")) && "ADMIN".equals(user.get("account_role"));
   }
 
   public void role(Map<String, Object> u, String... roles) {
+    denyPending(u);
     if (!List.of(roles).contains(u.get("role"))) deny();
   }
 
@@ -55,6 +70,7 @@ public class Access {
   }
 
   public Map<String, Object> complaint(UUID id, Map<String, Object> u, boolean lock) {
+    denyPending(u);
     var c =
         db.one(
             "SELECT *,ST_Y(location::geometry) latitude,ST_X(location::geometry) longitude FROM"

@@ -256,7 +256,7 @@ public class ComplaintController {
     }
     String base =
         " FROM complaint c JOIN category k ON k.id=c.category_id WHERE c.municipality_id=? AND "
-            + scope;
+            + (Access.pendingDepartment(u) ? "false AND (" + scope + ")" : scope);
     if (activeOnly && !overview) base += " AND " + queues.actionable((String) u.get("role"));
     var stats =
         db.one(
@@ -329,8 +329,10 @@ public class ComplaintController {
     try {
       c = access.complaint(id, u, false);
     } catch (ResponseStatusException denied) {
-      if (historyOnly && denied.getStatusCode().value() == 403 && workHistory.hasOutcome(id, u))
-        return workHistory.detail(id, u);
+      if (historyOnly
+          && !Access.pendingDepartment(u)
+          && denied.getStatusCode().value() == 403
+          && workHistory.hasOutcome(id, u)) return workHistory.detail(id, u);
       throw denied;
     }
     boolean citizen = u.get("role").equals("CITIZEN");
@@ -805,8 +807,9 @@ public class ComplaintController {
   @GetMapping("/notifications")
   public Object notifications(Authentication a) {
     return db.list(
-        "SELECT id,complaint_id,message,created_at,read_at FROM notification WHERE user_id=? ORDER"
-            + " BY created_at DESC LIMIT 100",
+        "SELECT n.id,n.complaint_id,n.message,n.created_at,n.read_at,"
+            + "COALESCE(c.reporter_id=n.user_id,false) own,c.status FROM notification n LEFT JOIN"
+            + " complaint c ON c.id=n.complaint_id WHERE n.user_id=? ORDER BY n.created_at DESC LIMIT 100",
         access.user(a).get("id"));
   }
 

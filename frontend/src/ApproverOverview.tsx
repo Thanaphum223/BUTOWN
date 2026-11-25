@@ -39,7 +39,7 @@ export default function ApproverOverview({
   onOpen,
 }: {
   onQueue: () => void;
-  onOpen: (id: string) => void;
+  onOpen: (id: string, status: string) => void;
 }) {
   const { t } = useI18n();
   const [search, setSearch] = useState("");
@@ -253,7 +253,7 @@ export default function ApproverOverview({
                   {t("วันที่แจ้ง")} {date(item.created_at)}
                 </Text>
                 {item.can_open && (
-                  <Button onClick={() => onOpen(item.id)}>{t("ดูรายละเอียด")}</Button>
+                  <Button onClick={() => onOpen(item.id, item.status)}>{t("ดูรายละเอียด")}</Button>
                 )}
               </article>
             ))

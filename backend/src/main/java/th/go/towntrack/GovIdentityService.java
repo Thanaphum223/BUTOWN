@@ -14,11 +14,14 @@ public class GovIdentityService {
   final Db db;
   final PasswordEncoder passwords;
   final GovRoleMapping roles;
+  final StaffPlacementController placement;
 
-  public GovIdentityService(Db db, PasswordEncoder passwords, GovRoleMapping roles) {
+  public GovIdentityService(
+      Db db, PasswordEncoder passwords, GovRoleMapping roles, StaffPlacementController placement) {
     this.db = db;
     this.passwords = passwords;
     this.roles = roles;
+    this.placement = placement;
   }
 
   static String text(JsonNode n, String key, int max, boolean required) {
@@ -164,6 +167,12 @@ public class GovIdentityService {
           name == null || name.isBlank() ? "ผู้ใช้ Gov Center" : name,
           initial.role(),
           initial.department());
+      if (Access.departmentRole(initial.role()) && initial.department() == null)
+        placement.notifyWaiting(
+            town,
+            local,
+            initial.role(),
+            name == null || name.isBlank() ? "ผู้ใช้ Gov Center" : name);
     }
     var rows =
         db.list(

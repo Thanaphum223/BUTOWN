@@ -860,6 +860,8 @@ public class Workflow {
       }
     }
     for (var line : extra) {
+      if (!Boolean.TRUE.equals(stock.item(line.get("stockItemId"), u, false).get("active")))
+        throw new IllegalArgumentException("วัสดุนี้ปิดใช้งานในคลังแล้ว");
       stock.requireAvailable(
           u, line.get("stockItemId"), (java.math.BigDecimal) line.get("quantity"));
       stock.move(
@@ -931,7 +933,7 @@ public class Workflow {
         && ((java.math.BigDecimal) latest.getFirst().get("amount")).compareTo(LIMITED_APPROVAL) > 0)
       throw new ResponseStatusException(
           HttpStatus.BAD_REQUEST,
-          "วงเงินเกิน 500,000 บาท เกินอำนาจอนุมัติของผู้อำนวยการกองคลัง/หัวหน้าเจ้าหน้าที่พัสดุ กรุณาเลือกปลัดเทศบาล รองนายกเทศมนตรี หรือนายกเทศมนตรีเป็นผู้อนุมัติลำดับสุดท้าย");
+          "วงเงินเกิน 500,000 บาท เกินอำนาจอนุมัติของผู้อำนวยการกองคลัง/หัวหน้าเจ้าหน้าที่พัสดุ กรุณาเลือกปลัดเทศบาล รองปลัดเทศบาล รองนายกเทศมนตรี หรือนายกเทศมนตรีเป็นผู้อนุมัติลำดับสุดท้าย");
   }
 
   Map<String, Object> latestReport(UUID id) {

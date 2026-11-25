@@ -160,7 +160,7 @@ class GovRoleMappingIntegrationTest {
   void defaultsIncludeMunicipalPositions() throws Exception {
     mvc.perform(get("/api/admin/gov-roles").with(user(adminName).roles("ADMIN")))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.mappings.length()").value(17))
+        .andExpect(jsonPath("$.mappings.length()").value(24))
         .andExpect(jsonPath("$.mappings[?(@.govRole=='MAYOR')].role").value("APPROVER"))
         .andExpect(jsonPath("$.mappings[?(@.govRole=='SARABAN_OFFICER')].role").value("OFFICER"))
         .andExpect(jsonPath("$.mappings[?(@.govRole=='IT_ADMIN')].role").value("ADMIN"));
@@ -189,9 +189,9 @@ class GovRoleMappingIntegrationTest {
   }
 
   @Test
-  void unknownOrUnscopedStaffAndMissingDepartmentFailWithoutCreatingAccount() throws Exception {
+  void unknownStaffRoleFailsWithoutCreatingAccount() throws Exception {
     configure("", List.of(rule("LEADER", "LEADER", null)));
-    for (String role : List.of("LEADER", "UNMAPPED_REVIEWER")) {
+    for (String role : List.of("UNMAPPED_REVIEWER")) {
       var error =
           assertThrows(
               org.springframework.web.server.ResponseStatusException.class,
@@ -202,6 +202,112 @@ class GovRoleMappingIntegrationTest {
     }
     assertEquals(
         1L, db.one("SELECT count(*) n FROM app_user WHERE municipality_id=?", town).get("n"));
+  }
+
+  Map<String, Object> arrive(String role, String code) {
+    return identities.sync(
+        town, verified(code + role, code, "towntrack-test", "gov-town", true), null);
+  }
+
+  org.springframework.test.web.servlet.ResultActions place(
+      Map<String, Object> actor, Object target, UUID department) throws Exception {
+    return mvc.perform(
+        post("/api/staff-placement/" + target)
+            .with(user(actor.get("username").toString()))
+            .with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(json.writeValueAsString(Map.of("departmentId", department))));
+  }
+
+  long notices(Object account) {
+    return (long)
+        db.one(
+                "SELECT count(*) n FROM notification WHERE user_id=? AND complaint_id IS NULL",
+                account)
+            .get("n");
+  }
+
+  @Test
+  void staffWithoutADepartmentWaitUntilTheRightPersonPlacesThem() throws Exception {
+    configure(
+        "",
+        List.of(
+            rule("MAYOR", "APPROVER", null),
+            rule("DEPUTY_MAYOR", "APPROVER", null),
+            rule("DEPT_HEAD", "LEADER", null),
+            rule("FIELD_TECH", "FIELD", null)));
+    UUID other = UUID.randomUUID();
+    db.run("INSERT INTO department(id,municipality_id,name) VALUES(?,?,'Health')", other, town);
+    // Nobody can place a first head yet, so the administrator is told.
+    var early = arrive("early", "DEPT_HEAD");
+    assertEquals("LEADER", early.get("role"));
+    assertNull(early.get("department_id"));
+    assertEquals(1, notices(admin));
+    var mayor = arrive("", "MAYOR");
+    var deputy = arrive("", "DEPUTY_MAYOR");
+    var head = arrive("", "DEPT_HEAD");
+    assertEquals(1, notices(mayor.get("id")));
+    assertEquals(1, notices(admin));
+    arrive("", "DEPT_HEAD");
+    assertEquals(1, notices(mayor.get("id")));
+
+    var asHead = user(head.get("username").toString());
+    mvc.perform(get("/api/auth/me").with(asHead))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.pending_department").value(true));
+    mvc.perform(get("/api/notifications").with(asHead)).andExpect(status().isOk());
+    mvc.perform(get("/api/complaints").with(asHead))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(0));
+    for (String path : List.of("/api/people?role=FIELD", "/api/staff-placement", "/api/teams"))
+      mvc.perform(get(path).with(asHead)).andExpect(status().isForbidden());
+
+    place(deputy, head.get("id"), dept).andExpect(status().isForbidden());
+    place(head, head.get("id"), dept).andExpect(status().isForbidden());
+    place(mayor, deputy.get("id"), dept).andExpect(status().isForbidden());
+    place(mayor, head.get("id"), UUID.randomUUID()).andExpect(status().isNotFound());
+    place(mayor, head.get("id"), dept).andExpect(status().isOk());
+    place(mayor, head.get("id"), other).andExpect(status().isConflict());
+    assertEquals(1, notices(head.get("id")));
+    assertEquals(
+        1L,
+        db.one(
+                "SELECT count(*) n FROM audit_event WHERE actor_id=? AND action='USER_DEPARTMENT'",
+                mayor.get("id"))
+            .get("n"));
+    mvc.perform(get("/api/auth/me").with(asHead))
+        .andExpect(jsonPath("$.pending_department").doesNotExist())
+        .andExpect(jsonPath("$.department_id").value(dept.toString()));
+
+    var worker = arrive("", "FIELD_TECH");
+    assertEquals(2, notices(head.get("id")));
+    mvc.perform(get("/api/staff-placement").with(asHead))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.people.length()").value(1))
+        .andExpect(jsonPath("$.departments.length()").value(1));
+    place(mayor, worker.get("id"), dept).andExpect(status().isForbidden());
+    place(head, worker.get("id"), other).andExpect(status().isForbidden());
+    place(head, early.get("id"), dept).andExpect(status().isForbidden());
+    place(head, worker.get("id"), dept).andExpect(status().isOk());
+    assertEquals(
+        "FIELD",
+        db.one("SELECT role FROM app_user WHERE id=? AND department_id=?", worker.get("id"), dept)
+            .get("role"));
+  }
+
+  @Test
+  void placementCannotReachAnotherMunicipality() throws Exception {
+    configure("", List.of(rule("MAYOR", "APPROVER", null)));
+    var mayor = arrive("", "MAYOR");
+    UUID foreignTown = UUID.randomUUID(), foreign = UUID.randomUUID();
+    db.run("INSERT INTO municipality(id,name) VALUES(?,'Elsewhere')", foreignTown);
+    db.run(
+        "INSERT INTO app_user(id,municipality_id,username,password_hash,display_name,role)"
+            + " VALUES(?,?,?,'unused','Elsewhere head','LEADER')",
+        foreign,
+        foreignTown,
+        "foreign-" + foreign);
+    place(mayor, foreign, dept).andExpect(status().isNotFound());
   }
 
   @Test

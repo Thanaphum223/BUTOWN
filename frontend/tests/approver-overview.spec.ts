@@ -213,7 +213,9 @@ for (const language of ["th", "en"])
     await expect(open).toBeVisible();
     await open.focus();
     await page.keyboard.press("Enter");
-    await expect(page.getByText("Assigned detail", { exact: true })).toBeVisible();
+    await expect(
+      page.locator(".workspace-detail").getByText("Assigned detail", { exact: true }).first(),
+    ).toBeVisible();
     expect([...new Set(detailRequests)]).toEqual(["/api/complaints/assigned"]);
     await expect(overview).toHaveCount(0);
   });

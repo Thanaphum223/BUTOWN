@@ -180,6 +180,21 @@ class StockAndSlaIntegrationTest {
   }
 
   @Test
+  void startingCannotTakeADeactivatedItem() throws Exception {
+    UUID cement = item("Cement", 10);
+    UUID id = accepted();
+    photo(id, "BEFORE");
+    db.run("UPDATE stock_item SET active=false WHERE id=?", cement);
+    action(
+            id,
+            "FIELD",
+            "START",
+            Map.of("stockItems", List.of(Map.of("stockItemId", cement, "quantity", 1))))
+        .andExpect(status().isBadRequest());
+    assertEquals(10, onHand(cement));
+  }
+
+  @Test
   void startingWithoutARequestIssuesStockAndTheReportReturnsLeftovers() throws Exception {
     UUID cement = item("Cement", 10);
     UUID id = accepted();

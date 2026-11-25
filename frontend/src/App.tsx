@@ -11,10 +11,12 @@ import GovCallback from "./GovCallback";
 import type { GovCallbackReturn } from "./govCallbackReturn";
 import CitizenTracking from "./CitizenTracking";
 import PrivacyGate from "./PrivacyGate";
-import CommunityDetail from "./CommunityDetail";
 import NewCase from "./NewCase";
+import PendingDepartment from "./PendingDepartment";
+import { canPlaceStaff } from "./govRoles";
 import { lazy } from "react";
 const EmergencyContacts = lazy(() => import("./EmergencyContacts"));
+const StaffPlacement = lazy(() => import("./StaffPlacement"));
 const Teams = lazy(() => import("./Teams"));
 const Inventory = lazy(() => import("./Inventory"));
 const Admin = lazy(() => import("./Admin"));
@@ -114,6 +116,10 @@ function TownTrackApp() {
     [refresh, setRefresh] = useState(0);
   const [selectedPublic, setSelectedPublic] = useState(false);
   const [workspaceQueue, setWorkspaceQueue] = useState<string>();
+  const [workspaceCase, setWorkspaceCase] = useState("");
+  useEffect(() => {
+    if (view !== "cases" && view !== "history") setWorkspaceCase("");
+  }, [view]);
   const { message } = AntApp.useApp();
   const [authError, setAuthError] = useState("");
   const [authErrorDetail, setAuthErrorDetail] = useState("");
@@ -180,7 +186,14 @@ function TownTrackApp() {
       setSwitchingRole(false);
     }
   };
-  const open = (id: string, publicView = false) => {
+  const open = (id: string, publicView = false, status = "") => {
+    window.scrollTo({ top: 0 });
+    if (user?.role !== "CITIZEN") {
+      setWorkspaceQueue(undefined);
+      setWorkspaceCase(id);
+      setView(["CLOSED", "REJECTED", "TERMINATED"].includes(status) ? "history" : "cases");
+      return;
+    }
     setSelectedPublic(publicView);
     setSelected(id);
     setView("detail");
@@ -203,7 +216,8 @@ function TownTrackApp() {
         }}
       />
     );
-  const items = [
+  const pending = !!user.pending_department;
+  const allItems = [
     { key: "dashboard", icon: <DashboardOutlined />, label: t("ภาพรวม") },
     {
       key: "cases",
@@ -226,6 +240,9 @@ function TownTrackApp() {
     ...(user.role === "LEADER"
       ? [{ key: "teams", icon: <TeamOutlined />, label: t("ทีมลงพื้นที่") }]
       : []),
+    ...(canPlaceStaff(user)
+      ? [{ key: "placement", icon: <TeamOutlined />, label: t("รอกำหนดกอง") }]
+      : []),
     ...(user.role !== "CITIZEN"
       ? [{ key: "inventory", icon: <InboxOutlined />, label: t("คลังวัสดุ") }]
       : []),
@@ -235,6 +252,9 @@ function TownTrackApp() {
       : []),
     { key: "password", icon: <LockOutlined />, label: t("เปลี่ยนรหัสผ่าน") },
   ];
+  const items = allItems.filter(
+    (item) => !pending || ["dashboard", "notifications", "password"].includes(item.key),
+  );
   return (
     <PrivacyGate key={user.id} user={user}>
       <Modal
@@ -289,6 +309,7 @@ function TownTrackApp() {
               items={items}
               onClick={({ key }) => {
                 if (key === "cases") setWorkspaceQueue(undefined);
+                setWorkspaceCase("");
                 setView(key);
                 window.scrollTo({ top: 0 });
               }}
@@ -311,6 +332,7 @@ function TownTrackApp() {
             items={items}
             onClick={({ key }) => {
               if (key === "cases") setWorkspaceQueue(undefined);
+              setWorkspaceCase("");
               setView(key);
               setMobileMenu(false);
               window.scrollTo({ top: 0 });
@@ -440,7 +462,9 @@ function TownTrackApp() {
             </Space>
           </Layout.Header>
           <Layout.Content className="content">
-            {view === "dashboard" && user.role === "CITIZEN" ? (
+            {pending && !["notifications", "password"].includes(view) ? (
+              <PendingDepartment role={user.role} onUser={setUser} />
+            ) : view === "dashboard" && user.role === "CITIZEN" ? (
               <CitizenHome onFollowing={() => setView("following")} />
             ) : view === "dashboard" && user.role === "APPROVER" ? (
               <ApproverOverview
@@ -449,7 +473,7 @@ function TownTrackApp() {
                   setWorkspaceQueue(undefined);
                   setView("cases");
                 }}
-                onOpen={open}
+                onOpen={(id, status) => open(id, false, status)}
               />
             ) : view === "dashboard" && user.role !== "CITIZEN" ? (
               <StaffOverview
@@ -468,9 +492,10 @@ function TownTrackApp() {
               />
             ) : (view === "cases" || view === "history") && user.role !== "CITIZEN" ? (
               <StaffWorkspace
-                key={`${user.id}:${user.role}:${user.department_id}:${view === "history"}:${workspaceQueue || ""}`}
+                key={`${user.id}:${user.role}:${user.department_id}:${view === "history"}:${workspaceQueue || ""}:${workspaceCase}`}
                 user={user}
                 initialQueue={workspaceQueue}
+                initialSelected={workspaceCase}
                 dashboard={false}
                 history={view === "history"}
               />
@@ -508,6 +533,8 @@ function TownTrackApp() {
               <EmergencyContacts />
             ) : view === "teams" ? (
               <Teams />
+            ) : view === "placement" && canPlaceStaff(user) ? (
+              <StaffPlacement />
             ) : view === "inventory" && user.role !== "CITIZEN" ? (
               <Inventory admin={user.account_role === "ADMIN"} />
             ) : view === "admin" ? (
@@ -721,9 +748,14 @@ function CaseList({
     </>
   );
 }
-function Notifications({ open, citizen }: { open: (id: string) => void; citizen: boolean }) {
+function Notifications({
+  open,
+  citizen,
+}: {
+  open: (id: string, publicView?: boolean, status?: string) => void;
+  citizen: boolean;
+}) {
   const { t } = useI18n();
-  const [communityId, setCommunityId] = useState<string>();
   const [refresh, setRefresh] = useState(0);
   const { data, error } = useData<RowData[]>("/notifications", refresh);
   const { message, modal } = AntApp.useApp();
@@ -744,8 +776,7 @@ function Notifications({ open, citizen }: { open: (id: string) => void; citizen:
     });
   function view(r: RowData) {
     if (!r.read_at) void run(() => post(`/notifications/${r.id}/read`, {}));
-    if (citizen) setCommunityId(r.complaint_id);
-    else open(r.complaint_id);
+    open(r.complaint_id, citizen && !r.own, r.status);
   }
   return (
     <>
@@ -808,7 +839,6 @@ function Notifications({ open, citizen }: { open: (id: string) => void; citizen:
           )}
         />
       </Card>
-      {citizen && <CommunityDetail id={communityId} onClose={() => setCommunityId(undefined)} />}
     </>
   );
 }

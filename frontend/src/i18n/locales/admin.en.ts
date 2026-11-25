@@ -116,8 +116,11 @@ const messages: Record<string, string> = {
   "รหัสบทบาทจาก Gov": "Gov role code",
   "กรุณากรอกรหัสบทบาท Gov": "Please enter a Gov role code",
   "บทบาทใน TownTrack": "TownTrack role",
-  ต้องเลือกกองก่อนให้บัญชีใหม่ใช้บทบาทหัวหน้าหรือผู้ลงพื้นที่:
-    "Select a division before assigning a team leader or field worker role to new accounts.",
+  "เว้นว่างได้ บัญชีใหม่จะรอผู้มีสิทธิ์กำหนดกองก่อนเริ่มใช้งาน":
+    "Optional. New accounts then wait for an authorised person to choose their division.",
+  "ตั้งค่าไว้ที่เซิร์ฟเวอร์แล้ว แก้ไขจากหน้านี้ไม่ได้":
+    "Set on the server; it cannot be changed here.",
+  "เพิ่มตำแหน่งมาตรฐานที่ยังไม่มี ({{count}})": "Add missing standard positions ({{count}})",
   "ดูแลงานระดับเทศบาล ไม่สังกัดกอง": "Municipality-wide role; no division assigned",
   ไม่สังกัดกอง: "No division assigned",
   เพิ่มการจับคู่บทบาท: "Add role mapping",

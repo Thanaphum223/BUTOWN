@@ -457,7 +457,7 @@ public class AdminController {
     return db.list(
         "SELECT d.notification_id,d.state,d.attempts,d.last_error,d.next_attempt,d.sent_at FROM"
             + " notification_delivery d JOIN notification n ON n.id=d.notification_id JOIN"
-            + " complaint c ON c.id=n.complaint_id WHERE c.municipality_id=? ORDER BY n.created_at"
+            + " app_user r ON r.id=n.user_id WHERE r.municipality_id=? ORDER BY n.created_at"
             + " DESC LIMIT 200",
         u.get("municipality_id"));
   }

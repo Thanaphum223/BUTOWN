@@ -40,6 +40,7 @@ async function notifications(page: Page, role: string) {
       "/api/catalog": { categories: [], departments: [] },
       "/api/municipal-center": { latitude: 13.75, longitude: 100.5 },
       "/api/community/complaints": { items: [], top: [], total: 0, stats: {} },
+      "/api/complaints": { items: [], total: 0, stats: {} },
       "/api/notifications": rows,
     };
     return route.fulfill({ json: data[path] ?? [] });
@@ -85,3 +86,98 @@ for (const role of ["CITIZEN", "OFFICER"]) {
     expect(writes).toContain("DELETE /api/notifications/n-1");
   });
 }
+
+for (const own of [true, false]) {
+  test(`citizen notification opens the ${own ? "own" : "followed"} case like tracking`, async ({
+    page,
+  }) => {
+    const { rows } = await notifications(page, "CITIZEN");
+    rows.forEach((row) => Object.assign(row, { own }));
+    await page.reload();
+    await page
+      .getByRole("link", { name: /แจ้งเตือน/ })
+      .first()
+      .click();
+    const path = own ? `/api/complaints/${complaint}` : `/api/community/complaints/${complaint}`;
+    await page.route(`**${path}`, (route) =>
+      route.fulfill({
+        json: {
+          complaint: {
+            id: complaint,
+            category_name: "ไฟฟ้าสาธารณะ",
+            title: "ไฟฟ้าสาธารณะ",
+            status: "TRIAGED",
+            created_at: "2026-11-20T01:00:00Z",
+            updated_at: "2026-11-20T01:00:00Z",
+            latitude: 13.75,
+            longitude: 100.5,
+            version: 1,
+          },
+          media: [],
+          history: [],
+          files: [],
+          actions: [],
+        },
+      }),
+    );
+    await page.route(`**${path}/sla`, (route) =>
+      route.fulfill({ json: { open: true, extensions: [], progress_days: 15 } }),
+    );
+    const request = page.waitForRequest((r) => new URL(r.url()).pathname === path);
+    await page.getByRole("button", { name: "ดูคำร้อง", exact: true }).first().click();
+    await request;
+    await expect(page.locator(".citizen-case-detail")).toContainText("ไฟฟ้าสาธารณะ");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+}
+
+for (const role of ["OFFICER", "LEADER", "FIELD", "APPROVER", "ADMIN"])
+  for (const status of ["TRIAGED", "CLOSED"]) {
+    test(`${role} notification opens a ${status} case in the workspace`, async ({ page }) => {
+      const { rows } = await notifications(page, role);
+      rows.forEach((row) => Object.assign(row, { status }));
+      await page.route("**/api/complaints?*", (route) =>
+        route.fulfill({ json: { items: [], total: 0, stats: {} } }),
+      );
+      await page.route(`**/api/complaints/${complaint}*`, (route) =>
+        route.fulfill({
+          json: {
+            complaint: {
+              id: complaint,
+              title: "ไฟฟ้าสาธารณะ",
+              status,
+              latitude: 13.75,
+              longitude: 100.5,
+              version: 1,
+            },
+            media: [],
+            history: [],
+            files: [],
+            actions: [],
+            reports: [],
+            resources: [],
+            workOrders: [],
+          },
+        }),
+      );
+      await page.route(`**/api/complaints/${complaint}/sla`, (route) =>
+        route.fulfill({ json: { open: status === "TRIAGED", extensions: [] } }),
+      );
+      await page.reload();
+      await page
+        .getByRole("menuitem", { name: /แจ้งเตือน/ })
+        .first()
+        .click();
+      await page.getByRole("button", { name: "ดูคำร้อง", exact: true }).first().click();
+      const workspace = page.locator(".staff-workspace.viewing-work");
+      await expect(workspace.locator(".workspace-detail")).toContainText("ไฟฟ้าสาธารณะ");
+      await page.getByRole("button", { name: /กลับคิวงาน/ }).click();
+      await expect(page.locator(".viewing-work")).toHaveCount(0);
+      await expect(
+        page.getByRole("heading", {
+          name: status === "CLOSED" ? "ประวัติงาน" : /^(รายการคำร้อง|งานลงพื้นที่ของฉัน)$/,
+          level: 2,
+        }),
+      ).toBeVisible();
+    });
+  }

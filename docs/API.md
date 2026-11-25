@@ -85,4 +85,4 @@ GET /emergency/nearby?latitude=...&longitude=...&type=hospital&radiusKm=5 เป
 ## บทบาทและการลบบัญชี
 GET/POST /admin/gov-roles สำหรับผู้ดูแล: จับคู่รหัสบทบาท Gov กับ role/departmentId ของ TownTrack โดยตั้ง municipalityId ของ Gov และ serviceId (ถ้าระบุบริการด้วย ID) การเปลี่ยนค่านี้ใช้กับบัญชีใหม่เท่านั้น
 DELETE /admin/users/{id}: ผู้ดูแลลบบัญชีในเทศบาลตนเองได้ ยกเว้นตนเอง ซ่อนบัญชีและยกเลิก Session โดยเก็บคำร้อง/ไฟล์/ประวัติงาน ครั้งถัดไปที่ Gov ยืนยันตัวตนเดิม จะได้บัญชี TownTrack ID ใหม่ ไม่รับข้อมูลส่วนตัวหรือสิทธิ์เดิมกลับมา การระงับบัญชีโดยไม่ลบยังคงบล็อกการเข้าสู่ระบบ
-OFFICER/APPROVER ดูแลงานระดับเทศบาล ไม่มี departmentId; LEADER/FIELD ต้องมี departmentId ที่อยู่ในเทศบาลเดียวกัน
+OFFICER/APPROVER ดูแลงานระดับเทศบาล ไม่มี departmentId; LEADER/FIELD ต้องมี departmentId ที่อยู่ในเทศบาลเดียวกันจึงเริ่มงานได้ บัญชีใหม่จาก Gov ที่ยังไม่มีกองจะรอกำหนดผ่าน GET /staff-placement และ POST /staff-placement/{userId} {departmentId} (หัวหน้ารับผู้ลงพื้นที่เข้ากองตนเอง นายก/ปลัดกำหนดกองให้หัวหน้า)
