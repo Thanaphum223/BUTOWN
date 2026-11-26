@@ -66,7 +66,7 @@ for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await report(page);
     await page.getByRole("button", { name: /ถนนและทางเท้า/ }).click();
-    const details = page.getByLabel("รายละเอียดอื่น ๆ (ไม่บังคับ)", { exact: true });
+    const details = page.getByLabel("รายละเอียด", { exact: true });
     await expect(details).toHaveAttribute("placeholder", /ถนน.*หลุม/);
     await details.fill("รายละเอียดที่ผู้แจ้งพิมพ์ไว้");
     await page.getByRole("button", { name: /เสียงดัง.*ฝุ่นควัน/ }).click();

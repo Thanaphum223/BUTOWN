@@ -39,7 +39,7 @@ import {
   attachmentError,
 } from "./attachments";
 import { reportDescriptionExample } from "./reportExamples";
-import { composeDescription, reportSymptoms } from "./reportSymptoms";
+import { reportSymptoms, withSymptoms } from "./reportSymptoms";
 import VideoRecorder, { canRecordVideo } from "./VideoRecorder";
 import ReporterEmail from "./ReporterEmail";
 type D = Record<string, any>;
@@ -143,6 +143,13 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
   const pendingFiles = useRef<File[]>([]);
   const [attachmentMissing, setAttachmentMissing] = useState(false);
   const [symptoms, setSymptoms] = useState<string[]>([]);
+  function pickSymptoms(next: string[]) {
+    form.setFieldValue(
+      "description",
+      withSymptoms(form.getFieldValue("description"), symptoms, next),
+    );
+    setSymptoms(next);
+  }
   const [recording, setRecording] = useState(false);
   const { message } = App.useApp();
   const [previews, setPreviews] = useState<Record<string, string>>({});
@@ -449,7 +456,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
       const payload = {
         categoryId: category!.id,
         title: v.title?.trim() || category!.name,
-        description: composeDescription(symptoms, v.description),
+        description: v.description.trim(),
         address: v.address,
         answers: v.answers || {},
         latitude: position?.[0] ?? null,
@@ -842,8 +849,8 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
                     if (!currentTitle?.trim() || currentTitle === category?.name)
                       form.setFieldValue("title", c.name);
                     setCategory(c);
-                    setSymptoms((picked) =>
-                      picked.filter((symptom) => reportSymptoms(c.name).includes(symptom)),
+                    pickSymptoms(
+                      symptoms.filter((symptom) => reportSymptoms(c.name).includes(symptom)),
                     );
                     setNearby([]);
                   }}
@@ -899,8 +906,8 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
                     key={symptom}
                     checked={symptoms.includes(symptom)}
                     onChange={(checked) =>
-                      setSymptoms((picked) =>
-                        checked ? [...picked, symptom] : picked.filter((s) => s !== symptom),
+                      pickSymptoms(
+                        checked ? [...symptoms, symptom] : symptoms.filter((s) => s !== symptom),
                       )
                     }
                   >
@@ -919,9 +926,16 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
             <Input placeholder={t("สรุปปัญหาที่พบ")} />
           </Form.Item>
           <Form.Item
-            label={t("รายละเอียดอื่น ๆ (ไม่บังคับ)")}
+            label={t("รายละเอียด")}
             name="description"
-            rules={[{ max: 19000 }]}
+            rules={[
+              {
+                required: step === 1,
+                whitespace: true,
+                message: t("กรุณากรอกรายละเอียด หรือแตะเลือกอาการที่พบ"),
+              },
+              { max: 19000 },
+            ]}
           >
             <Input.TextArea rows={3} placeholder={reportDescriptionExample(category?.name, t)} />
           </Form.Item>

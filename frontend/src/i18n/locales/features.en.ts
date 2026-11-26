@@ -5,7 +5,7 @@ const messages: Record<string, string> = {
   "หัวข้อปัญหา (ไม่บังคับ)": "Problem title (optional)",
   "ถ้าไม่กรอก ระบบจะใช้ชื่อประเภทปัญหาเป็นหัวข้อ":
     "If left blank, the problem category is used as the title",
-  "รายละเอียดอื่น ๆ (ไม่บังคับ)": "Other details (optional)",
+  "กรุณากรอกรายละเอียด หรือแตะเลือกอาการที่พบ": "Describe the problem, or tap what you found",
   "ถ่ายวิดีโอ (ไม่เกิน 60 วินาที)": "Record video (up to 60 seconds)",
   "ภาพและวิดีโออาจติดใบหน้า ทะเบียนรถ หรือบ้านเลขที่ของผู้อื่น กรุณาถ่ายเฉพาะจุดเกิดเหตุเท่าที่จำเป็น":
     "Photos and videos may show other people's faces, number plates or house numbers. Capture only what the incident needs.",

@@ -26,7 +26,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const width of [390, 1280]) {
-  test(`citizens report by tapping symptoms, with title and details optional, at ${width}px`, async ({
+  test(`tapped symptoms fill the required details and the title stays optional, at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 });
@@ -35,19 +35,29 @@ for (const width of [390, 1280]) {
     await confirmLocation(page, "หน้าตลาด");
     await page.getByRole("button", { name: /ถนนและทางเท้า/ }).click();
     const symptoms = page.locator(".symptom-picker");
+    const details = page.getByLabel("รายละเอียด", { exact: true });
     await expect(symptoms).toBeVisible();
+    await expect(details).toBeEmpty();
+    await page.locator('input[type="file"][multiple]').setInputFiles(photo("site.png"));
+    await page.getByRole("button", { name: "ส่งคำร้อง", exact: true }).click();
+    await expect(page.getByText("กรุณากรอกรายละเอียด หรือแตะเลือกอาการที่พบ")).toBeVisible();
     await symptoms.getByText("ถนนเป็นหลุม", { exact: true }).click();
     await symptoms.getByText("เกิดซ้ำบ่อย", { exact: true }).click();
     await expect(symptoms.locator(".ant-tag-checkable-checked")).toHaveCount(2);
+    await expect(details).toHaveValue("ถนนเป็นหลุม, เกิดซ้ำบ่อย");
+    await details.press("End");
+    await details.pressSequentially("\nน้ำขังในหลุม");
+    await symptoms.getByText("ถนนเป็นหลุม", { exact: true }).click();
+    await expect(details).toHaveValue("เกิดซ้ำบ่อย\nน้ำขังในหลุม");
+    await symptoms.getByText("ถนนเป็นหลุม", { exact: true }).click();
+    await expect(details).toHaveValue("เกิดซ้ำบ่อย, ถนนเป็นหลุม\nน้ำขังในหลุม");
     await expect(page.getByLabel("หัวข้อปัญหา (ไม่บังคับ)", { exact: true })).toBeVisible();
-    await expect(page.getByLabel("รายละเอียดอื่น ๆ (ไม่บังคับ)", { exact: true })).toBeEmpty();
     await expect(
       page.getByText("ข้อมูลส่วนตัวของคุณจะไม่ถูกเผยแพร่", { exact: true }),
     ).toBeVisible();
     await expect(page.locator(".media-privacy-note")).toBeVisible();
     await expect(page.getByRole("button", { name: /ถ่ายวิดีโอ/ })).toBeVisible();
     await expect(page.getByText(/\/ 300 MB/)).toBeVisible();
-    await page.locator('input[type="file"][multiple]').setInputFiles(photo("site.png"));
 
     const sent = page.waitForRequest(
       (r) => new URL(r.url()).pathname === "/api/complaints" && r.method() === "POST",
@@ -56,7 +66,7 @@ for (const width of [390, 1280]) {
     const body = (await sent).postDataBuffer()!.toString("utf8");
     const json = JSON.parse(body.slice(body.indexOf("{"), body.indexOf("}\r\n") + 1));
     expect(json.title).toBe("ถนนและทางเท้า");
-    expect(json.description).toBe("ถนนเป็นหลุม, เกิดซ้ำบ่อย");
+    expect(json.description).toBe("เกิดซ้ำบ่อย, ถนนเป็นหลุม\nน้ำขังในหลุม");
     await expect(
       page.getByRole("heading", { name: "บันทึกคำร้องแล้ว", exact: true }),
     ).toBeVisible();

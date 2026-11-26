@@ -97,7 +97,14 @@ export function reportSymptoms(categoryName?: string): string[] {
   return [...own, ...general];
 }
 
-// The server keeps one description text; selected symptoms lead, free text follows.
-export function composeDescription(picked: string[], details?: string): string {
-  return [picked.join(", "), details?.trim()].filter(Boolean).join("\n");
+// Tapped symptoms fill the first line of the details; whatever the reporter typed below it stays.
+export function withSymptoms(
+  details: string | undefined,
+  before: string[],
+  after: string[],
+): string {
+  let rest = details ?? "";
+  const old = before.join(", ");
+  if (old && rest.startsWith(old)) rest = rest.slice(old.length).replace(/^\n/, "");
+  return [after.join(", "), rest].filter(Boolean).join("\n");
 }
