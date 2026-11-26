@@ -360,16 +360,19 @@ public class Workflow {
             issueForStart(c, w, b, u);
           }
           case "REQUEST_RESOURCE" -> {
+            var items = fromStock(requestedItems(b), u);
             db.run(
-                "INSERT INTO"
-                    + " resource_request(id,complaint_id,work_order_id,requested_by,necessity,requested_items)"
-                    + " VALUES(?,?,?,?,?,?::jsonb)",
+                "INSERT INTO resource_request(id,complaint_id,work_order_id,requested_by,necessity,"
+                    + "requested_items,loan_due_on) VALUES(?,?,?,?,?,?::jsonb,?)",
                 UUID.randomUUID(),
                 id,
                 w.get("id"),
                 u.get("id"),
                 reason,
-                json.valueToTree(fromStock(requestedItems(b), u)).toString());
+                json.valueToTree(items).toString(),
+                lendsEquipment(items.stream().map(item -> item.get("stockItemId")).toList())
+                    ? loanDueOn(b)
+                    : null);
             notifyUser(c.get("leader_id"), id, "ทีมขอใช้ทรัพยากร กรุณาจัดทำข้อเสนอ");
           }
           case "REPORT" -> {
@@ -580,9 +583,7 @@ public class Workflow {
                 i + 1,
                 target.get("id"));
           }
-          checkApprovalAuthority(
-              (UUID) r.get("id"),
-              db.one("SELECT gov_role FROM app_user WHERE id=?", Db.id(ids.getLast())));
+          checkApprovalAuthority((UUID) r.get("id"), Db.id(ids.getLast()));
           db.run(
               "UPDATE resource_request SET approver_id=? WHERE id=?",
               Db.id(ids.getFirst()),
@@ -618,7 +619,7 @@ public class Workflow {
                   r.get("id"));
               notifyUser(
                   next.getFirst().get("approver_id"), id, "มีคำขอทรัพยากรรออนุมัติลำดับถัดไป");
-            } else checkApprovalAuthority((UUID) r.get("id"), u);
+            } else checkApprovalAuthority((UUID) r.get("id"), u.get("id"));
           }
         }
         String state =
@@ -880,6 +881,7 @@ public class Workflow {
             latest.getFirst().get("id"),
             w.get("id"));
       }
+      stock.openLoans(u, latest.getFirst().get("id"), id, w.get("id"), approved);
     }
     for (var line : extra) {
       var registered = stock.item(line.get("stockItemId"), u, false);
@@ -926,20 +928,33 @@ public class Workflow {
       Map<String, Object> c, Map<String, Object> w, Map<String, Object> b, Map<String, Object> u) {
     var outstanding = stock.outstanding(w.get("id"));
     stock.lock(u, outstanding.keySet());
+    var damaged = damagedReturns(b.get("stockReturns"));
     for (var line : Stock.lines(b.get("stockReturns"))) {
-      var held = outstanding.get((UUID) line.get("stockItemId"));
+      UUID item = (UUID) line.get("stockItemId");
+      var held = outstanding.get(item);
       var quantity = (java.math.BigDecimal) line.get("quantity");
       if (held == null || quantity.compareTo(held) > 0)
         throw new IllegalArgumentException("จำนวนที่คืนต้องไม่เกินจำนวนที่เบิกไป");
+      String note = damaged.get(item);
       stock.move(
           u,
-          line.get("stockItemId"),
+          item,
           "RETURN",
           quantity,
-          "คืนวัสดุที่เหลือหลังปฏิบัติงาน",
+          note == null ? "คืนวัสดุที่เหลือหลังปฏิบัติงาน" : "คืนครุภัณฑ์ในสภาพชำรุด: " + note,
           c.get("id"),
           null,
           w.get("id"));
+      // Clause 209: equipment comes back in working order; damage is recorded and reported.
+      stock.closeLoans(u, w.get("id"), item, note == null ? "GOOD" : "DAMAGED", note);
+      if (note != null)
+        for (Object recipient : leaderAndKeepers(c, u))
+          notifyUser(
+              recipient,
+              (UUID) c.get("id"),
+              "ครุภัณฑ์ "
+                  + stock.item(item, u, false).get("name")
+                  + " ส่งคืนในสภาพชำรุด กรุณาตรวจสอบและดำเนินการซ่อมแซมหรือชดใช้");
     }
     boolean equipmentMissing = false;
     for (UUID item : stock.outstanding(w.get("id")).keySet())
@@ -952,12 +967,60 @@ public class Workflow {
           "ครุภัณฑ์ที่เบิกไปยังคืนคลังไม่ครบ กรุณาตรวจสอบกับผู้ลงพื้นที่");
   }
 
+  /** Returned items the team marked damaged, with what is wrong. */
+  static Map<UUID, String> damagedReturns(Object value) {
+    var result = new HashMap<UUID, String>();
+    if (!(value instanceof List<?> list)) return result;
+    for (Object entry : list) {
+      if (!(entry instanceof Map<?, ?> line) || !"DAMAGED".equals(line.get("condition"))) continue;
+      String note = line.get("conditionNote") instanceof String text ? text.strip() : "";
+      if (note.isEmpty() || note.length() > 500)
+        throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST, "กรุณาระบุสภาพความชำรุดของครุภัณฑ์ไม่เกิน 500 ตัวอักษร");
+      result.put(Db.id(line.get("stockItemId")), note);
+    }
+    return result;
+  }
+
+  boolean lendsEquipment(Collection<?> stockItemIds) {
+    for (Object item : stockItemIds)
+      if (item != null
+          && !db.list("SELECT 1 FROM stock_item WHERE id=? AND item_type='EQUIPMENT'", Db.id(item))
+              .isEmpty()) return true;
+    return false;
+  }
+
+  /** The return date asked for borrowed equipment (clause 208(2)): today up to a year ahead. */
+  static java.time.LocalDate loanDueOn(Map<String, Object> b) {
+    var today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Bangkok"));
+    java.time.LocalDate due;
+    try {
+      due = java.time.LocalDate.parse(String.valueOf(b.get("loanDueOn")));
+    } catch (java.time.format.DateTimeParseException e) {
+      due = null;
+    }
+    if (due == null || due.isBefore(today) || due.isAfter(today.plusYears(1)))
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "กรุณาระบุกำหนดวันส่งคืนครุภัณฑ์ ตั้งแต่วันนี้ถึงไม่เกิน 1 ปี");
+    return due;
+  }
+
   // Procurement regulation 2560, clause 79: these positions may not give final approval above this.
   static final java.math.BigDecimal LIMITED_APPROVAL = new java.math.BigDecimal("500000.00");
   static final Set<String> LIMITED_APPROVERS = Set.of("FINANCE_DIRECTOR", "SUPPLY_HEAD");
 
-  void checkApprovalAuthority(UUID resourceId, Map<String, Object> finalApprover) {
+  void checkApprovalAuthority(UUID resourceId, Object finalApproverId) {
+    var finalApprover =
+        db.one("SELECT gov_role,loan_approver FROM app_user WHERE id=?", finalApproverId);
     Object govRole = finalApprover.get("gov_role");
+    // Clause 208(2): equipment goes off site only with the mayor's or a written delegate's
+    // approval.
+    if (!"MAYOR".equals(govRole)
+        && !Boolean.TRUE.equals(finalApprover.get("loan_approver"))
+        && lendsEquipment(approvedStock(Map.of("id", resourceId)).keySet()))
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST,
+          "คำขอนี้มีการยืมครุภัณฑ์ออกนอกสถานที่ ผู้อนุมัติลำดับสุดท้ายต้องเป็นนายกเทศมนตรีหรือผู้ได้รับมอบอำนาจเป็นหนังสือ");
     if (govRole == null || !LIMITED_APPROVERS.contains(govRole)) return;
     var latest =
         db.list(

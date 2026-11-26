@@ -205,6 +205,16 @@ public class ComplaintRetention {
         id,
         id,
         id);
+    // The equipment loan register outlives the complaint, like the stock ledger.
+    db.run(
+        "UPDATE equipment_loan SET complaint_id=NULL,resource_id=NULL,work_order_id=NULL WHERE"
+            + " complaint_id=? OR resource_id IN "
+            + resources
+            + " OR work_order_id IN "
+            + works,
+        id,
+        id,
+        id);
     db.run(
         "DELETE FROM notification_delivery WHERE notification_id IN (SELECT id FROM notification"
             + " WHERE complaint_id=?)",

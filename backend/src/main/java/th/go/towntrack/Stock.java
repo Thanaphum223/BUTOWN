@@ -117,6 +117,7 @@ public class Stock {
             row.get("resource_id"),
             row.get("stock_item_id"));
     }
+    closeLoans(u, workOrderId, null, "CANCELLED", note);
   }
 
   /** Records one movement; a negative delta that exceeds the balance is refused. */
@@ -193,6 +194,59 @@ public class Stock {
                   line.get("quantity"), "จำนวนวัสดุต้องมากกว่า 0 และมีทศนิยมไม่เกินสองตำแหน่ง")));
     }
     return result;
+  }
+
+  /**
+   * Opens a loan (clause 208(2)) for each approved equipment line issued at the start of a job. The
+   * reason is the request's stated need; the due date is the one asked for, or the approved
+   * duration for requests made before return dates were asked.
+   */
+  public void openLoans(
+      Map<String, Object> u,
+      Object resourceId,
+      Object complaintId,
+      Object workOrderId,
+      Map<UUID, BigDecimal> approved) {
+    for (var line : approved.entrySet()) {
+      if (!"EQUIPMENT".equals(item(line.getKey(), u, false).get("item_type"))) continue;
+      db.run(
+          "INSERT INTO equipment_loan(id,municipality_id,stock_item_id,complaint_id,resource_id,"
+              + "work_order_id,borrower_id,approved_by,quantity,reason,due_on) SELECT"
+              + " ?,?,?,?,r.id,?,?,(SELECT approver_id FROM approval_assignment WHERE"
+              + " resource_id=r.id AND decision='APPROVE' ORDER BY step DESC LIMIT"
+              + " 1),?,COALESCE(r.necessity,''),COALESCE(r.loan_due_on,(now() AT TIME ZONE"
+              + " 'Asia/Bangkok')::date+COALESCE((SELECT duration_days FROM resource_revision WHERE"
+              + " resource_id=r.id ORDER BY revision DESC LIMIT 1),1)) FROM resource_request r"
+              + " WHERE r.id=?",
+          UUID.randomUUID(),
+          u.get("municipality_id"),
+          line.getKey(),
+          complaintId,
+          workOrderId,
+          u.get("id"),
+          line.getValue(),
+          resourceId);
+    }
+  }
+
+  /**
+   * Closes the open loans on a job once nothing of that item is still out; a null item closes every
+   * fully returned one.
+   */
+  public void closeLoans(
+      Map<String, Object> u, Object workOrderId, Object itemId, String condition, String note) {
+    db.run(
+        "UPDATE equipment_loan l SET returned_at=now(),returned_by=?,return_condition=?,"
+            + "return_note=? WHERE l.work_order_id=? AND l.returned_at IS NULL AND (?::uuid IS NULL"
+            + " OR l.stock_item_id=?::uuid) AND COALESCE((SELECT -SUM(m.delta) FROM stock_movement m"
+            + " WHERE m.work_order_id=l.work_order_id AND m.stock_item_id=l.stock_item_id AND"
+            + " m.kind IN ('ISSUE','RETURN')),0)<=0",
+        u.get("id"),
+        condition,
+        note == null ? "" : note,
+        workOrderId,
+        itemId,
+        itemId);
   }
 
   /** Net quantity per stock item issued to a work order and not yet returned. */

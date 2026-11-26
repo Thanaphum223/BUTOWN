@@ -44,7 +44,8 @@ class StockAndSlaIntegrationTest {
         town,
         dept,
         definition);
-    for (String role : List.of("CITIZEN", "OFFICER", "LEADER", "FIELD", "FIELD_2", "APPROVER")) {
+    for (String role :
+        List.of("CITIZEN", "OFFICER", "LEADER", "FIELD", "FIELD_2", "APPROVER", "ADMIN")) {
       UUID id = UUID.randomUUID();
       String name = "stock_" + id;
       String stored = role.startsWith("FIELD") ? "FIELD" : role;
@@ -584,10 +585,25 @@ class StockAndSlaIntegrationTest {
         .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("ครุภัณฑ์")));
     assertEquals(2, onHand(drill));
     UUID id = approved(drill, 2);
+    // Only the mayor or a written delegate may approve the loan.
+    action(id, "APPROVER", "APPROVE", Map.of("reason", "Fine")).andExpect(status().isBadRequest());
+    send(
+            "ADMIN",
+            () -> put("/api/stock/loan-approvers/" + users.get("APPROVER")),
+            Map.of("approver", true, "reference", "คำสั่งที่ 1/2569"))
+        .andExpect(status().isOk());
     action(id, "APPROVER", "APPROVE", Map.of("reason", "Fine")).andExpect(status().isOk());
     photo(id, "BEFORE");
     action(id, "FIELD", "START", Map.of()).andExpect(status().isOk());
     assertEquals(0, onHand(drill));
+    assertEquals(
+        1,
+        db.list(
+                "SELECT id FROM equipment_loan WHERE complaint_id=? AND returned_at IS NULL"
+                    + " AND approved_by=?",
+                id,
+                users.get("APPROVER"))
+            .size());
     photo(id, "AFTER");
     action(
             id,
