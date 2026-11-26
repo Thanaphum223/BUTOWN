@@ -31,6 +31,8 @@ const messages: Record<string, string> = {
   "งานนี้เคยมอบหมายผู้ลงพื้นที่แล้ว ไม่สามารถส่งคืนแบบจ่ายงานผิดได้":
     "This task has already been assigned to field staff and cannot be returned as an incorrect assignment.",
   ยังไม่ได้ตั้งค่าระบบตรวจไฟล์: "File scanning has not been configured.",
+  "ระบบตรวจไฟล์ไม่พร้อม กรุณาลองแนบไฟล์อีกครั้งในอีกสักครู่":
+    "The file scanner is not ready. Please attach the file again in a moment.",
   ไฟล์ไม่ผ่านการตรวจสอบ: "The file did not pass validation.",
   "หลักฐาน BEFORE/AFTER ต้องเป็นภาพถ่าย": "BEFORE/AFTER evidence must be photographs.",
   "รองรับ PNG, JPEG, PDF และวิดีโอ MP4, MOV, WebM ที่มีรูปแบบไฟล์ถูกต้อง":

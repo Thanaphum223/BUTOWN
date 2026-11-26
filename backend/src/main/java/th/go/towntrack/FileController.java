@@ -53,6 +53,14 @@ public class FileController {
     return root;
   }
 
+  static final String SCAN_UNAVAILABLE = "ระบบตรวจไฟล์ไม่พร้อม กรุณาลองแนบไฟล์อีกครั้งในอีกสักครู่";
+  int clamPort = 3310;
+
+  /** How long a scan may take: 30 seconds plus 3 per MB, so a 15 MB PDF waits at most 75. */
+  long scanMillis(long bytes) {
+    return Math.min(600_000L, 30_000L + bytes / 1_000_000L * 3_000L);
+  }
+
   void scan(Path file) throws IOException {
     if (clamHost.isBlank()) {
       if (!dev)
@@ -60,27 +68,54 @@ public class FileController {
             HttpStatus.SERVICE_UNAVAILABLE, "ยังไม่ได้ตั้งค่าระบบตรวจไฟล์");
       return;
     }
+    String reply;
     try (Socket sock = new Socket()) {
-      sock.connect(new InetSocketAddress(clamHost, 3310), 5000);
-      sock.setSoTimeout(600000);
-      var out = new DataOutputStream(sock.getOutputStream());
-      out.write(new byte[] {'z', 'I', 'N', 'S', 'T', 'R', 'E', 'A', 'M', 0});
-      try (InputStream input = Files.newInputStream(file)) {
-        byte[] buffer = new byte[64 * 1024];
-        int n;
-        while ((n = input.read(buffer)) != -1) {
-          out.writeInt(n);
-          out.write(buffer, 0, n);
+      // A read timeout does not stop a write that clamd never drains, so the whole scan has one
+      // deadline that closes the socket.
+      var deadline =
+          java.util.concurrent.CompletableFuture.delayedExecutor(
+              scanMillis(Files.size(file)), java.util.concurrent.TimeUnit.MILLISECONDS);
+      var finished = new java.util.concurrent.atomic.AtomicBoolean();
+      deadline.execute(
+          () -> {
+            if (finished.get()) return;
+            try {
+              sock.close();
+            } catch (IOException ignored) {
+            }
+          });
+      try {
+        sock.connect(new InetSocketAddress(clamHost, clamPort), 5000);
+        sock.setSoTimeout((int) scanMillis(Files.size(file)));
+        var out = new DataOutputStream(sock.getOutputStream());
+        out.write(new byte[] {'z', 'I', 'N', 'S', 'T', 'R', 'E', 'A', 'M', 0});
+        try (InputStream input = Files.newInputStream(file)) {
+          byte[] buffer = new byte[64 * 1024];
+          int n;
+          while ((n = input.read(buffer)) != -1) {
+            out.writeInt(n);
+            out.write(buffer, 0, n);
+          }
         }
+        out.writeInt(0);
+        out.flush();
+        var response = new ByteArrayOutputStream();
+        int ch;
+        while ((ch = sock.getInputStream().read()) > 0 && response.size() < 2048)
+          response.write(ch);
+        reply = response.toString(java.nio.charset.StandardCharsets.UTF_8);
+      } catch (IOException e) {
+        // Refused, unreachable, too slow or closed by the deadline: the file was not checked.
+        throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, SCAN_UNAVAILABLE);
+      } finally {
+        finished.set(true);
       }
-      out.writeInt(0);
-      out.flush();
-      var response = new ByteArrayOutputStream();
-      int ch;
-      while ((ch = sock.getInputStream().read()) > 0 && response.size() < 2048) response.write(ch);
-      if (!response.toString(java.nio.charset.StandardCharsets.UTF_8).endsWith("OK"))
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ไฟล์ไม่ผ่านการตรวจสอบ");
     }
+    if (reply.endsWith("FOUND"))
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ไฟล์ไม่ผ่านการตรวจสอบ");
+    // Anything but a clean verdict (an error, or no reply) means the file was not checked.
+    if (!reply.endsWith("OK"))
+      throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, SCAN_UNAVAILABLE);
   }
 
   @PostMapping("/complaints/{id}/files")

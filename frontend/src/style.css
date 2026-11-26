@@ -4086,3 +4086,32 @@ button.queue-item .queue-item-top .ant-tag {
   max-width: 100%;
   white-space: normal;
 }
+/* Date and status share a row; the status drops below only when the row is full. */
+.sla-value {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.sla-date {
+  white-space: nowrap;
+}
+.sla-value .ant-tag {
+  margin-inline-end: 0;
+}
+@media (max-width: 600px) {
+  /* Phones: label column on the left, value column on the right, like a record. */
+  .sla-panel .ant-descriptions-item-container {
+    align-items: baseline;
+  }
+  .sla-panel .ant-descriptions-item-container .ant-descriptions-item-label {
+    /* Block, so a wrapped label keeps its colon at the end of the text. */
+    display: block;
+    flex: 0 0 38%;
+    white-space: normal;
+  }
+  .sla-panel .ant-descriptions-item-container .ant-descriptions-item-content {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}

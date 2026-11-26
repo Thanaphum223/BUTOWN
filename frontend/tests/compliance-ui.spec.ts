@@ -586,3 +586,25 @@ test("officer asks with a preset and the reporter answers on the real server", a
   await chat.getByRole("button", { name: "ส่งข้อความ" }).click();
   await expect(chat.locator(".chat-message.is-mine")).toContainText("ช่วงเย็น");
 });
+for (const width of [360, 390, 1280]) {
+  test(`SLA dates read as label and value rows at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await boundary(page, "FIELD", "ASSIGNED", sla({}));
+    await openCase(page, "FIELD");
+    const panel = page.locator(".sla-panel");
+    await expect(panel.locator(".sla-date")).toHaveCount(2);
+    for (const date of await panel.locator(".sla-date").all()) {
+      const item = date.locator(
+        "xpath=ancestor::*[contains(@class,'ant-descriptions-item-container')]",
+      );
+      const label = (await item.locator(".ant-descriptions-item-label").boundingBox())!;
+      const value = (await date.boundingBox())!;
+      // The value sits beside its label, and a date never breaks across lines.
+      expect(value.x).toBeGreaterThan(label.x + label.width - 1);
+      expect(Math.abs(value.y - label.y)).toBeLessThan(12);
+      expect(value.height).toBeLessThan(40);
+    }
+    await fits(page);
+    await panel.screenshot({ path: `../work/screenshots/sla-panel-${width}.png` });
+  });
+}

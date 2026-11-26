@@ -37,7 +37,10 @@ services:
       FILE_ROOT: /data/files
       CLAMAV_HOST: clamav
       DEV_UNSCANNED_FILES: 'false'
-      JAVA_TOOL_OPTIONS: '-Xms64m -Xmx192m -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=32m -XX:+UseSerialGC'
+      # Client compiler only: the optimising compiler briefly needs tens of MB on this 512 MB host.
+      JAVA_TOOL_OPTIONS: '-Xms64m -Xmx192m -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=32m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xss512k'
+      # Fewer idle request threads; each one keeps its own stack.
+      SERVER_TOMCAT_THREADS_MAX: '40'
     volumes: ['files:/data/files']
     depends_on:
       db:
@@ -67,11 +70,15 @@ services:
     environment:
       CLAMD_CONF_MaxThreads: '1'
       CLAMD_CONF_ConcurrentDatabaseReload: 'no'
-      CLAMD_CONF_StreamMaxLength: 1024M
-      CLAMD_CONF_MaxFileSize: 1024M
-      CLAMD_CONF_MaxScanSize: 2048M
-      CLAMD_CONF_MaxScanTime: '600000'
+      # Uploads are at most 100 MB, so nothing larger needs scanning; matches the backend deadline.
+      CLAMD_CONF_StreamMaxLength: 110M
+      CLAMD_CONF_MaxFileSize: 110M
+      CLAMD_CONF_MaxScanSize: 220M
+      CLAMD_CONF_MaxScanTime: '330000'
       CLAMD_CONF_AlertExceedsMax: 'yes'
+      # Do not load each new signature set a second time just to test it; that test needs about as
+      # much RAM as clamd itself. ClamAV documents this as its low-memory setting.
+      FRESHCLAM_CONF_TestDatabases: 'no'
     volumes: ['clamdata:/var/lib/clamav']
     logging: *logging
 volumes:

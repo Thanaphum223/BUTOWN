@@ -141,14 +141,14 @@ export default function SlaPanel({
             key: "due",
             label: t("กำหนดแก้ไขแล้วเสร็จ"),
             children: (
-              <>
-                {date(sla.due_at)}{" "}
+              <span className="sla-value">
+                <span className="sla-date">{date(sla.due_at)}</span>
                 {sla.open && (
                   <Tag color={overdue ? "red" : "green"}>
                     {overdue ? t("เกินกำหนด") : t("อยู่ในกำหนด")}
                   </Tag>
                 )}
-              </>
+              </span>
             ),
           },
           ...(sla.open
@@ -157,8 +157,8 @@ export default function SlaPanel({
                   key: "progress",
                   label: t("แจ้งความคืบหน้าให้ผู้แจ้งภายใน"),
                   children: (
-                    <>
-                      {date(sla.progress_due_at)}{" "}
+                    <span className="sla-value">
+                      <span className="sla-date">{date(sla.progress_due_at)}</span>
                       <Tag color={progressLate ? "red" : "blue"}>
                         {progressLate
                           ? t("เลยกำหนดแจ้งความคืบหน้า")
@@ -166,7 +166,7 @@ export default function SlaPanel({
                               days: sla.progress_days,
                             })}
                       </Tag>
-                    </>
+                    </span>
                   ),
                 },
               ]
