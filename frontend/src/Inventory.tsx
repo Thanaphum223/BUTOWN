@@ -23,6 +23,12 @@ import { useI18n } from "./i18n/useI18n";
 import StockVerifications from "./StockVerifications";
 
 type D = Record<string, any>;
+type StockData = {
+  keeper: boolean;
+  canVerify?: boolean;
+  vehicleLocalExempt?: boolean;
+  items: D[];
+};
 const kindNames: Record<string, string> = {
   RECEIVE: "รับเข้า",
   ISSUE: "เบิกจ่าย",
@@ -40,7 +46,7 @@ const kindColors: Record<string, string> = {
 export default function Inventory({ admin }: { admin: boolean }) {
   const { t } = useI18n();
   const { message } = App.useApp();
-  const [data, setData] = useState<{ keeper: boolean; canVerify?: boolean; items: D[] }>();
+  const [data, setData] = useState<StockData>();
   const [issues, setIssues] = useState<D[]>([]);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
@@ -48,6 +54,7 @@ export default function Inventory({ admin }: { admin: boolean }) {
   const [moving, setMoving] = useState<{ item: D; kind: "RECEIVE" | "ADJUST" }>();
   const [history, setHistory] = useState<{ item: D; rows: D[] }>();
   const [loans, setLoans] = useState<D[]>();
+  const [trips, setTrips] = useState<D[]>();
   const [keepers, setKeepers] = useState<D[]>();
   const [returningLoan, setReturningLoan] = useState<D>();
   const [delegatingApprover, setDelegatingApprover] = useState<D>();
@@ -55,8 +62,27 @@ export default function Inventory({ admin }: { admin: boolean }) {
   const [form] = Form.useForm();
   const [loanForm] = Form.useForm();
   const [delegateForm] = Form.useForm();
+  const [plating, setPlating] = useState<D>();
+  const [plateForm] = Form.useForm();
+  async function savePlate(values: D) {
+    if (!plating) return;
+    setBusy(true);
+    try {
+      await api(`/stock/${plating.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ vehiclePlate: values.vehiclePlate ?? "" }),
+      });
+      message.success(t("บันทึกแล้ว"));
+      setPlating(undefined);
+      setRevision((v) => v + 1);
+    } catch (e) {
+      message.error(t((e as Error).message));
+    } finally {
+      setBusy(false);
+    }
+  }
   useEffect(() => {
-    api<{ keeper: boolean; canVerify?: boolean; items: D[] }>("/stock")
+    api<StockData>("/stock")
       .then((value) => {
         setData(value);
         setError("");
@@ -69,7 +95,21 @@ export default function Inventory({ admin }: { admin: boolean }) {
     api<D[]>("/stock/loans")
       .then(setLoans)
       .catch(() => setLoans([]));
+    api<D[]>("/stock/vehicle-trips")
+      .then(setTrips)
+      .catch(() => setTrips([]));
   }, [revision]);
+  async function setLocalExempt(localExempt: boolean) {
+    try {
+      await api("/stock/vehicle-settings", {
+        method: "PUT",
+        body: JSON.stringify({ localExempt }),
+      });
+      setData((value) => value && { ...value, vehicleLocalExempt: localExempt });
+    } catch (e) {
+      message.error(t((e as Error).message));
+    }
+  }
   async function save(values: D) {
     setBusy(true);
     try {
@@ -160,6 +200,19 @@ export default function Inventory({ admin }: { admin: boolean }) {
         <Space wrap>
           <Button href="/api/stock/export.csv">{t("ส่งออกรายงานคลัง (CSV)")}</Button>
           {admin && <Button onClick={openKeepers}>{t("กำหนดผู้ดูแลคลัง")}</Button>}
+          {admin && data && (
+            <Space size={6}>
+              <Switch
+                size="small"
+                checked={!!data.vehicleLocalExempt}
+                aria-label={t("ยกเว้นใบขออนุญาตใช้รถ (แบบ 3) เมื่อใช้ภายในเขตเทศบาล")}
+                onChange={setLocalExempt}
+              />
+              <Typography.Text>
+                {t("ยกเว้นใบขออนุญาตใช้รถ (แบบ 3) เมื่อใช้ภายในเขตเทศบาล")}
+              </Typography.Text>
+            </Space>
+          )}
           {keeper && (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setAdding(true)}>
               {t("เพิ่มวัสดุใหม่")}
@@ -194,6 +247,11 @@ export default function Inventory({ admin }: { admin: boolean }) {
                   <Tag color={item.item_type === "EQUIPMENT" ? "blue" : "default"}>
                     {item.item_type === "EQUIPMENT" ? t("ครุภัณฑ์") : t("วัสดุสิ้นเปลือง")}
                   </Tag>
+                  {item.vehicle_plate && (
+                    <Tag color="geekblue">
+                      {t("ยานพาหนะ {{plate}}", { plate: item.vehicle_plate })}
+                    </Tag>
+                  )}
                   {!item.active && <Tag>{t("ปิดใช้งาน")}</Tag>}
                 </>
               ),
@@ -238,6 +296,11 @@ export default function Inventory({ admin }: { admin: boolean }) {
                       <Button size="small" onClick={() => setMoving({ item, kind: "ADJUST" })}>
                         {t("ปรับยอด")}
                       </Button>
+                      {item.item_type === "EQUIPMENT" && (
+                        <Button size="small" onClick={() => setPlating(item)}>
+                          {t("ทะเบียนรถ")}
+                        </Button>
+                      )}
                       <Switch
                         size="small"
                         checked={item.active}
@@ -327,6 +390,67 @@ export default function Inventory({ admin }: { admin: boolean }) {
           />
         </Card>
       )}
+      {trips && trips.length > 0 && (
+        <Card
+          title={t("บันทึกการใช้รถส่วนกลาง (แบบ 4)")}
+          style={{ marginTop: 16 }}
+          extra={
+            <Typography.Text type="secondary">
+              {t("แสดง {{n}} รายการล่าสุด", { n: trips.length })}
+            </Typography.Text>
+          }
+        >
+          <Table
+            size="small"
+            rowKey="id"
+            dataSource={trips}
+            scroll={{ x: true }}
+            pagination={{ pageSize: 10, hideOnSinglePage: true }}
+            columns={[
+              {
+                title: t("รถ"),
+                render: (_, r) => (
+                  <>
+                    <strong>{r.vehicle_plate}</strong> {r.name}
+                  </>
+                ),
+              },
+              { title: t("ผู้ใช้รถ"), dataIndex: "user_name" },
+              { title: t("ผู้ขับ"), render: (_, r) => r.driver_name || "-" },
+              {
+                title: t("สถานที่ไป / วัตถุประสงค์"),
+                render: (_, r) => (
+                  <>
+                    {r.destination || (r.local_use ? t("ภายในเขตเทศบาล") : "-")}
+                    {r.purpose && (
+                      <div>
+                        <Typography.Text type="secondary">{r.purpose}</Typography.Text>
+                      </div>
+                    )}
+                  </>
+                ),
+              },
+              {
+                title: t("ออก"),
+                render: (_, r) => `${date(r.departed_at)} · ${amount(r.odometer_out)} ${t("กม.")}`,
+              },
+              {
+                title: t("กลับ"),
+                render: (_, r) =>
+                  r.arrived_at ? (
+                    `${date(r.arrived_at)} · ${amount(r.odometer_in)} ${t("กม.")}`
+                  ) : (
+                    <Tag color="orange">{t("ยังไม่กลับ")}</Tag>
+                  ),
+              },
+              {
+                title: t("ระยะทาง"),
+                render: (_, r) => (r.distance == null ? "-" : `${amount(r.distance)} ${t("กม.")}`),
+              },
+            ]}
+          />
+        </Card>
+      )}
       <Modal
         open={adding || !!moving}
         destroyOnHidden
@@ -362,6 +486,22 @@ export default function Inventory({ admin }: { admin: boolean }) {
                     { value: "EQUIPMENT", label: t("ครุภัณฑ์") },
                   ]}
                 />
+              </Form.Item>
+              <Form.Item noStyle shouldUpdate={(a, b) => a.itemType !== b.itemType}>
+                {({ getFieldValue }) =>
+                  getFieldValue("itemType") === "EQUIPMENT" ? (
+                    <Form.Item
+                      name="vehiclePlate"
+                      label={t("ทะเบียนรถ (เฉพาะยานพาหนะ ไม่บังคับ)")}
+                      extra={t(
+                        "ครุภัณฑ์ที่มีทะเบียนรถต้องกรอกใบขออนุญาตใช้รถ (แบบ 3) และบันทึกเลขไมล์ (แบบ 4) ทุกครั้ง",
+                      )}
+                      rules={[{ max: 20, whitespace: true }]}
+                    >
+                      <Input placeholder={t("เช่น กข 1234 ขอนแก่น")} maxLength={20} />
+                    </Form.Item>
+                  ) : null
+                }
               </Form.Item>
               <Form.Item
                 name="name"
@@ -611,6 +751,31 @@ export default function Inventory({ admin }: { admin: boolean }) {
             rules={[{ required: true, whitespace: true, max: 200 }]}
           >
             <Input placeholder={t("เช่น มท 0808.1/1234")} maxLength={200} />
+          </Form.Item>
+        </Form>
+      </Modal>
+      <Modal
+        open={!!plating}
+        destroyOnHidden
+        title={t("ทะเบียนรถ: {{name}}", { name: plating?.name })}
+        okText={t("บันทึก")}
+        cancelText={t("ยกเลิก")}
+        confirmLoading={busy}
+        onOk={() => plateForm.submit()}
+        onCancel={() => setPlating(undefined)}
+      >
+        <Form
+          form={plateForm}
+          layout="vertical"
+          onFinish={savePlate}
+          initialValues={{ vehiclePlate: plating?.vehicle_plate ?? "" }}
+        >
+          <Form.Item
+            name="vehiclePlate"
+            label={t("ทะเบียนรถ (เว้นว่างถ้าไม่ใช่ยานพาหนะ)")}
+            rules={[{ max: 20 }]}
+          >
+            <Input placeholder={t("เช่น กข 1234 ขอนแก่น")} maxLength={20} />
           </Form.Item>
         </Form>
       </Modal>

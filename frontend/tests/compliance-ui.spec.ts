@@ -253,6 +253,97 @@ test("reporting preselects the full return of equipment with a warning", async (
   await expect(dialog.getByRole("spinbutton", { name: "จำนวนที่คืน ทราย" })).toHaveValue("0.00");
 });
 
+test("reporting asks for each vehicle's odometer on return (form 4)", async ({ page }) => {
+  const extra = withActions("IN_PROGRESS", "REPORT") as D;
+  extra["/api/complaints/" + caseId].workOrders = [
+    { id: "w", status: "IN_PROGRESS", handed_off: false },
+  ];
+  await boundary(page, "FIELD", "IN_PROGRESS", {
+    ...extra,
+    ["/api/stock/complaints/" + caseId]: [],
+    [`/api/stock/complaints/${caseId}/vehicles`]: {
+      pending: [],
+      open: [
+        {
+          id: "trip",
+          stock_item_id: "truck",
+          name: "รถกระบะ",
+          vehicle_plate: "กข 1234",
+          odometer_out: 1000,
+        },
+      ],
+    },
+  });
+  await openCase(page, "FIELD");
+  await page.getByRole("button", { name: "ส่งรายงานผล", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("เลขไมล์เมื่อกลับถึง (บันทึกการใช้รถ แบบ 4)")).toBeVisible();
+  await expect(dialog.getByText("กข 1234 · ออก 1,000 กม.")).toBeVisible();
+  const odometer = dialog.getByRole("spinbutton", { name: "เลขไมล์รถ กข 1234" });
+  await odometer.fill("990");
+  await odometer.blur();
+  await expect(dialog.getByText("เลขไมล์ต้องไม่น้อยกว่า 1,000 กม.")).toBeVisible();
+});
+
+test("a vehicle gets its plate and its trips appear in the form 4 log", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { posts } = await boundary(page, "OFFICER", "TRIAGED", {
+    "/api/stock": {
+      keeper: true,
+      items: [
+        {
+          id: "truck",
+          name: "รถกระบะ",
+          unit: "คัน",
+          item_type: "EQUIPMENT",
+          vehicle_plate: "กข 1234",
+          active: true,
+          on_hand: 1,
+          reserved: 0,
+          available: 1,
+          in_use: 0,
+        },
+      ],
+    },
+    "/api/stock/vehicle-trips": [
+      {
+        id: "trip",
+        name: "รถกระบะ",
+        vehicle_plate: "กข 1234",
+        user_name: "ช่างสมชาย",
+        driver_name: "สมชาย",
+        destination: "สถานีสูบน้ำ",
+        purpose: "ขนท่อ",
+        departed_at: "2026-11-20T01:00:00Z",
+        odometer_out: 1000,
+        arrived_at: "2026-11-20T08:00:00Z",
+        odometer_in: 1042.5,
+        distance: 42.5,
+      },
+    ],
+  });
+  await page.getByRole("button", { name: "เปิดเมนูหลัก", exact: true }).click();
+  await page.locator(".ant-drawer").getByRole("menuitem", { name: "คลังวัสดุ" }).click();
+  await expect(
+    page.locator(".inventory-page tbody tr").filter({ hasText: "รถกระบะ" }).first(),
+  ).toContainText("ยานพาหนะ กข 1234");
+  const log = page.locator(".ant-card").filter({ hasText: "บันทึกการใช้รถส่วนกลาง (แบบ 4)" });
+  await expect(log).toContainText("สถานีสูบน้ำ");
+  await expect(log).toContainText("42.5 กม.");
+  await fits(page);
+  await page.getByRole("button", { name: "เพิ่มวัสดุใหม่" }).click();
+  const create = page.getByRole("dialog", { name: "เพิ่มวัสดุใหม่" });
+  await expect(create.getByLabel(/ทะเบียนรถ/)).toHaveCount(0);
+  await create.getByText("ครุภัณฑ์", { exact: true }).click();
+  await create.getByLabel("ชื่อวัสดุ", { exact: true }).fill("รถบรรทุก");
+  await create.getByLabel("หน่วย", { exact: true }).fill("คัน");
+  await create.getByLabel(/ทะเบียนรถ/).fill("1กก 999");
+  await create.getByRole("button", { name: "บันทึก" }).click();
+  await expect
+    .poll(() => posts.find((p) => p.path === "/api/stock")?.body)
+    .toMatchObject({ itemType: "EQUIPMENT", name: "รถบรรทุก", vehiclePlate: "1กก 999" });
+});
+
 const sla = (values: D) => ({
   [`/api/complaints/${caseId}/sla`]: {
     due_at: complaint.due_at,

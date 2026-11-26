@@ -55,7 +55,7 @@ import {
   withTitle,
 } from "./govRoles";
 import StockUsage from "./StockUsage";
-import { StockReturns, StockTaken, stockOptions } from "./StockFields";
+import { StockReturns, StockTaken, VehicleOdometers, stockOptions } from "./StockFields";
 type D = Record<string, any>;
 const { Title, Text, Paragraph } = Typography;
 const denialPresets = [
@@ -220,6 +220,8 @@ export default function Detail({
     [approverFallback, setApproverFallback] = useState(false),
     [stockItems, setStockItems] = useState<D[]>([]),
     [heldStock, setHeldStock] = useState<D[]>([]),
+    [vehicles, setVehicles] = useState<D[]>([]),
+    [vehicleLocalExempt, setVehicleLocalExempt] = useState(false),
     [teams, setTeams] = useState<D[]>([]),
     [people, setPeople] = useState<D[]>([]),
     [busy, setBusy] = useState(false);
@@ -302,10 +304,29 @@ export default function Detail({
     setAction(a);
     if (a === "REQUEST_RESOURCE") form.setFieldsValue({ items: [{ name: "", unit: "" }] });
     setHeldStock([]);
+    setVehicles([]);
     if (["REQUEST_RESOURCE", "START", "REPORT"].includes(a)) {
       api<D>("/stock")
-        .then((s) => setStockItems(s.items.filter((item: D) => item.active)))
+        .then((s) => {
+          setStockItems(s.items.filter((item: D) => item.active));
+          setVehicleLocalExempt(!!s.vehicleLocalExempt);
+        })
         .catch(() => setStockItems([]));
+    }
+    if (a === "START" || a === "REPORT") {
+      api<D>(`/stock/complaints/${id}/vehicles`)
+        .then((found) => {
+          const list: D[] = (a === "START" ? found.pending : found.open) || [];
+          setVehicles(list);
+          const saved: D[] | undefined = form.getFieldValue("vehicleOdometers");
+          form.setFieldsValue({
+            vehicleOdometers: list.map((v) => ({
+              stockItemId: v.stock_item_id,
+              odometer: saved?.find((s) => s?.stockItemId === v.stock_item_id)?.odometer,
+            })),
+          });
+        })
+        .catch(() => setVehicles([]));
     }
     if (a === "REPORT") {
       const work = activeWorkOrder(data);
@@ -1992,6 +2013,7 @@ export default function Detail({
                 {t(citizen ? ATTACHMENT_HELP : STAFF_ATTACHMENT_HELP)}
               </Text>
               <StockReturns held={heldStock} />
+              <VehicleOdometers vehicles={vehicles} leaving={false} />
             </>
           )}
           {action === "START" && (
@@ -2039,6 +2061,7 @@ export default function Detail({
                 )}
               />
               <StockTaken items={stockItems} approved={c.status === "READY"} />
+              <VehicleOdometers vehicles={vehicles} leaving />
             </div>
           )}
           {action === "REQUEST_RESOURCE" && (
@@ -2206,6 +2229,108 @@ export default function Detail({
                   format="DD/MM/YYYY"
                 />
               </Form.Item>
+            )}
+          {action === "REQUEST_RESOURCE" &&
+            requestItems?.some(
+              (item) => stockItems.find((s) => s.id === item?.stockItemId)?.vehicle_plate,
+            ) && (
+              <section className="stock-fields">
+                <Typography.Title level={5}>
+                  {t("ใบขออนุญาตใช้รถส่วนกลาง (แบบ 3)")}
+                </Typography.Title>
+                <Form.Item name={["vehicleUse", "local"]} valuePropName="checked">
+                  <Checkbox>{t("ใช้รถภายในเขตเทศบาล")}</Checkbox>
+                </Form.Item>
+                <Form.Item noStyle shouldUpdate>
+                  {({ getFieldValue }) =>
+                    vehicleLocalExempt && getFieldValue(["vehicleUse", "local"]) ? (
+                      <Alert
+                        type="info"
+                        showIcon
+                        style={{ marginBottom: 16 }}
+                        message={t(
+                          "เทศบาลยกเว้นแบบ 3 สำหรับการใช้รถภายในเขต ยังต้องบันทึกเลขไมล์ (แบบ 4) ตอนออกและกลับ",
+                        )}
+                      />
+                    ) : (
+                      <>
+                        <Form.Item
+                          label={t("สถานที่ไป")}
+                          name={["vehicleUse", "destination"]}
+                          rules={[{ required: true, whitespace: true, max: 300 }]}
+                        >
+                          <Input maxLength={300} />
+                        </Form.Item>
+                        <Form.Item
+                          label={t("วัตถุประสงค์การใช้รถ")}
+                          name={["vehicleUse", "purpose"]}
+                          rules={[{ required: true, whitespace: true, max: 500 }]}
+                        >
+                          <Input maxLength={500} />
+                        </Form.Item>
+                        <Form.Item
+                          label={t("ผู้ขับ")}
+                          name={["vehicleUse", "driverName"]}
+                          rules={[{ required: true, whitespace: true, max: 200 }]}
+                        >
+                          <Input maxLength={200} />
+                        </Form.Item>
+                        <Form.Item
+                          label={t("จำนวนผู้โดยสาร (รวมผู้ขับ)")}
+                          name={["vehicleUse", "passengers"]}
+                          rules={[{ required: true, type: "number", min: 1, max: 100 }]}
+                        >
+                          <InputNumber min={1} max={100} precision={0} inputMode="numeric" />
+                        </Form.Item>
+                        <Form.Item
+                          label={t("เวลาออก")}
+                          name={["vehicleUse", "startAt"]}
+                          rules={[{ required: true, message: t("กรุณาระบุเวลาออก") }]}
+                          getValueProps={(v) => ({ value: v ? dayjs(v) : undefined })}
+                          getValueFromEvent={(d: dayjs.Dayjs | null) =>
+                            d ? d.format("YYYY-MM-DDTHH:mm") : undefined
+                          }
+                        >
+                          <DatePicker
+                            showTime={{ format: "HH:mm" }}
+                            format="DD/MM/YYYY HH:mm"
+                            style={{ width: "100%" }}
+                            disabledDate={(d) =>
+                              d.isBefore(dayjs(), "day") || d.isAfter(dayjs().add(1, "year"), "day")
+                            }
+                          />
+                        </Form.Item>
+                        <Form.Item
+                          label={t("เวลากลับ")}
+                          name={["vehicleUse", "endAt"]}
+                          dependencies={[["vehicleUse", "startAt"]]}
+                          rules={[
+                            { required: true, message: t("กรุณาระบุเวลากลับ") },
+                            {
+                              validator: async (_, value) => {
+                                const start = getFieldValue(["vehicleUse", "startAt"]);
+                                if (value && start && !dayjs(value).isAfter(dayjs(start)))
+                                  throw new Error(t("เวลากลับต้องหลังเวลาออก"));
+                              },
+                            },
+                          ]}
+                          getValueProps={(v) => ({ value: v ? dayjs(v) : undefined })}
+                          getValueFromEvent={(d: dayjs.Dayjs | null) =>
+                            d ? d.format("YYYY-MM-DDTHH:mm") : undefined
+                          }
+                        >
+                          <DatePicker
+                            showTime={{ format: "HH:mm" }}
+                            format="DD/MM/YYYY HH:mm"
+                            style={{ width: "100%" }}
+                            disabledDate={(d) => d.isBefore(dayjs(), "day")}
+                          />
+                        </Form.Item>
+                      </>
+                    )
+                  }
+                </Form.Item>
+              </section>
             )}
           {!["ACCEPT", "START", "PROPOSE", "REPORT"].includes(action) && (
             <Form.Item

@@ -34,17 +34,33 @@ POST /complaints/{id}/actions ตัวอย่าง:
 - SEND_APPROVAL ต้องมี approverIds ตามจำนวนลำดับของ Workflow คนต้องไม่ซ้ำ
 - DENY ยุติทั้งคำร้องทันที ไม่มีเส้นทางให้เริ่มงานต่อ
 - REQUEST_RESOURCE รายการใน items ใส่ stockItemId ได้ ชื่อและหน่วยจะใช้ตามทะเบียนคลัง แต่ละ stockItemId ใช้ได้ครั้งเดียว และ quantity ต้องไม่เกินคงเหลือที่ยังไม่ถูกจอง มิฉะนั้นตอบ 400
+  - มีครุภัณฑ์: ต้องส่ง loanDueOn (YYYY-MM-DD ตั้งแต่วันนี้ถึง 1 ปี) และผู้อนุมัติลำดับสุดท้ายต้องเป็น gov_role MAYOR หรือผู้รับมอบอำนาจ (loan_approver) มิฉะนั้น SEND_APPROVAL/APPROVE ตอบ 400 (ข้อ 208(2))
+  - มียานพาหนะ (ครุภัณฑ์ที่มี vehicle_plate): ต้องส่ง vehicleUse ตามแบบ 3 {destination, purpose, driverName, passengers 1–100, startAt, endAt (YYYY-MM-DDTHH:mm เวลาไทย), local?} ถ้า local=true และเทศบาลเปิดยกเว้นไว้ ส่งแค่ {local:true}
+- START รับ vehicleOdometers [{stockItemId,odometer}] บังคับเมื่อคำขอที่อนุมัติมียานพาหนะ เลขไมล์ต้องไม่น้อยกว่าเลขไมล์กลับของเที่ยวก่อน (แบบ 4) และเปิดใบยืมครุภัณฑ์ให้อัตโนมัติ
 - START รับ stockItems [{stockItemId,quantity}] เพิ่มได้ ไม่บังคับ และรับเฉพาะวัสดุสิ้นเปลือง ครุภัณฑ์ตอบ 400 เพราะต้องยื่นคำขอใช้ทรัพยากรและได้รับอนุมัติก่อน (ระเบียบพัสดุฯ ข้อ 208(2)); วัสดุในคำขอที่อนุมัติแล้วถูกตัดจากคลังอัตโนมัติตอนเริ่มงาน; รายการที่เบิกหน้างานเป็นใบเบิกย้อนหลัง แจ้งหัวหน้างานและผู้ดูแลคลังให้รับรองทั้งสองฝ่าย
-- REPORT รับ stockReturns [{stockItemId,quantity}] คืนของที่เหลือ ไม่เกินจำนวนที่เบิกไปในงานนั้น
+- REPORT รับ stockReturns [{stockItemId,quantity,condition?: GOOD|DAMAGED,conditionNote?}] คืนของที่เหลือ ไม่เกินจำนวนที่เบิกไปในงานนั้น ครุภัณฑ์ที่ DAMAGED ต้องมี conditionNote ไม่เกิน 500 ตัวอักษร (ข้อ 209) และรับ vehicleOdometers [{stockItemId,odometer}] บังคับสำหรับรถทุกคันที่ยังไม่กลับ ต้องไม่น้อยกว่าเลขไมล์ออก
+- UNDO_START คืนของทั้งหมด ปิดใบยืมเป็น CANCELLED และยกเลิกเที่ยวรถที่ยังไม่กลับ
 - APPROVE ขั้นสุดท้ายไม่ผ่านถ้าคลังมีไม่พอ (409)
 
 ## คลังวัสดุ
-GET /stock: รายการวัสดุ on_hand, reserved, available, in_use (เฉพาะงานที่ยังไม่ปิด), item_type และ keeper (ผู้ใช้นี้แก้ไขคลังได้หรือไม่) สำหรับบุคลากรทุกบทบาท
-POST /stock {name,unit,itemType?: CONSUMABLE|EQUIPMENT,quantity?,note?}, POST /stock/{id}/movements {kind: RECEIVE|ADJUST, quantity, note}, PATCH /stock/{id} {active}: ผู้ดูแลระบบหรือผู้ดูแลคลังเท่านั้น ยอดติดลบไม่ได้และประวัติแก้ย้อนหลังไม่ได้
+GET /stock: รายการวัสดุ on_hand, reserved, available, in_use (เฉพาะงานที่ยังไม่ปิด), item_type, vehicle_plate, keeper (ผู้ใช้นี้แก้ไขคลังได้หรือไม่) และ vehicleLocalExempt สำหรับบุคลากรทุกบทบาท
+POST /stock {name,unit,itemType?: CONSUMABLE|EQUIPMENT,vehiclePlate? (เฉพาะ EQUIPMENT ไม่เกิน 20 ตัวอักษร),quantity?,note?}, POST /stock/{id}/movements {kind: RECEIVE|ADJUST, quantity, note}, PATCH /stock/{id} {active}: ผู้ดูแลระบบหรือผู้ดูแลคลังเท่านั้น ยอดติดลบไม่ได้และประวัติแก้ย้อนหลังไม่ได้
 GET /stock/{id}/movements, GET /stock/complaints/{complaintId}: ประวัติเข้า-ออก และสรุปเบิก/คืน/ใช้ไปของคำร้อง
 GET /stock/pending-verifications, GET /stock/complaints/{complaintId}/verifications, POST /stock/movements/{movementId}/verify {note?}: หัวหน้าและผู้ดูแลคลังรับรองใบเบิกหน้างานย้อนหลัง
 GET /stock/export.csv?from=YYYY-MM-DD&to=YYYY-MM-DD: รายงานคลัง (UTF-8 BOM)
-GET /stock/keepers, PUT /stock/keepers/{userId} {keeper}: ผู้ดูแลระบบกำหนดผู้ดูแลคลัง
+GET /stock/keepers, PUT /stock/keepers/{userId} {keeper}: ผู้ดูแลระบบกำหนดผู้ดูแลคลัง keepers ส่ง gov_role และ loan_approver ด้วย
+
+## ครุภัณฑ์ยืมและยานพาหนะ
+ระเบียบกระทรวงการคลังว่าด้วยการจัดซื้อจัดจ้างและการบริหารพัสดุภาครัฐ พ.ศ. 2560 ข้อ 208–211 และระเบียบกระทรวงมหาดไทยว่าด้วยการใช้และรักษารถยนต์ของ อปท. พ.ศ. 2548 แก้ไขถึง (ฉบับที่ 2) พ.ศ. 2563
+
+GET /stock/loans: ทะเบียนคุมการยืม 200 รายการล่าสุด แต่ละรายการมี due_on, overdue, return_condition, borrower_name, approved_by_name
+POST /stock/loans/{id}/return {condition: GOOD|DAMAGED|LOST, note}: ผู้ดูแลคลังรับคืนหลังรายงาน note บังคับเมื่อไม่ใช่ GOOD ถ้า LOST จะลง RETURN แล้วตามด้วย ADJUST ลบ
+PUT /stock/loan-approvers/{userId} {approver, reference}: ผู้ดูแลระบบตั้งผู้รับมอบอำนาจอนุมัติยืม (บทบาท APPROVER) reference คือเลขที่หนังสือมอบอำนาจ บังคับเมื่อ approver=true
+ระบบแจ้งเตือนผู้ยืม หัวหน้า และผู้ดูแลคลัง 1 ครั้งทุกวัน 08:00 เมื่อเลยกำหนดคืน (ข้อ 211)
+GET /stock/vehicle-trips: บันทึกการใช้รถ (แบบ 4) 200 เที่ยวล่าสุด มี odometer_out, odometer_in, distance
+GET /stock/complaints/{complaintId}/vehicles: {pending: รถที่อนุมัติแล้วรอออก พร้อม last_odometer, open: เที่ยวที่ยังไม่กลับ}
+PUT /stock/vehicle-settings {localExempt}: ผู้ดูแลระบบเปิดหรือปิดการยกเว้นแบบ 3 สำหรับการใช้รถภายในเขตเทศบาล
+ลบคำร้องแล้ว ทะเบียนยืมและบันทึกการใช้รถยังอยู่ แต่ตัดลิงก์ไปยังคำร้อง
 
 ## ระยะเวลาดำเนินการ (SLA)
 GET /complaints/{id}/sla: due_at, progress_due_at (15 วันนับจากความเคลื่อนไหวล่าสุด), extensions, canRequest, canDecide นับเป็นวันตามปฏิทิน

@@ -4,7 +4,7 @@ import AttachmentList from "./AttachmentList";
 import { date } from "./api";
 type D = Record<string, any>;
 function RequestedItems({ resource }: { resource: D }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const items: D[] = JSON.parse(resource.requested_items || "[]");
   if (!items.length) return null;
   return (
@@ -23,7 +23,52 @@ function RequestedItems({ resource }: { resource: D }) {
           </List.Item>
         )}
       />
+      {resource.loan_due_on && (
+        <Typography.Paragraph>
+          <Typography.Text strong>{t("กำหนดวันส่งคืนครุภัณฑ์")}: </Typography.Text>
+          {new Date(resource.loan_due_on).toLocaleDateString(
+            language === "en" ? "en-GB" : "th-TH",
+            { dateStyle: "medium", timeZone: "UTC" },
+          )}
+        </Typography.Paragraph>
+      )}
+      <VehicleUse resource={resource} />
     </>
+  );
+}
+// Form 3, the request to use a municipal vehicle, as the approver reads it.
+function VehicleUse({ resource }: { resource: D }) {
+  const { t } = useI18n();
+  if (!resource.vehicle_form) return null;
+  const use: D = JSON.parse(resource.vehicle_form);
+  const period = (value?: string) => (value ? date(value + ":00+07:00") : "-");
+  return (
+    <div className="vehicle-use">
+      <Typography.Text strong>{t("ใบขออนุญาตใช้รถส่วนกลาง (แบบ 3)")}</Typography.Text>
+      {use.waived ? (
+        <Typography.Paragraph type="secondary">
+          {t("ใช้รถภายในเขตเทศบาล ได้รับยกเว้นแบบ 3")}
+        </Typography.Paragraph>
+      ) : (
+        <dl>
+          <dt>{t("สถานที่ไป")}</dt>
+          <dd>
+            {use.destination}
+            {use.local && ` (${t("ภายในเขตเทศบาล")})`}
+          </dd>
+          <dt>{t("วัตถุประสงค์การใช้รถ")}</dt>
+          <dd>{use.purpose}</dd>
+          <dt>{t("ผู้ขับ")}</dt>
+          <dd>{use.driverName}</dd>
+          <dt>{t("จำนวนผู้โดยสาร (รวมผู้ขับ)")}</dt>
+          <dd>{use.passengers}</dd>
+          <dt>{t("ช่วงเวลาใช้รถ")}</dt>
+          <dd>
+            {period(use.startAt)} – {period(use.endAt)}
+          </dd>
+        </dl>
+      )}
+    </div>
   );
 }
 export default function ResourceReview({

@@ -140,6 +140,76 @@ public class EquipmentLoans {
     }
   }
 
+  /** Form 4: the vehicle trip log, newest first. */
+  @GetMapping("/vehicle-trips")
+  public Object trips(Authentication a) {
+    var u = access.user(a);
+    access.role(u, StockController.STAFF.toArray(String[]::new));
+    return db.list(
+        "SELECT t.id,t.stock_item_id,i.name,i.vehicle_plate,t.complaint_id,p.display_name"
+            + " user_name,t.driver_name,t.destination,t.purpose,t.local_use,t.departed_at,"
+            + "t.odometer_out,t.arrived_at,t.odometer_in,t.odometer_in-t.odometer_out distance FROM"
+            + " vehicle_trip t JOIN stock_item i ON i.id=t.stock_item_id JOIN app_user p ON"
+            + " p.id=t.user_id WHERE t.municipality_id=? AND t.cancelled_at IS NULL ORDER BY"
+            + " t.departed_at DESC LIMIT 200",
+        u.get("municipality_id"));
+  }
+
+  /**
+   * Vehicles on a complaint's job: approved ones still to leave (odometer out at the start) and
+   * trips still out (odometer in with the report).
+   */
+  @GetMapping("/complaints/{complaintId}/vehicles")
+  public Object vehicles(@PathVariable UUID complaintId, Authentication a) {
+    var u = access.user(a);
+    access.role(u, StockController.STAFF.toArray(String[]::new));
+    access.complaint(complaintId, u, false);
+    var pending = new ArrayList<Map<String, Object>>();
+    var request = workflow.unissuedApproval(complaintId);
+    if (request != null)
+      for (UUID item : workflow.approvedStock(request).keySet())
+        pending.addAll(
+            db.list(
+                "SELECT i.id stock_item_id,i.name,i.vehicle_plate,(SELECT odometer_in FROM"
+                    + " vehicle_trip WHERE stock_item_id=i.id AND arrived_at IS NOT NULL ORDER BY"
+                    + " arrived_at DESC LIMIT 1) last_odometer FROM stock_item i WHERE i.id=? AND"
+                    + " i.vehicle_plate IS NOT NULL",
+                item));
+    return Map.of(
+        "pending",
+        pending,
+        "open",
+        db.list(
+            "SELECT t.id,t.stock_item_id,i.name,i.vehicle_plate,t.odometer_out,t.departed_at FROM"
+                + " vehicle_trip t JOIN stock_item i ON i.id=t.stock_item_id JOIN work_order w ON"
+                + " w.id=t.work_order_id WHERE t.complaint_id=? AND t.arrived_at IS NULL AND"
+                + " t.cancelled_at IS NULL AND w.status NOT IN ('DECLINED','COMPLETE','CANCELLED')"
+                + " ORDER BY i.name",
+            complaintId));
+  }
+
+  /** The executive's waiver of form 3 for vehicle use within the municipality's own area. */
+  @PutMapping("/vehicle-settings")
+  @Transactional
+  public Object vehicleSettings(@RequestBody Map<String, Object> b, Authentication a) {
+    var u = access.user(a);
+    if (!"ADMIN".equals(u.get("account_role"))) Access.deny();
+    if (!(b.get("localExempt") instanceof Boolean exempt)) throw new IllegalArgumentException();
+    db.run(
+        "UPDATE municipality SET vehicle_local_exempt=? WHERE id=?",
+        exempt,
+        u.get("municipality_id"));
+    workflow.audit(
+        u,
+        null,
+        "SET_VEHICLE_LOCAL_EXEMPT",
+        null,
+        null,
+        exempt ? "ยกเว้นแบบ 3 เมื่อใช้รถภายในเขตเทศบาล" : "ต้องใช้แบบ 3 ทุกครั้ง",
+        Map.of("localExempt", exempt));
+    return Map.of("vehicleLocalExempt", exempt);
+  }
+
   /** Approvers the mayor has delegated, in writing, to approve equipment loans. */
   @PutMapping("/loan-approvers/{userId}")
   @Transactional

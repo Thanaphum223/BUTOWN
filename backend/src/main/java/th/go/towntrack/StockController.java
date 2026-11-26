@@ -45,12 +45,16 @@ public class StockController {
                 + ") b ORDER BY b.active DESC,b.name",
             u.get("municipality_id")),
         "canVerify",
-        "LEADER".equals(u.get("role")) || stock.keeper(u));
+        "LEADER".equals(u.get("role")) || stock.keeper(u),
+        "vehicleLocalExempt",
+        db.one("SELECT vehicle_local_exempt FROM municipality WHERE id=?", u.get("municipality_id"))
+            .get("vehicle_local_exempt"));
   }
 
   // Items on finished jobs are used up, so only open jobs count as in use.
   static final String BALANCES =
-      "SELECT i.id,i.name,i.unit,i.on_hand,i.active,i.item_type,(SELECT COALESCE(SUM(r.quantity),0)"
+      "SELECT i.id,i.name,i.unit,i.on_hand,i.active,i.item_type,i.vehicle_plate,"
+          + "(SELECT COALESCE(SUM(r.quantity),0)"
           + " FROM stock_reservation r WHERE r.stock_item_id=i.id AND r.status='ACTIVE') reserved,"
           + "(SELECT COALESCE(-SUM(m.delta),0) FROM stock_movement m JOIN work_order w ON"
           + " w.id=m.work_order_id WHERE m.stock_item_id=i.id AND m.kind IN ('ISSUE','RETURN') AND"
@@ -199,7 +203,9 @@ public class StockController {
               String.join(
                   ",",
                   cell(r.get("name")),
-                  "EQUIPMENT".equals(r.get("item_type")) ? "ครุภัณฑ์" : "วัสดุสิ้นเปลือง",
+                  r.get("vehicle_plate") != null
+                      ? cell("ยานพาหนะ ทะเบียน " + r.get("vehicle_plate"))
+                      : "EQUIPMENT".equals(r.get("item_type")) ? "ครุภัณฑ์" : "วัสดุสิ้นเปลือง",
                   cell(r.get("unit")),
                   Boolean.TRUE.equals(r.get("active")) ? "ใช้งาน" : "ปิดใช้งาน",
                   number(r.get("on_hand")),
@@ -241,15 +247,18 @@ public class StockController {
     Object type = b.get("itemType") == null ? "CONSUMABLE" : b.get("itemType");
     if (!List.of("CONSUMABLE", "EQUIPMENT").contains(type))
       throw new IllegalArgumentException("ประเภทวัสดุไม่ถูกต้อง");
+    String plate = plate(b, type);
     UUID id = UUID.randomUUID();
     try {
       db.run(
-          "INSERT INTO stock_item(id,municipality_id,name,unit,item_type) VALUES(?,?,?,?,?)",
+          "INSERT INTO stock_item(id,municipality_id,name,unit,item_type,vehicle_plate)"
+              + " VALUES(?,?,?,?,?,?)",
           id,
           u.get("municipality_id"),
           name,
           unit,
-          type);
+          type,
+          plate);
     } catch (DuplicateKeyException e) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "มีวัสดุชื่อและหน่วยนี้ในคลังแล้ว");
     }
@@ -298,10 +307,23 @@ public class StockController {
       @PathVariable UUID id, @RequestBody Map<String, Object> b, Authentication a) {
     var u = access.user(a);
     stock.requireKeeper(u);
-    stock.item(id, u, true);
-    if (!(b.get("active") instanceof Boolean active)) throw new IllegalArgumentException();
-    db.run("UPDATE stock_item SET active=? WHERE id=?", active, id);
+    var item = stock.item(id, u, true);
+    if (b.containsKey("vehiclePlate")) {
+      String plate = plate(b, item.get("item_type"));
+      db.run("UPDATE stock_item SET vehicle_plate=? WHERE id=?", plate, id);
+    } else if (b.get("active") instanceof Boolean active) {
+      db.run("UPDATE stock_item SET active=? WHERE id=?", active, id);
+    } else throw new IllegalArgumentException();
     return stock.item(id, u, false);
+  }
+
+  /** A vehicle is equipment with a licence plate; it then needs forms 3 and 4 to be used. */
+  static String plate(Map<String, Object> b, Object itemType) {
+    String plate = b.get("vehiclePlate") instanceof String text ? text.strip() : "";
+    if (plate.length() > 20 || (!plate.isEmpty() && !"EQUIPMENT".equals(itemType)))
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "ทะเบียนรถใช้กับครุภัณฑ์เท่านั้น และยาวไม่เกิน 20 ตัวอักษร");
+    return plate.isEmpty() ? null : plate;
   }
 
   @GetMapping("/{id}/movements")

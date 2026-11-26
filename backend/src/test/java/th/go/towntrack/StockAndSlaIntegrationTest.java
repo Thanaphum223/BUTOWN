@@ -906,6 +906,196 @@ class StockAndSlaIntegrationTest {
             .get("returned_at"));
   }
 
+  UUID vehicle(String plate) throws Exception {
+    var result =
+        send(
+                "OFFICER",
+                () -> post("/api/stock"),
+                Map.of(
+                    "name",
+                    "Pickup " + plate,
+                    "unit",
+                    "คัน",
+                    "quantity",
+                    1,
+                    "itemType",
+                    "EQUIPMENT",
+                    "vehiclePlate",
+                    plate))
+            .andExpect(status().isOk())
+            .andReturn();
+    return UUID.fromString(
+        json.readTree(result.getResponse().getContentAsString()).get("id").asText());
+  }
+
+  Map<String, Object> form3(String start, String end) {
+    return Map.of(
+        "destination",
+        "Pumping station",
+        "purpose",
+        "Carry pipes",
+        "driverName",
+        "Somchai",
+        "passengers",
+        2,
+        "startAt",
+        start,
+        "endAt",
+        end);
+  }
+
+  @Test
+  void aVehicleRequestNeedsForm3UnlessLocalUseIsWaived() throws Exception {
+    send(
+            "OFFICER",
+            () -> post("/api/stock"),
+            Map.of("name", "Sand", "unit", "bags", "vehiclePlate", "กข 1234"))
+        .andExpect(status().isBadRequest());
+    UUID pickup = vehicle("กข 1234");
+    UUID sand = item("Sand", 5), truck = equip("Truck", 1);
+    send("OFFICER", () -> patch("/api/stock/" + sand), Map.of("vehiclePlate", "ขข 1"))
+        .andExpect(status().isBadRequest());
+    send("OFFICER", () -> patch("/api/stock/" + truck), Map.of("vehiclePlate", "ขข 1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.vehicle_plate").value("ขข 1"));
+    send("OFFICER", () -> patch("/api/stock/" + truck), Map.of("vehiclePlate", ""))
+        .andExpect(jsonPath("$.vehicle_plate").doesNotExist());
+    var line = Map.of("stockItemId", pickup, "name", "Pickup", "unit", "คัน", "quantity", 1);
+    var today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Bangkok"));
+    String due = today.plusDays(1).toString();
+    String start = today.plusDays(1) + "T08:00", end = today.plusDays(1) + "T16:00";
+    UUID id = accepted();
+    for (var use : List.<Object>of(Map.of(), Map.of("local", true), form3(end, start)))
+      action(
+              id,
+              "FIELD",
+              "REQUEST_RESOURCE",
+              Map.of("reason", "Need", "loanDueOn", due, "items", List.of(line), "vehicleUse", use))
+          .andExpect(status().isBadRequest());
+    action(
+            id,
+            "FIELD",
+            "REQUEST_RESOURCE",
+            Map.of(
+                "reason",
+                "Need",
+                "loanDueOn",
+                due,
+                "items",
+                List.of(line),
+                "vehicleUse",
+                form3(start, end)))
+        .andExpect(status().isOk());
+    assertEquals(
+        "Pumping station",
+        db.one(
+                "SELECT vehicle_use->>'destination' v FROM resource_request WHERE complaint_id=?",
+                id)
+            .get("v"));
+
+    mvc.perform(get("/api/complaints/" + id).with(user(names.get("LEADER"))))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.resources[0].vehicle_form")
+                .value(org.hamcrest.Matchers.containsString("Pumping station")));
+    send("OFFICER", () -> put("/api/stock/vehicle-settings"), Map.of("localExempt", true))
+        .andExpect(status().isForbidden());
+    send("ADMIN", () -> put("/api/stock/vehicle-settings"), Map.of("localExempt", true))
+        .andExpect(status().isOk());
+    mvc.perform(get("/api/stock").with(user(names.get("OFFICER"))))
+        .andExpect(jsonPath("$.vehicleLocalExempt").value(true));
+    UUID local = accepted();
+    action(
+            local,
+            "FIELD",
+            "REQUEST_RESOURCE",
+            Map.of(
+                "reason",
+                "Need",
+                "loanDueOn",
+                due,
+                "items",
+                List.of(line),
+                "vehicleUse",
+                Map.of("local", true)))
+        .andExpect(status().isOk());
+    assertEquals(
+        "true",
+        db.one("SELECT vehicle_use->>'waived' v FROM resource_request WHERE complaint_id=?", local)
+            .get("v"));
+  }
+
+  @Test
+  void eachVehicleTripLogsTheOdometerOutAtStartAndInWithTheReport() throws Exception {
+    UUID pickup = vehicle("1กก 999");
+    send(
+            "ADMIN",
+            () -> put("/api/stock/loan-approvers/" + users.get("APPROVER")),
+            Map.of("approver", true, "reference", "คำสั่งที่ 1/2569"))
+        .andExpect(status().isOk());
+    UUID id = approved(pickup, 1);
+    action(id, "APPROVER", "APPROVE", Map.of("reason", "Fine")).andExpect(status().isOk());
+    photo(id, "BEFORE");
+    mvc.perform(get("/api/stock/complaints/" + id + "/vehicles").with(user(names.get("FIELD"))))
+        .andExpect(jsonPath("$.pending[0].vehicle_plate").value("1กก 999"))
+        .andExpect(jsonPath("$.open").isEmpty());
+    action(id, "FIELD", "START", Map.of())
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("เลขไมล์")));
+    var out = List.of(Map.of("stockItemId", pickup, "odometer", 1000));
+    action(id, "FIELD", "START", Map.of("vehicleOdometers", out)).andExpect(status().isOk());
+    mvc.perform(get("/api/stock/complaints/" + id + "/vehicles").with(user(names.get("FIELD"))))
+        .andExpect(jsonPath("$.pending").isEmpty())
+        .andExpect(jsonPath("$.open[0].odometer_out").value(1000.0));
+
+    photo(id, "AFTER");
+    var returns = List.of(Map.of("stockItemId", pickup, "quantity", 1));
+    action(
+            id,
+            "FIELD",
+            "REPORT",
+            Map.of(
+                "content",
+                "Done",
+                "stockReturns",
+                returns,
+                "vehicleOdometers",
+                List.of(Map.of("stockItemId", pickup, "odometer", 990))))
+        .andExpect(status().isBadRequest());
+    action(
+            id,
+            "FIELD",
+            "REPORT",
+            Map.of(
+                "content",
+                "Done",
+                "stockReturns",
+                returns,
+                "vehicleOdometers",
+                List.of(Map.of("stockItemId", pickup, "odometer", 1042.5))))
+        .andExpect(status().isOk());
+    mvc.perform(get("/api/stock/vehicle-trips").with(user(names.get("OFFICER"))))
+        .andExpect(jsonPath("$[0].vehicle_plate").value("1กก 999"))
+        .andExpect(jsonPath("$[0].distance").value(42.5));
+
+    // The next trip cannot start below the last reading.
+    UUID next = approved(pickup, 1);
+    action(next, "APPROVER", "APPROVE", Map.of("reason", "Fine")).andExpect(status().isOk());
+    photo(next, "BEFORE");
+    action(next, "FIELD", "START", Map.of("vehicleOdometers", out))
+        .andExpect(status().isBadRequest());
+    action(
+            next,
+            "FIELD",
+            "START",
+            Map.of("vehicleOdometers", List.of(Map.of("stockItemId", pickup, "odometer", 1050))))
+        .andExpect(status().isOk());
+    action(next, "FIELD", "UNDO_START", Map.of("reason", "Rain")).andExpect(status().isOk());
+    assertNotNull(
+        db.one("SELECT cancelled_at FROM vehicle_trip WHERE complaint_id=?", next)
+            .get("cancelled_at"));
+  }
+
   @Test
   void overdueReminderFiresExactlyOnce() throws Exception {
     UUID drill = equip("Overdue Drill", 1);

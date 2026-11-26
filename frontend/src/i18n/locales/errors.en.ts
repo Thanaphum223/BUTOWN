@@ -131,6 +131,14 @@ const messages: Record<string, string> = {
     "This request lends out equipment. The final approver must be the mayor or someone delegated in writing.",
   "กรุณาระบุสภาพความชำรุดของครุภัณฑ์ไม่เกิน 500 ตัวอักษร":
     "Describe the damage to the equipment in at most 500 characters",
+  "กรุณากรอกใบขออนุญาตใช้รถ (แบบ 3) ให้ครบ ได้แก่ สถานที่ไป วัตถุประสงค์ ผู้ขับ จำนวนผู้โดยสาร และช่วงเวลาใช้รถ":
+    "Complete the vehicle use request (form 3): destination, purpose, driver, passengers and period of use",
+  "ช่วงเวลาใช้รถไม่ถูกต้อง เวลากลับต้องหลังเวลาออก และเริ่มใช้ได้ไม่เกิน 1 ปีข้างหน้า":
+    "The period of use is invalid. Return must be after departure, and departure within one year.",
+  "กรุณาระบุเลขไมล์เป็นตัวเลข ทศนิยมไม่เกิน 1 ตำแหน่ง":
+    "Enter the odometer reading as a number with at most one decimal place",
+  "ทะเบียนรถใช้กับครุภัณฑ์เท่านั้น และยาวไม่เกิน 20 ตัวอักษร":
+    "A licence plate is only for equipment and is at most 20 characters",
   "กรุณาระบุเลขที่หนังสือมอบอำนาจไม่เกิน 200 ตัวอักษร":
     "Enter the delegation letter reference in at most 200 characters",
 };

@@ -4005,6 +4005,22 @@ button.queue-item .queue-item-top .ant-tag {
 .stock-line > .stock-line-note {
   grid-column: 1 / -1;
 }
+.vehicle-use {
+  margin-top: 8px;
+}
+.vehicle-use dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 8px 0 12px;
+}
+.vehicle-use dt {
+  color: #516575;
+}
+.vehicle-use dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
 .loan-overdue-row > td {
   background: #fdf1ec;
 }

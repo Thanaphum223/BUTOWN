@@ -147,6 +147,7 @@ export function StockReturns({ held }: { held: D[] }) {
                       rules={[{ required: true }]}
                     >
                       <Select
+                        style={{ minWidth: 120 }}
                         aria-label={t("สภาพครุภัณฑ์ {{name}}", { name: line.name })}
                         options={[
                           { value: "GOOD", label: t("สภาพปกติ") },
@@ -174,6 +175,65 @@ export function StockReturns({ held }: { held: D[] }) {
                     </Form.Item>
                   </>
                 )}
+              </div>
+            );
+          })
+        }
+      </Form.List>
+    </section>
+  );
+}
+
+// Form 4: each vehicle's odometer reading as it leaves at the start and when it is back.
+export function VehicleOdometers({ vehicles, leaving }: { vehicles: D[]; leaving: boolean }) {
+  const { t } = useI18n();
+  if (!vehicles.length) return null;
+  return (
+    <section className="stock-fields">
+      <Typography.Title level={5}>
+        {leaving
+          ? t("เลขไมล์ก่อนออกเดินทาง (บันทึกการใช้รถ แบบ 4)")
+          : t("เลขไมล์เมื่อกลับถึง (บันทึกการใช้รถ แบบ 4)")}
+      </Typography.Title>
+      <Form.List name="vehicleOdometers">
+        {(fields) =>
+          fields.map((field, index) => {
+            const vehicle = vehicles[index];
+            if (!vehicle) return null;
+            const min = Number((leaving ? vehicle.last_odometer : vehicle.odometer_out) ?? 0);
+            return (
+              <div className="stock-line" key={field.key}>
+                <Form.Item name={[field.name, "stockItemId"]} hidden>
+                  <input />
+                </Form.Item>
+                <Typography.Text className="stock-line-name">
+                  {leaving
+                    ? `${vehicle.vehicle_plate} · ${vehicle.name}`
+                    : t("{{plate}} · ออก {{km}} กม.", {
+                        plate: vehicle.vehicle_plate,
+                        km: amount(vehicle.odometer_out),
+                      })}
+                </Typography.Text>
+                <Form.Item
+                  name={[field.name, "odometer"]}
+                  rules={[
+                    {
+                      required: true,
+                      type: "number",
+                      min,
+                      message: t("เลขไมล์ต้องไม่น้อยกว่า {{km}} กม.", { km: amount(min) }),
+                    },
+                  ]}
+                >
+                  <InputNumber
+                    aria-label={t("เลขไมล์รถ {{plate}}", { plate: vehicle.vehicle_plate })}
+                    min={0}
+                    max={9999999.9}
+                    precision={1}
+                    inputMode="decimal"
+                    addonAfter={t("กม.")}
+                  />
+                </Form.Item>
               </div>
             );
           })

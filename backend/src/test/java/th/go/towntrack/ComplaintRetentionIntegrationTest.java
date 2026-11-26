@@ -379,7 +379,7 @@ class ComplaintRetentionIntegrationTest {
   }
 
   @Test
-  void theEquipmentLoanRegisterOutlivesTheComplaint() throws Exception {
+  void theLoanRegisterAndTripLogOutliveTheComplaint() throws Exception {
     UUID drill = item("Drill", "EQUIPMENT");
     UUID id = closed(item("Cement", "CONSUMABLE"));
     Object work = db.one("SELECT id FROM work_order WHERE complaint_id=? LIMIT 1", id).get("id");
@@ -403,8 +403,31 @@ class ComplaintRetentionIntegrationTest {
         work,
         users.get("FIELD"),
         users.get("APPROVER"));
+    UUID trip = UUID.randomUUID();
+    db.run(
+        "INSERT INTO vehicle_trip(id,municipality_id,stock_item_id,complaint_id,resource_id,"
+            + "work_order_id,user_id,odometer_out,arrived_at,odometer_in) VALUES(?,?,?,?,?,?,?,"
+            + "100,now(),120)",
+        trip,
+        town,
+        drill,
+        id,
+        resource,
+        work,
+        users.get("FIELD"));
 
     purge("ADMIN", id, "Duplicate of another report").andExpect(status().isOk());
+
+    var log =
+        db.one(
+            "SELECT complaint_id,resource_id,work_order_id,odometer_in FROM vehicle_trip WHERE id=?",
+            trip);
+    assertNull(log.get("complaint_id"));
+    assertNull(log.get("resource_id"));
+    assertNull(log.get("work_order_id"));
+    assertEquals(
+        0,
+        new java.math.BigDecimal("120").compareTo((java.math.BigDecimal) log.get("odometer_in")));
 
     var row =
         db.one(

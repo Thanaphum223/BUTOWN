@@ -17,6 +17,7 @@ public class Workflow {
   @org.springframework.beans.factory.annotation.Autowired WorkflowPolicy policy;
   @org.springframework.beans.factory.annotation.Autowired DepartmentTransfers transfers;
   @org.springframework.beans.factory.annotation.Autowired Stock stock;
+  @org.springframework.beans.factory.annotation.Autowired Vehicles vehicles;
 
   public Workflow(Db d, Access a) {
     db = d;
@@ -361,18 +362,19 @@ public class Workflow {
           }
           case "REQUEST_RESOURCE" -> {
             var items = fromStock(requestedItems(b), u);
+            var stockIds = items.stream().map(item -> item.get("stockItemId")).toList();
             db.run(
                 "INSERT INTO resource_request(id,complaint_id,work_order_id,requested_by,necessity,"
-                    + "requested_items,loan_due_on) VALUES(?,?,?,?,?,?::jsonb,?)",
+                    + "requested_items,loan_due_on,vehicle_use) VALUES(?,?,?,?,?,?::jsonb,?,"
+                    + "?::jsonb)",
                 UUID.randomUUID(),
                 id,
                 w.get("id"),
                 u.get("id"),
                 reason,
                 json.valueToTree(items).toString(),
-                lendsEquipment(items.stream().map(item -> item.get("stockItemId")).toList())
-                    ? loanDueOn(b)
-                    : null);
+                lendsEquipment(stockIds) ? loanDueOn(b) : null,
+                vehicles.useRequest(b, stockIds, u));
             notifyUser(c.get("leader_id"), id, "ทีมขอใช้ทรัพยากร กรุณาจัดทำข้อเสนอ");
           }
           case "REPORT" -> {
@@ -406,6 +408,7 @@ public class Workflow {
                 || ((Number) stages.get("a")).longValue() == 0)
               throw new ResponseStatusException(
                   HttpStatus.BAD_REQUEST, "กรุณาแนบภาพก่อนทำ BEFORE และหลังทำ AFTER ให้ครบ");
+            vehicles.arrive(w.get("id"), b.get("vehicleOdometers"));
             returnLeftovers(c, w, b, u);
             db.run(
                 "INSERT INTO"
@@ -702,6 +705,7 @@ public class Workflow {
         var w = active(id);
         if (!u.get("id").equals(w.get("assignee_id"))) Access.deny();
         stock.returnAll(u, id, w.get("id"), "คืนวัสดุอัตโนมัติจากการยกเลิกการเริ่มปฏิบัติงาน");
+        vehicles.cancel(w.get("id"));
         db.run(
             "UPDATE work_order SET status='ACCEPTED',start_latitude=NULL,start_longitude=NULL,"
                 + "start_accuracy_m=NULL,start_distance_m=NULL WHERE id=?",
@@ -841,37 +845,44 @@ public class Workflow {
     stock.reserve(u, r.get("id"), approvedStock(r));
   }
 
+  /** The complaint's latest request if it is approved and nothing has been issued against it. */
+  public Map<String, Object> unissuedApproval(UUID complaintId) {
+    var latest =
+        db.list(
+            "SELECT * FROM resource_request WHERE complaint_id=? AND NOT handed_off ORDER BY created_at"
+                + " DESC LIMIT 1",
+            complaintId);
+    if (latest.isEmpty() || !"APPROVED".equals(latest.getFirst().get("status"))) return null;
+    var issued =
+        (java.math.BigDecimal)
+            db.one(
+                    "SELECT COALESCE(-SUM(delta),0) net FROM stock_movement WHERE resource_id=? AND"
+                        + " kind IN ('ISSUE','RETURN')",
+                    latest.getFirst().get("id"))
+                .get("net");
+    return issued.signum() == 0 ? latest.getFirst() : null;
+  }
+
   // Starting work is when items leave the store: approved items, plus anything the team takes
   // without a prior request (recorded as a retrospective issue for the leader to confirm).
   void issueForStart(
       Map<String, Object> c, Map<String, Object> w, Map<String, Object> b, Map<String, Object> u) {
     UUID id = (UUID) c.get("id");
-    var latest =
-        db.list(
-            "SELECT * FROM resource_request WHERE complaint_id=? AND NOT handed_off ORDER BY created_at"
-                + " DESC LIMIT 1",
-            id);
-    Map<UUID, java.math.BigDecimal> approved = Map.of();
-    if (!latest.isEmpty()
-        && "APPROVED".equals(latest.getFirst().get("status"))
-        && ((java.math.BigDecimal)
-                    db.one(
-                            "SELECT COALESCE(-SUM(delta),0) net FROM stock_movement WHERE"
-                                + " resource_id=? AND kind IN ('ISSUE','RETURN')",
-                            latest.getFirst().get("id"))
-                        .get("net"))
-                .signum()
-            == 0) approved = approvedStock(latest.getFirst());
+    var request = unissuedApproval(id);
+    Map<UUID, java.math.BigDecimal> approved = request == null ? Map.of() : approvedStock(request);
     var extra = Stock.lines(b.get("stockItems"));
     var items = new HashSet<>(approved.keySet());
     for (var line : extra) items.add((UUID) line.get("stockItemId"));
     stock.lock(u, items);
-    if (!approved.isEmpty()) {
+    if (request != null && !approved.isEmpty()) {
+      // Form 4: vehicles leave with their odometer reading, checked before anything moves.
+      vehicles.depart(
+          u, request.get("id"), id, w.get("id"), approved.keySet(), b.get("vehicleOdometers"));
       // Free this request's own hold first so the check below only protects other jobs.
       db.run(
           "UPDATE stock_reservation SET status='FULFILLED',resolved_at=now() WHERE resource_id=?"
               + " AND status='ACTIVE'",
-          latest.getFirst().get("id"));
+          request.get("id"));
       for (var line : approved.entrySet()) {
         stock.requireAvailable(u, line.getKey(), line.getValue());
         stock.move(
@@ -881,10 +892,10 @@ public class Workflow {
             line.getValue().negate(),
             "เบิกตามคำขอใช้ทรัพยากรที่อนุมัติแล้ว",
             id,
-            latest.getFirst().get("id"),
+            request.get("id"),
             w.get("id"));
       }
-      stock.openLoans(u, latest.getFirst().get("id"), id, w.get("id"), approved);
+      stock.openLoans(u, request.get("id"), id, w.get("id"), approved);
     }
     for (var line : extra) {
       var registered = stock.item(line.get("stockItemId"), u, false);

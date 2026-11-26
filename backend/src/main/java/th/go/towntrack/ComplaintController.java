@@ -397,7 +397,7 @@ public class ComplaintController {
     result.put(
         "resources",
         db.list(
-            "SELECT r.requested_items::text requested_items,r.*,u.display_name approver_name,u.gov_role approver_gov_role,requester.display_name"
+            "SELECT r.requested_items::text requested_items,r.*,r.vehicle_use::text vehicle_form,u.display_name approver_name,u.gov_role approver_gov_role,requester.display_name"
                 + " requester_name,COALESCE((SELECT json_agg(v ORDER BY v.revision) FROM"
                 + " resource_revision v WHERE v.resource_id=r.id),'[]'::json)::text revisions FROM"
                 + " resource_request r LEFT JOIN app_user u ON u.id=r.approver_id LEFT JOIN"
