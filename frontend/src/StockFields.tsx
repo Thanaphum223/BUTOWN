@@ -149,19 +149,18 @@ export function StockReturns({ held }: { held: D[] }) {
                       <Select
                         aria-label={t("สภาพครุภัณฑ์ {{name}}", { name: line.name })}
                         options={[
-                          { value: "GOOD", label: t("ปกติ") },
+                          { value: "GOOD", label: t("สภาพปกติ") },
                           { value: "DAMAGED", label: t("ชำรุด") },
                         ]}
                       />
                     </Form.Item>
-                    <Form.Item shouldUpdate>
+                    <Form.Item shouldUpdate noStyle>
                       {({ getFieldValue }) =>
                         getFieldValue(["stockReturns", field.name, "condition"]) === "DAMAGED" ? (
                           <Form.Item
+                            className="stock-line-note"
                             name={[field.name, "conditionNote"]}
-                            rules={[
-                              { required: true, whitespace: true, max: 500 },
-                            ]}
+                            rules={[{ required: true, whitespace: true, max: 500 }]}
                           >
                             <Input.TextArea
                               aria-label={t("หมายเหตุสภาพชำรุด {{name}}", { name: line.name })}

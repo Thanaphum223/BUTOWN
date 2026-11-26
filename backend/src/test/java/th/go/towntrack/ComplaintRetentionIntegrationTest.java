@@ -379,6 +379,46 @@ class ComplaintRetentionIntegrationTest {
   }
 
   @Test
+  void theEquipmentLoanRegisterOutlivesTheComplaint() throws Exception {
+    UUID drill = item("Drill", "EQUIPMENT");
+    UUID id = closed(item("Cement", "CONSUMABLE"));
+    Object work = db.one("SELECT id FROM work_order WHERE complaint_id=? LIMIT 1", id).get("id");
+    UUID resource = UUID.randomUUID(), loan = UUID.randomUUID();
+    db.run(
+        "INSERT INTO resource_request(id,complaint_id,work_order_id,requested_by,status)"
+            + " VALUES(?,?,?,?,'APPROVED')",
+        resource,
+        id,
+        work,
+        users.get("FIELD"));
+    db.run(
+        "INSERT INTO equipment_loan(id,municipality_id,stock_item_id,complaint_id,resource_id,"
+            + "work_order_id,borrower_id,approved_by,quantity,reason,due_on,returned_at,"
+            + "return_condition) VALUES(?,?,?,?,?,?,?,?,1,'Drill holes',current_date,now(),'GOOD')",
+        loan,
+        town,
+        drill,
+        id,
+        resource,
+        work,
+        users.get("FIELD"),
+        users.get("APPROVER"));
+
+    purge("ADMIN", id, "Duplicate of another report").andExpect(status().isOk());
+
+    var row =
+        db.one(
+            "SELECT complaint_id,resource_id,work_order_id,borrower_id,return_condition"
+                + " FROM equipment_loan WHERE id=?",
+            loan);
+    assertNull(row.get("complaint_id"));
+    assertNull(row.get("resource_id"));
+    assertNull(row.get("work_order_id"));
+    assertEquals(users.get("FIELD"), row.get("borrower_id"));
+    assertEquals("GOOD", row.get("return_condition"));
+  }
+
+  @Test
   void equipmentStillOutBlocksTheDeletion() throws Exception {
     // Taken on site as a consumable, then reclassified; equipment cannot be taken at start.
     UUID drill = item("Drill", "CONSUMABLE");

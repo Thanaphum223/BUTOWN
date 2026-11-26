@@ -560,7 +560,7 @@ export default function Inventory({ admin }: { admin: boolean }) {
           <Form.Item name="condition" label={t("สภาพที่รับคืน")} rules={[{ required: true }]}>
             <Segmented
               options={[
-                { value: "GOOD", label: t("ปกติ") },
+                { value: "GOOD", label: t("สภาพปกติ") },
                 { value: "DAMAGED", label: t("ชำรุด") },
                 { value: "LOST", label: t("สูญหาย") },
               ]}
@@ -572,7 +572,7 @@ export default function Inventory({ admin }: { admin: boolean }) {
               return (
                 <Form.Item
                   name="note"
-                  label={t("หมายเหตุ (ไม่บังคับ)")}
+                  label={condition === "GOOD" ? t("หมายเหตุ (ไม่บังคับ)") : t("หมายเหตุ")}
                   rules={[
                     {
                       required: condition !== "GOOD",

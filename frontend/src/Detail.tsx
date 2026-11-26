@@ -2200,8 +2200,7 @@ export default function Detail({
                 <DatePicker
                   style={{ width: "100%" }}
                   disabledDate={(d) =>
-                    d.isBefore(dayjs().add(1, "day"), "day") ||
-                    d.isAfter(dayjs().add(1, "year"), "day")
+                    d.isBefore(dayjs(), "day") || d.isAfter(dayjs().add(1, "year"), "day")
                   }
                   placeholder={t("เลือกวันส่งคืน")}
                   format="DD/MM/YYYY"

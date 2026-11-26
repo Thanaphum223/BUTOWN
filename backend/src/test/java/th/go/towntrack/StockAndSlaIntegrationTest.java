@@ -788,15 +788,10 @@ class StockAndSlaIntegrationTest {
     UUID id = accepted();
     var drillLine = Map.of("stockItemId", drill, "name", "Drill", "unit", "pcs", "quantity", 1);
     // Missing loanDueOn → 400
-    action(
-            id,
-            "FIELD",
-            "REQUEST_RESOURCE",
-            Map.of("reason", "Need", "items", List.of(drillLine)))
+    action(id, "FIELD", "REQUEST_RESOURCE", Map.of("reason", "Need", "items", List.of(drillLine)))
         .andExpect(status().isBadRequest())
         .andExpect(
-            jsonPath("$.message")
-                .value(org.hamcrest.Matchers.containsString("กำหนดวันส่งคืน")));
+            jsonPath("$.message").value(org.hamcrest.Matchers.containsString("กำหนดวันส่งคืน")));
     // Past date → 400
     action(
             id,
@@ -805,8 +800,7 @@ class StockAndSlaIntegrationTest {
             Map.of("reason", "Need", "loanDueOn", "2020-01-01", "items", List.of(drillLine)))
         .andExpect(status().isBadRequest())
         .andExpect(
-            jsonPath("$.message")
-                .value(org.hamcrest.Matchers.containsString("กำหนดวันส่งคืน")));
+            jsonPath("$.message").value(org.hamcrest.Matchers.containsString("กำหนดวันส่งคืน")));
     // Valid date within one year → 200
     String validDue =
         java.time.LocalDate.now(java.time.ZoneId.of("Asia/Bangkok")).plusDays(30).toString();
@@ -839,7 +833,10 @@ class StockAndSlaIntegrationTest {
                     id1)
                 .get("id");
     assertEquals(2, onHand(drill));
-    send("OFFICER", () -> post("/api/stock/loans/" + loan1 + "/return"), Map.of("condition", "GOOD"))
+    send(
+            "OFFICER",
+            () -> post("/api/stock/loans/" + loan1 + "/return"),
+            Map.of("condition", "GOOD"))
         .andExpect(status().isOk());
     assertEquals(3, onHand(drill));
     assertEquals(
@@ -898,8 +895,7 @@ class StockAndSlaIntegrationTest {
     UUID drill = equip("Drill", 1);
     UUID id = delegateAndApprove(drill, 1);
     assertEquals(0, onHand(drill));
-    action(id, "FIELD", "UNDO_START", Map.of("reason", "Bad weather"))
-        .andExpect(status().isOk());
+    action(id, "FIELD", "UNDO_START", Map.of("reason", "Bad weather")).andExpect(status().isOk());
     assertEquals(1, onHand(drill));
     assertEquals(
         "CANCELLED",

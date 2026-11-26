@@ -386,16 +386,14 @@ const messages: Record<string, string> = {
   ทะเบียนคุมการยืมครุภัณฑ์: "Equipment loan register",
   "แสดง {{n}} รายการล่าสุด": "Showing {{n}} most recent",
   ผู้ยืม: "Borrower",
-  ผู้อนุมัติ: "Approved by",
   กำหนดคืน: "Due date",
   ยังอยู่: "Out",
-  เกินกำหนด: "Overdue",
-  "คืนแล้ว": "Returned",
+  คืนแล้ว: "Returned",
   รับคืน: "Receive back",
   "รับคืนครุภัณฑ์: {{name}}": "Receive equipment back: {{name}}",
   สภาพที่รับคืน: "Returned condition",
   สูญหาย: "Lost",
-  กรุณาระบุสภาพครุภัณฑ์ที่ชำรุดหรือสูญหายไม่เกิน500ตัวอักษร:
+  "กรุณาระบุสภาพครุภัณฑ์ที่ชำรุดหรือสูญหายไม่เกิน 500 ตัวอักษร":
     "Describe the damage or loss in at most 500 characters",
   ผู้รับมอบอำนาจอนุมัติยืมครุภัณฑ์: "Equipment loan authorised approver",
   "ผู้รับมอบอำนาจอนุมัติยืมครุภัณฑ์ {{name}}": "Equipment loan authorised approver: {{name}}",
@@ -406,9 +404,10 @@ const messages: Record<string, string> = {
   กรุณาระบุกำหนดวันส่งคืนครุภัณฑ์: "Please set an equipment return date",
   เลือกวันส่งคืน: "Select return date",
   "สภาพครุภัณฑ์ {{name}}": "Condition of {{name}}",
-  ปกติ: "Good condition",
+  สภาพปกติ: "Good condition",
   ชำรุด: "Damaged",
   "หมายเหตุสภาพชำรุด {{name}}": "Damage note for {{name}}",
   ระบุสภาพความชำรุดของครุภัณฑ์: "Describe the damage",
+  รับคืนครุภัณฑ์ตามใบยืม: "Equipment returned against its loan record",
 };
 export default messages;

@@ -622,8 +622,7 @@ public class Workflow {
                 "UPDATE resource_request SET approver_id=? WHERE id=?",
                 next.getFirst().get("approver_id"),
                 r.get("id"));
-            notifyUser(
-                next.getFirst().get("approver_id"), id, "มีคำขอทรัพยากรรออนุมัติลำดับถัดไป");
+            notifyUser(next.getFirst().get("approver_id"), id, "มีคำขอทรัพยากรรออนุมัติลำดับถัดไป");
           }
         }
         String state =

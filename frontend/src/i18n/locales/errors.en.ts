@@ -125,5 +125,13 @@ const messages: Record<string, string> = {
     "Ask an administrator to enter the Gov Center municipality ID in role mappings before staff sign in.",
   "ไฟล์แนบมีขนาดเกินกำหนด (ไฟล์ละไม่เกิน 100 MB และรวมต่อคำร้องฝั่งประชาชนไม่เกิน 300 MB)":
     "Attachments are too large (up to 100 MB per file and 300 MB in total per citizen report)",
+  "กรุณาระบุกำหนดวันส่งคืนครุภัณฑ์ ตั้งแต่วันนี้ถึงไม่เกิน 1 ปี":
+    "Set an equipment return date between today and one year from now",
+  "คำขอนี้มีการยืมครุภัณฑ์ออกนอกสถานที่ ผู้อนุมัติลำดับสุดท้ายต้องเป็นนายกเทศมนตรีหรือผู้ได้รับมอบอำนาจเป็นหนังสือ":
+    "This request lends out equipment. The final approver must be the mayor or someone delegated in writing.",
+  "กรุณาระบุสภาพความชำรุดของครุภัณฑ์ไม่เกิน 500 ตัวอักษร":
+    "Describe the damage to the equipment in at most 500 characters",
+  "กรุณาระบุเลขที่หนังสือมอบอำนาจไม่เกิน 200 ตัวอักษร":
+    "Enter the delegation letter reference in at most 200 characters",
 };
 export default messages;

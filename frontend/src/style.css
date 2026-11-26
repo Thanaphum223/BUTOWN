@@ -4002,6 +4002,15 @@ button.queue-item .queue-item-top .ant-tag {
 .stock-fields {
   margin: 16px 0;
 }
+.stock-line > .stock-line-note {
+  grid-column: 1 / -1;
+}
+.loan-overdue-row > td {
+  background: #fdf1ec;
+}
+.loan-overdue-row:hover > td {
+  background: #f9e3da !important;
+}
 .stock-quick-add {
   display: flex;
   flex-wrap: wrap;
