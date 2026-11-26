@@ -445,8 +445,8 @@ public class AdminController {
   public Object audit(Authentication a) {
     var u = admin(a);
     return db.list(
-        "SELECT e.id,e.action,e.from_status,e.to_status,e.reason,e.created_at,u.display_name"
-            + " actor_name FROM audit_event e JOIN app_user u ON u.id=e.actor_id WHERE"
+        "SELECT e.id,e.action,e.from_status,e.to_status,e.reason,e.created_at,COALESCE(u.display_name,'ระบบ')"
+            + " actor_name FROM audit_event e LEFT JOIN app_user u ON u.id=e.actor_id WHERE"
             + " e.municipality_id=? ORDER BY e.created_at DESC LIMIT 200",
         u.get("municipality_id"));
   }

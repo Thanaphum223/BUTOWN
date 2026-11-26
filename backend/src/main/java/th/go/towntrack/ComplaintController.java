@@ -24,6 +24,7 @@ public class ComplaintController {
   @org.springframework.beans.factory.annotation.Autowired WorkHistory workHistory;
   @org.springframework.beans.factory.annotation.Autowired DepartmentTransfers transfers;
   @org.springframework.beans.factory.annotation.Autowired RoleQueues queues;
+  @org.springframework.beans.factory.annotation.Autowired ComplaintRetention retention;
 
   public ComplaintController(Db d, Access a, Workflow w, ObjectMapper j, FileController files) {
     db = d;
@@ -339,6 +340,7 @@ public class ComplaintController {
     transfers.publicProgress(c);
     var result = new LinkedHashMap<String, Object>();
     result.put("readOnlyHistory", historyOnly);
+    result.put("retention", retention.view(id));
     if (citizen) {
       var clean = new LinkedHashMap<String, Object>();
       for (String k :

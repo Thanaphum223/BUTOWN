@@ -608,3 +608,76 @@ for (const width of [360, 390, 1280]) {
     await panel.screenshot({ path: `../work/screenshots/sla-panel-${width}.png` });
   });
 }
+const detail = (status: string, retention: D) => ({
+  ["/api/complaints/" + caseId]: {
+    complaint: { ...complaint, status },
+    retention,
+    actions: [],
+    history: [],
+    files: [],
+    resources: [],
+    reports: [],
+    reviews: [],
+    workOrders: [],
+    approvals: [],
+    transfers: [],
+    approvalStages: 1,
+  },
+});
+test("staff read how long a report is kept but cannot delete it", async ({ page }) => {
+  await boundary(
+    page,
+    "OFFICER",
+    "CLOSED",
+    detail("CLOSED", { years: 5, until: "2031-11-26T03:00:00Z" }),
+  );
+  await openCase(page, "OFFICER");
+  const notice = page.locator(".retention-notice");
+  await expect(notice).toContainText("ระยะเวลาเก็บข้อมูล");
+  await expect(notice).toContainText("5 ปีหลังปิดคำร้อง");
+  await expect(notice.getByRole("button", { name: "ลบคำร้องถาวร" })).toHaveCount(0);
+});
+test("an administrator in another role deletes a report only with a reason", async ({ page }) => {
+  const { posts } = await boundary(page, "OFFICER", "TRIAGED", {
+    "/api/auth/me": {
+      id: "admin",
+      display_name: "ผู้ดูแล",
+      role: "OFFICER",
+      account_role: "ADMIN",
+    },
+    ...detail("TRIAGED", { years: 5, until: null }),
+  });
+  await openCase(page, "OFFICER");
+  const notice = page.locator(".retention-notice");
+  await expect(notice).toContainText("เมื่อปิดคำร้องแล้ว ระบบจะเก็บข้อมูลไว้ 5 ปี");
+  await notice.getByRole("button", { name: "ลบคำร้องถาวร" }).click();
+  const dialog = page.getByRole("dialog", { name: "ลบคำร้องถาวร" });
+  const confirm = dialog.getByRole("button", { name: "ลบถาวร" });
+  await expect(confirm).toBeDisabled();
+  await dialog.getByLabel("เหตุผลการลบ").fill("แจ้งซ้ำ");
+  await confirm.click();
+  await expect(page.getByText("ลบคำร้องถาวรแล้ว")).toBeVisible();
+  expect(posts).toContainEqual({
+    path: `/api/admin/complaints/${caseId}/purge`,
+    body: { reason: "แจ้งซ้ำ" },
+  });
+});
+for (const width of [360, 390, 1280]) {
+  test(`the retention notice fits at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await boundary(page, "OFFICER", "CLOSED", {
+      "/api/auth/me": {
+        id: "admin",
+        display_name: "ผู้ดูแล",
+        role: "OFFICER",
+        account_role: "ADMIN",
+      },
+      ...detail("CLOSED", { years: 5, until: "2031-11-26T03:00:00Z" }),
+    });
+    await openCase(page, "OFFICER");
+    const notice = page.locator(".retention-notice");
+    await expect(notice.getByRole("button", { name: "ลบคำร้องถาวร" })).toBeVisible();
+    await fits(page);
+    await notice.screenshot({ path: `../work/screenshots/retention-notice-${width}.png` });
+  });
+}

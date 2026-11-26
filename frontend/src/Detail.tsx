@@ -42,6 +42,7 @@ import LocationMap from "./LocationMap";
 import { useGeo } from "./GeoContext";
 import { ATTACHMENT_HELP, STAFF_ATTACHMENT_HELP, attachmentError } from "./attachments";
 import SlaPanel from "./SlaPanel";
+import RetentionNotice from "./RetentionNotice";
 import { composeReason } from "./format";
 import ComplaintChat from "./ComplaintChat";
 import {
@@ -900,6 +901,17 @@ export default function Detail({
           </Card>
         )}
       {!publicView && <SlaPanel id={id} version={c.version} onChanged={load} />}
+      {!publicView && !data.readOnlyHistory && (
+        <RetentionNotice
+          id={id}
+          retention={data.retention}
+          admin={user.account_role === "ADMIN" || user.role === "ADMIN"}
+          onDeleted={() => {
+            onChanged?.();
+            back();
+          }}
+        />
+      )}
       {!publicView && !data.limitedHistory && (
         <ComplaintChat
           id={id}

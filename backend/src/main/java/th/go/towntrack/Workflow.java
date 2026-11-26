@@ -711,7 +711,12 @@ public class Workflow {
     // A new request replaces the approved one, so its hold must not outlive it.
     if (List.of("TRANSFER_DEPARTMENT", "REQUEST_RESOURCE").contains(action)
         || SlaController.CLOSED.contains(to)) stock.release(id);
-    db.run("UPDATE complaint SET status=?,version=version+1,updated_at=now() WHERE id=?", to, id);
+    db.run(
+        "UPDATE complaint SET status=?,version=version+1,updated_at=now(),closed_at=CASE WHEN ?"
+            + " THEN now() END WHERE id=?",
+        to,
+        SlaController.CLOSED.contains(to),
+        id);
     var assignmentAudit = new LinkedHashMap<String, Object>();
     if (action.equals("REASSIGN_LEADER")) {
       assignmentAudit.put("previousLeaderId", c.get("leader_id"));

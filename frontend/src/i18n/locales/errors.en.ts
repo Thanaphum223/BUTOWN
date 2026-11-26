@@ -2,6 +2,10 @@
 // Unknown/authored text is left intact by translate(); Gov 503 source detail is
 // rendered separately and never passed through this catalog.
 const messages: Record<string, string> = {
+  "กรุณาระบุเหตุผลการลบไม่เกิน 500 ตัวอักษร":
+    "Please give a reason for deletion of up to 500 characters.",
+  "คำร้องนี้ยังมีอุปกรณ์ที่เบิกออกและยังไม่คืน กรุณาคืนก่อนลบ":
+    "Equipment issued for this report has not been returned yet. Return it before deleting.",
   "กรุณาระบุ name ให้ถูกต้อง": "Please enter a valid name.",
   "กรุณาระบุ role ให้ถูกต้อง": "Please enter a valid role.",
   "กรุณาระบุ username ให้ถูกต้อง": "Please enter a valid username.",

@@ -367,5 +367,17 @@ const messages: Record<string, string> = {
   "ตำแหน่งราชการในเทศบาล (ไม่บังคับ)": "Official municipal position (optional)",
   เลือกหรือพิมพ์รหัสตำแหน่ง: "Choose or type a position code",
   "รหัสบทบาท Gov Center ไม่ถูกต้อง": "The Gov Center role code is invalid",
+  ระยะเวลาเก็บข้อมูล: "Record retention",
+  ระบบไม่ลบคำร้องนี้อัตโนมัติ: "This report is not deleted automatically",
+  "ระบบเก็บคำร้องนี้ไว้ถึง {{date}} ({{years}} ปีหลังปิดคำร้อง) แล้วจะลบออกถาวร":
+    "This report is kept until {{date}} ({{years}} years after closing) and then permanently deleted",
+  "เมื่อปิดคำร้องแล้ว ระบบจะเก็บข้อมูลไว้ {{years}} ปี แล้วจะลบออกถาวร":
+    "Once closed, this report is kept for {{years}} years and then permanently deleted",
+  ลบคำร้องถาวร: "Delete report permanently",
+  ลบถาวร: "Delete permanently",
+  ลบคำร้องถาวรแล้ว: "Report permanently deleted",
+  เหตุผลการลบ: "Reason for deletion",
+  "คำร้อง ไฟล์แนบ ข้อความ และประวัติของคำร้องนี้จะถูกลบออกจากฐานข้อมูลทั้งหมดและกู้คืนไม่ได้ รายการพัสดุยังคงอยู่ในทะเบียน":
+    "This report, its attachments, messages and history are removed from the database and cannot be recovered. Stock records stay in the register.",
 };
 export default messages;
