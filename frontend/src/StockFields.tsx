@@ -17,13 +17,17 @@ export function stockOptions(items: D[], t: (key: string, params?: D) => string)
   }));
 }
 
-// Items taken from the store when work starts. Approved request items are issued automatically.
+// Consumables taken from the store when work starts. Approved request items are issued
+// automatically; equipment needs an approved request first (clause 208(2)).
 export function StockTaken({ items, approved }: { items: D[]; approved: boolean }) {
   const { t } = useI18n();
-  if (!items.length) return null;
+  const consumables = items.filter((item) => item.item_type !== "EQUIPMENT");
+  if (!consumables.length) return null;
   return (
     <section className="stock-fields">
-      <Typography.Title level={5}>{t("วัสดุที่เบิกจากคลัง (ไม่บังคับ)")}</Typography.Title>
+      <Typography.Title level={5}>
+        {t("วัสดุสิ้นเปลืองที่เบิกจากคลัง (ไม่บังคับ)")}
+      </Typography.Title>
       <Alert
         type="info"
         showIcon
@@ -34,7 +38,7 @@ export function StockTaken({ items, approved }: { items: D[]; approved: boolean 
                 "วัสดุในคำขอที่อนุมัติแล้วจะถูกตัดจากคลังอัตโนมัติเมื่อเริ่มงาน เพิ่มได้ถ้าต้องใช้มากกว่านั้น",
               )
             : t(
-                "ไม่ได้ขอใช้ทรัพยากรล่วงหน้า? เลือกวัสดุที่หยิบจากคลัง ระบบจะตัดยอดและแจ้งหัวหน้าตรวจสอบ",
+                "ไม่ได้ขอใช้ทรัพยากรล่วงหน้า? เลือกวัสดุสิ้นเปลืองที่หยิบจากคลัง ระบบจะตัดยอดเป็นใบเบิกย้อนหลังให้หัวหน้างานและผู้ดูแลคลังรับรอง ครุภัณฑ์ต้องยื่นขอใช้ทรัพยากรก่อน",
               )
         }
       />
@@ -52,7 +56,7 @@ export function StockTaken({ items, approved }: { items: D[]; approved: boolean 
                     optionFilterProp="label"
                     aria-label={t("วัสดุรายการที่ ") + (index + 1)}
                     placeholder={t("เลือกวัสดุ")}
-                    options={stockOptions(items, t)}
+                    options={stockOptions(consumables, t)}
                   />
                 </Form.Item>
                 <Form.Item

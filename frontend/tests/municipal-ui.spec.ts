@@ -571,6 +571,36 @@ test("field start sends the site location when GPS is allowed", async ({ page })
   expect(writes[0].body).toMatchObject({ action: "START", latitude: 13.76, longitude: 100.5 });
 });
 
+test("starting without a request offers only consumables from the store", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await workspace(page, "FIELD", "ACCEPTED", ["START"], {
+    "/api/stock": {
+      items: [
+        { id: "cement", name: "ปูนซีเมนต์", unit: "ถุง", on_hand: 10, available: 10, active: true },
+        {
+          id: "pump",
+          name: "เครื่องสูบน้ำ",
+          unit: "เครื่อง",
+          on_hand: 2,
+          available: 2,
+          active: true,
+          item_type: "EQUIPMENT",
+        },
+      ],
+    },
+  });
+  await page.getByRole("button", { name: /^เริ่มปฏิบัติงาน/ }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("วัสดุสิ้นเปลืองที่เบิกจากคลัง (ไม่บังคับ)")).toBeVisible();
+  await expect(dialog.getByText(/ครุภัณฑ์ต้องยื่นขอใช้ทรัพยากรก่อน/)).toBeVisible();
+  await dialog.getByRole("button", { name: "เพิ่มวัสดุจากคลัง" }).click();
+  await dialog.getByRole("combobox", { name: "วัสดุรายการที่ 1" }).click();
+  await expect(page.locator(".ant-select-item-option", { hasText: "ปูนซีเมนต์" })).toBeVisible();
+  await expect(page.locator(".ant-select-item-option", { hasText: "เครื่องสูบน้ำ" })).toHaveCount(
+    0,
+  );
+});
+
 test("leader filters field workers by Gov rank", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await workspace(page, "LEADER", "TRIAGED", ["ASSIGN"], {

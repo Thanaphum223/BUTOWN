@@ -882,8 +882,14 @@ public class Workflow {
       }
     }
     for (var line : extra) {
-      if (!Boolean.TRUE.equals(stock.item(line.get("stockItemId"), u, false).get("active")))
+      var registered = stock.item(line.get("stockItemId"), u, false);
+      if (!Boolean.TRUE.equals(registered.get("active")))
         throw new IllegalArgumentException("วัสดุนี้ปิดใช้งานในคลังแล้ว");
+      // Clause 208(2): equipment taken off site needs a written, approved loan first.
+      if ("EQUIPMENT".equals(registered.get("item_type")))
+        throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST,
+            "ครุภัณฑ์ต้องยื่นขอใช้ทรัพยากรและได้รับอนุมัติก่อนนำออกใช้ เบิกหน้างานได้เฉพาะวัสดุสิ้นเปลือง");
       stock.requireAvailable(
           u, line.get("stockItemId"), (java.math.BigDecimal) line.get("quantity"));
       stock.move(
@@ -896,11 +902,23 @@ public class Workflow {
           null,
           w.get("id"));
     }
+    // The retrospective issue needs both the leader and a stock keeper to confirm it.
     if (!extra.isEmpty())
-      notifyUser(
-          c.get("leader_id"),
-          id,
-          "ผู้ลงพื้นที่เบิกวัสดุจากคลังโดยไม่ได้ขอใช้ล่วงหน้า กรุณาตรวจสอบ");
+      for (Object recipient : leaderAndKeepers(c, u))
+        notifyUser(
+            recipient,
+            id,
+            "ผู้ลงพื้นที่เบิกวัสดุจากคลังโดยไม่ได้ขอใช้ล่วงหน้า (ใบเบิกย้อนหลัง) กรุณาตรวจสอบและรับรอง");
+  }
+
+  Set<Object> leaderAndKeepers(Map<String, Object> c, Map<String, Object> u) {
+    var recipients = new LinkedHashSet<Object>();
+    if (c.get("leader_id") != null) recipients.add(c.get("leader_id"));
+    for (var keeper :
+        db.list(
+            "SELECT id FROM app_user WHERE municipality_id=? AND stock_keeper=true AND enabled=true",
+            u.get("municipality_id"))) recipients.add(keeper.get("id"));
+    return recipients;
   }
 
   // Leftovers come back to the register with the report; the rest counts as used on the job.
@@ -927,13 +945,7 @@ public class Workflow {
     for (UUID item : stock.outstanding(w.get("id")).keySet())
       equipmentMissing |= "EQUIPMENT".equals(stock.item(item, u, false).get("item_type"));
     if (!equipmentMissing) return;
-    var recipients = new LinkedHashSet<Object>();
-    recipients.add(c.get("leader_id"));
-    for (var keeper :
-        db.list(
-            "SELECT id FROM app_user WHERE municipality_id=? AND stock_keeper=true AND enabled=true",
-            u.get("municipality_id"))) recipients.add(keeper.get("id"));
-    for (Object recipient : recipients)
+    for (Object recipient : leaderAndKeepers(c, u))
       notifyUser(
           recipient,
           (UUID) c.get("id"),

@@ -162,11 +162,11 @@ const messages: Record<string, string> = {
   คืนคลัง: "Returned",
   ใช้ไป: "Used",
   "{{name}} · คงเหลือ {{left}} {{unit}}": "{{name}} · {{left}} {{unit}} in stock",
-  "วัสดุที่เบิกจากคลัง (ไม่บังคับ)": "Items taken from stock (optional)",
+  "วัสดุสิ้นเปลืองที่เบิกจากคลัง (ไม่บังคับ)": "Consumables taken from stock (optional)",
   "วัสดุในคำขอที่อนุมัติแล้วจะถูกตัดจากคลังอัตโนมัติเมื่อเริ่มงาน เพิ่มได้ถ้าต้องใช้มากกว่านั้น":
     "Approved items are deducted from stock automatically when work starts. Add more if you need them.",
-  "ไม่ได้ขอใช้ทรัพยากรล่วงหน้า? เลือกวัสดุที่หยิบจากคลัง ระบบจะตัดยอดและแจ้งหัวหน้าตรวจสอบ":
-    "No resource request? Choose what you took from stock; it is deducted and your leader is asked to check.",
+  "ไม่ได้ขอใช้ทรัพยากรล่วงหน้า? เลือกวัสดุสิ้นเปลืองที่หยิบจากคลัง ระบบจะตัดยอดเป็นใบเบิกย้อนหลังให้หัวหน้างานและผู้ดูแลคลังรับรอง ครุภัณฑ์ต้องยื่นขอใช้ทรัพยากรก่อน":
+    "No resource request? Choose the consumables you took from stock. They are deducted as a retrospective issue for your leader and a stock keeper to confirm. Equipment needs a resource request first.",
   กรุณาเลือกวัสดุ: "Choose an item",
   "วัสดุรายการที่ ": "Item ",
   เลือกวัสดุ: "Choose an item",
@@ -228,6 +228,8 @@ const messages: Record<string, string> = {
   คืนวัสดุที่เหลือหลังปฏิบัติงาน: "Leftovers returned after work",
   "ผู้ลงพื้นที่เบิกวัสดุจากคลังโดยไม่ได้ขอใช้ล่วงหน้า กรุณาตรวจสอบ":
     "Field staff took stock without a prior request. Please check.",
+  "ผู้ลงพื้นที่เบิกวัสดุจากคลังโดยไม่ได้ขอใช้ล่วงหน้า (ใบเบิกย้อนหลัง) กรุณาตรวจสอบและรับรอง":
+    "Field staff took stock without a prior request (retrospective issue). Please check and confirm it.",
   วัสดุนี้ปิดใช้งานในคลังแล้ว: "This stock item is inactive",
   จำนวนที่คืนต้องไม่เกินจำนวนที่เบิกไป: "You cannot return more than was taken",
   "เลือกวัสดุซ้ำกัน กรุณารวมเป็นรายการเดียว":

@@ -572,7 +572,22 @@ class StockAndSlaIntegrationTest {
         .andExpect(status().isBadRequest());
     mvc.perform(get("/api/stock").with(user(names.get("FIELD"))))
         .andExpect(jsonPath("$.items[0].item_type").value("EQUIPMENT"));
-    UUID id = startedWith(drill, 2);
+    // Equipment leaves the store only through an approved request (clause 208(2)).
+    UUID unasked = accepted();
+    photo(unasked, "BEFORE");
+    action(
+            unasked,
+            "FIELD",
+            "START",
+            Map.of("stockItems", List.of(Map.of("stockItemId", drill, "quantity", 1))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("ครุภัณฑ์")));
+    assertEquals(2, onHand(drill));
+    UUID id = approved(drill, 2);
+    action(id, "APPROVER", "APPROVE", Map.of("reason", "Fine")).andExpect(status().isOk());
+    photo(id, "BEFORE");
+    action(id, "FIELD", "START", Map.of()).andExpect(status().isOk());
+    assertEquals(0, onHand(drill));
     photo(id, "AFTER");
     action(
             id,
@@ -592,6 +607,8 @@ class StockAndSlaIntegrationTest {
   void leadersAndKeepersConfirmItemsTakenWithoutARequest() throws Exception {
     UUID cement = item("Cement", 10);
     UUID id = startedWith(cement, 2);
+    assertEquals(1, notified("LEADER", "ใบเบิกย้อนหลัง"));
+    assertEquals(1, notified("OFFICER", "ใบเบิกย้อนหลัง"));
     var issue =
         db.one("SELECT id FROM stock_movement WHERE complaint_id=? AND kind='ISSUE'", id).get("id");
     var opening =

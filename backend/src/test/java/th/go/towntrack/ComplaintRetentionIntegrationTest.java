@@ -380,8 +380,10 @@ class ComplaintRetentionIntegrationTest {
 
   @Test
   void equipmentStillOutBlocksTheDeletion() throws Exception {
-    UUID drill = item("Drill", "EQUIPMENT");
+    // Taken on site as a consumable, then reclassified; equipment cannot be taken at start.
+    UUID drill = item("Drill", "CONSUMABLE");
     UUID id = started(drill, 1);
+    db.run("UPDATE stock_item SET item_type='EQUIPMENT' WHERE id=?", drill);
     purge("ADMIN", id, "Mistake").andExpect(status().isConflict());
     assertEquals(1, db.list("SELECT id FROM complaint WHERE id=?", id).size());
     // The scheduler passes over it and still removes a later expired complaint.

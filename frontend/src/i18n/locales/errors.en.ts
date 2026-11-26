@@ -3,6 +3,8 @@
 // rendered separately and never passed through this catalog.
 const messages: Record<string, string> = {
   "เลือกวัสดุจากคลังได้รายการละ 1 ครั้ง": "Each stock item can be chosen only once.",
+  "ครุภัณฑ์ต้องยื่นขอใช้ทรัพยากรและได้รับอนุมัติก่อนนำออกใช้ เบิกหน้างานได้เฉพาะวัสดุสิ้นเปลือง":
+    "Equipment needs an approved resource request before it leaves the store. Only consumables can be taken on site.",
   "กรุณาระบุเหตุผลการลบไม่เกิน 500 ตัวอักษร":
     "Please give a reason for deletion of up to 500 characters.",
   "คำร้องนี้ยังมีอุปกรณ์ที่เบิกออกและยังไม่คืน กรุณาคืนก่อนลบ":
