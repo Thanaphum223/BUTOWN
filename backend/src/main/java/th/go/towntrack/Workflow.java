@@ -779,13 +779,30 @@ public class Workflow {
     return quantity;
   }
 
-  /** Stock-linked request lines take their name and unit from the register. */
+  /**
+   * Stock-linked request lines take their name and unit from the register. Each item appears once
+   * and asks for no more than the store can still give.
+   */
   List<Map<String, Object>> fromStock(List<Map<String, Object>> items, Map<String, Object> u) {
+    var seen = new HashSet<Object>();
     for (var item : items) {
       if (item.get("stockItemId") == null) continue;
+      if (!seen.add(item.get("stockItemId")))
+        throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST, "เลือกวัสดุจากคลังได้รายการละ 1 ครั้ง");
       var registered = stock.item(item.get("stockItemId"), u, false);
       if (!Boolean.TRUE.equals(registered.get("active")))
         throw new IllegalArgumentException("วัสดุนี้ปิดใช้งานในคลังแล้ว");
+      var left = stock.available(registered).max(java.math.BigDecimal.ZERO);
+      if (((java.math.BigDecimal) item.get("quantity")).compareTo(left) > 0)
+        throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST,
+            "จำนวนเกินคงคลัง: "
+                + registered.get("name")
+                + " เหลือ "
+                + left.stripTrailingZeros().toPlainString()
+                + " "
+                + registered.get("unit"));
       item.put("name", registered.get("name"));
       item.put("unit", registered.get("unit"));
     }

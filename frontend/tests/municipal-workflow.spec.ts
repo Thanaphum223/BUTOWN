@@ -560,3 +560,35 @@ test("permission loss removes the cached case without signing out a valid accoun
   await expect(page.locator(".split-case-summary")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "เข้าสู่ระบบ", exact: true })).toHaveCount(0);
 });
+
+test("each stock item is requested once and no more than is left", async ({ page }) => {
+  await workspace(page, "FIELD", "ACCEPTED", ["REQUEST_RESOURCE"]);
+  await page.route("**/api/stock", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          { id: "mixer", name: "เครื่องโม่ปูน", unit: "เครื่อง", available: 4, active: true },
+          { id: "sand", name: "ทรายหยาบ", unit: "ถุง", available: 50, active: true },
+          { id: "empty", name: "ท่อ", unit: "ท่อน", available: 0, active: true },
+        ],
+      },
+    }),
+  );
+  await page
+    .getByRole("button", { name: "ส่งเอกสารประเมินทรัพยากร/ของบจากหน้างาน", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  const picker = dialog.getByRole("combobox", { name: "เลือกจากคลังวัสดุ" });
+  const options = page.locator(".ant-select-dropdown:visible .ant-select-item-option");
+  await picker.click();
+  await expect(options.filter({ hasText: "ท่อ" })).toHaveClass(/disabled/);
+  await options.filter({ hasText: "เครื่องโม่ปูน" }).click();
+  await picker.click();
+  await expect(options.filter({ hasText: "เครื่องโม่ปูน" })).toHaveCount(0);
+  await expect(options.filter({ hasText: "ทรายหยาบ" })).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  const quantity = dialog.getByLabel("จำนวนรายการ 1", { exact: true });
+  await quantity.fill("25");
+  await quantity.blur();
+  await expect(quantity).toHaveValue("4.00");
+});

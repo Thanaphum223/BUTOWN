@@ -236,6 +236,7 @@ class ComplaintRetentionIntegrationTest {
         "INSERT INTO follower(complaint_id,user_id) VALUES(?,?) ON CONFLICT DO NOTHING",
         id,
         citizen);
+    db.run("INSERT INTO follower(complaint_id,user_id) VALUES(?,?)", id, users.get("LEADER"));
     db.run(
         "INSERT INTO sla_reminder(complaint_id,user_id,reminder_type) VALUES(?,?,'PROGRESS')",
         id,
@@ -361,6 +362,20 @@ class ComplaintRetentionIntegrationTest {
     assertEquals("ADMIN", event.get("mode"));
     assertTrue(event.get("reason").toString().contains("Duplicate of another report"));
     assertEquals("off", db.one("SELECT current_setting('towntrack.purge') v").get("v"));
+    String ref = id.toString().substring(0, 8).toUpperCase();
+    for (String role : List.of("CITIZEN", "LEADER"))
+      assertEquals(
+          List.of(Map.of("message", "ผู้ดูแลระบบได้ลบคำร้อง #" + ref + " ออกจากระบบแล้ว")),
+          db.list(
+              "SELECT message FROM notification WHERE user_id=? AND complaint_id IS NULL",
+              users.get(role)),
+          role);
+    assertTrue(
+        db.list(
+                "SELECT 1 FROM notification WHERE user_id=? AND message LIKE ?",
+                users.get("OFFICER"),
+                "%#" + ref + "%")
+            .isEmpty());
   }
 
   @Test
@@ -407,6 +422,14 @@ class ComplaintRetentionIntegrationTest {
             town);
     assertNull(event.get("actor_id"));
     assertEquals("RETENTION", event.get("mode"));
+    assertEquals(
+        "คำร้อง #"
+            + expired.toString().substring(0, 8).toUpperCase()
+            + " ครบระยะเวลาเก็บ 5 ปี ระบบจึงลบออกจากระบบแล้ว",
+        db.one(
+                "SELECT message FROM notification WHERE user_id=? AND complaint_id IS NULL",
+                users.get("CITIZEN"))
+            .get("message"));
     mvc.perform(get("/api/admin/audit").with(user(names.get("ADMIN"))))
         .andExpect(jsonPath("$[0].actor_name").value("ระบบ"));
   }

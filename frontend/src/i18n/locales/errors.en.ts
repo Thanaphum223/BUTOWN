@@ -2,6 +2,7 @@
 // Unknown/authored text is left intact by translate(); Gov 503 source detail is
 // rendered separately and never passed through this catalog.
 const messages: Record<string, string> = {
+  "เลือกวัสดุจากคลังได้รายการละ 1 ครั้ง": "Each stock item can be chosen only once.",
   "กรุณาระบุเหตุผลการลบไม่เกิน 500 ตัวอักษร":
     "Please give a reason for deletion of up to 500 characters.",
   "คำร้องนี้ยังมีอุปกรณ์ที่เบิกออกและยังไม่คืน กรุณาคืนก่อนลบ":

@@ -91,7 +91,7 @@ public class ComplaintRetention {
           if (holdsStock(id))
             throw new ResponseStatusException(
                 HttpStatus.CONFLICT, "คำร้องนี้ยังมีอุปกรณ์ที่เบิกออกและยังไม่คืน กรุณาคืนก่อนลบ");
-          remove(id);
+          remove(id, "ผู้ดูแลระบบได้ลบคำร้อง #" + ref(id) + " ออกจากระบบแล้ว");
           workflow.audit(
               u,
               null,
@@ -143,7 +143,7 @@ public class ComplaintRetention {
       log.warn("Complaint {} is past retention but still holds issued equipment", id);
       return false;
     }
-    remove(id);
+    remove(id, "คำร้อง #" + ref(id) + " ครบระยะเวลาเก็บ " + years + " ปี ระบบจึงลบออกจากระบบแล้ว");
     db.run(
         "INSERT INTO audit_event(id,complaint_id,municipality_id,actor_id,action,reason,details)"
             + " VALUES(?,NULL,?,NULL,'COMPLAINT_PURGED',?,?::jsonb)",
@@ -172,8 +172,23 @@ public class ComplaintRetention {
         .isEmpty();
   }
 
-  /** Deletes the complaint's rows in dependency order; stored files go once the delete commits. */
-  void remove(UUID id) {
+  /** The short number people see on a report, such as #E00864A8. */
+  static String ref(UUID id) {
+    return id.toString().substring(0, 8).toUpperCase();
+  }
+
+  /**
+   * Deletes the complaint's rows in dependency order and tells its reporter and followers why;
+   * stored files go once the delete commits.
+   */
+  void remove(UUID id, String notice) {
+    var told =
+        db.list(
+            "SELECT u.id FROM app_user u WHERE u.enabled=true AND u.deleted_at IS NULL AND u.id IN"
+                + " (SELECT reporter_id FROM complaint WHERE id=? UNION SELECT user_id FROM"
+                + " follower WHERE complaint_id=?)",
+            id,
+            id);
     var stored =
         db.list(
             "SELECT storage_key,thumbnail_key,storage_provider FROM attachment WHERE complaint_id=?",
@@ -218,6 +233,7 @@ public class ComplaintRetention {
     db.run("DELETE FROM submission_key WHERE response->>'id'=?", id.toString());
     db.run("DELETE FROM complaint WHERE id=?", id);
     db.run("SET LOCAL towntrack.purge = 'off'");
+    for (var person : told) workflow.notifyUser(person.get("id"), null, notice);
     TransactionSynchronizationManager.registerSynchronization(
         new TransactionSynchronization() {
           @Override

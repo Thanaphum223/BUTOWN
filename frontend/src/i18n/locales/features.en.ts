@@ -217,6 +217,8 @@ const messages: Record<string, string> = {
   "รายการที่ {{n}} (จากคลัง)": "Item {{n}} (from stock)",
   เลือกจากคลังวัสดุ: "Choose from stock",
   "+ เลือกจากคลังวัสดุ": "+ Choose from stock",
+  "ขอได้ไม่เกินคงเหลือในคลัง {{left}} {{unit}}":
+    "You can request at most the {{left}} {{unit}} left in stock",
   "เพิ่มรายการที่ขอ (นอกคลัง)": "Add an item (not in stock)",
   คลังวัสดุ: "Stock",
   "ยอดยกมา / รับเข้าครั้งแรก": "Opening balance",

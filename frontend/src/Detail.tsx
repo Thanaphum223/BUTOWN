@@ -43,7 +43,7 @@ import { useGeo } from "./GeoContext";
 import { ATTACHMENT_HELP, STAFF_ATTACHMENT_HELP, attachmentError } from "./attachments";
 import SlaPanel from "./SlaPanel";
 import RetentionNotice from "./RetentionNotice";
-import { composeReason } from "./format";
+import { amount, composeReason } from "./format";
 import ComplaintChat from "./ComplaintChat";
 import {
   APPROVAL_LIMIT,
@@ -247,6 +247,10 @@ export default function Detail({
   useLocalizedFormErrors(form);
   const resourceItems = Form.useWatch("lineItems", form) as D[] | undefined;
   const requestItems = Form.useWatch("items", form) as D[] | undefined;
+  const stockLeft = (stockId?: string) => {
+    const item = stockId ? stockItems.find((s) => s.id === stockId) : undefined;
+    return item ? Math.max(0, Number(item.available ?? item.on_hand)) : undefined;
+  };
   const chosenApprovers = Form.useWatch("approverIds", form) as string[] | undefined;
   const resourceTotal =
     (resourceItems || []).reduce(
@@ -2050,72 +2054,89 @@ export default function Detail({
               {(fields, { add, remove }, { errors }) => (
                 <>
                   <div className="resource-items">
-                    {fields.map((field, index) => (
-                      <div className="resource-item-row requested-item-row" key={field.key}>
-                        <Form.Item name={[field.name, "stockItemId"]} hidden>
-                          <Input />
-                        </Form.Item>
-                        <Form.Item
-                          label={
-                            requestItems?.[index]?.stockItemId
-                              ? t("รายการที่ {{n}} (จากคลัง)", { n: index + 1 })
-                              : t("รายการที่ ") + (index + 1)
-                          }
-                          name={[field.name, "name"]}
-                          rules={[{ required: true, whitespace: true, max: 200 }]}
-                        >
-                          <Input
-                            aria-label={t("ชื่อรายการที่ขอ ") + (index + 1)}
-                            placeholder={t("ชื่อรายการ เช่น ทราย ปูนซีเมนต์")}
-                            maxLength={200}
-                            readOnly={!!requestItems?.[index]?.stockItemId}
-                          />
-                        </Form.Item>
-                        <Form.Item
-                          label={t("จำนวน")}
-                          name={[field.name, "quantity"]}
-                          rules={[{ required: true, type: "number", min: 0.01, max: 1000000000 }]}
-                        >
-                          <InputNumber
-                            aria-label={t("จำนวนรายการ ") + (index + 1)}
-                            min={0.01}
-                            max={1000000000}
-                            precision={2}
-                            inputMode="decimal"
-                            style={{ width: "100%" }}
-                          />
-                        </Form.Item>
-                        <Form.Item
-                          label={t("หน่วย")}
-                          name={[field.name, "unit"]}
-                          rules={[
-                            { required: true, whitespace: true, max: 50 },
-                            {
-                              pattern: /^[^\p{N}]*\p{L}[^\p{N}]*$/u,
-                              message: t("หน่วยเป็นคำ เช่น ถุง เมตร ห้ามใส่ตัวเลข"),
-                            },
-                          ]}
-                        >
-                          <Input
-                            aria-label={t("หน่วยรายการ ") + (index + 1)}
-                            placeholder={t("เช่น ถุง ท่อน เมตร")}
-                            maxLength={50}
-                            readOnly={!!requestItems?.[index]?.stockItemId}
-                          />
-                        </Form.Item>
-                        {fields.length > 1 && (
-                          <Button
-                            className="resource-remove"
-                            icon={<DeleteOutlined />}
-                            danger
-                            aria-label={t("ลบรายการ ") + (index + 1)}
-                            onClick={() => remove(field.name)}
+                    {fields.map((field, index) => {
+                      const left = stockLeft(requestItems?.[index]?.stockItemId);
+                      return (
+                        <div className="resource-item-row requested-item-row" key={field.key}>
+                          <Form.Item name={[field.name, "stockItemId"]} hidden>
+                            <Input />
+                          </Form.Item>
+                          <Form.Item
+                            label={
+                              requestItems?.[index]?.stockItemId
+                                ? t("รายการที่ {{n}} (จากคลัง)", { n: index + 1 })
+                                : t("รายการที่ ") + (index + 1)
+                            }
+                            name={[field.name, "name"]}
+                            rules={[{ required: true, whitespace: true, max: 200 }]}
                           >
-                            {t("ลบ")}
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+                            <Input
+                              aria-label={t("ชื่อรายการที่ขอ ") + (index + 1)}
+                              placeholder={t("ชื่อรายการ เช่น ทราย ปูนซีเมนต์")}
+                              maxLength={200}
+                              readOnly={!!requestItems?.[index]?.stockItemId}
+                            />
+                          </Form.Item>
+                          <Form.Item
+                            label={t("จำนวน")}
+                            name={[field.name, "quantity"]}
+                            rules={[
+                              { required: true, type: "number", min: 0.01, max: 1000000000 },
+                              ...(left === undefined
+                                ? []
+                                : [
+                                    {
+                                      type: "number" as const,
+                                      max: left,
+                                      message: t("ขอได้ไม่เกินคงเหลือในคลัง {{left}} {{unit}}", {
+                                        left: amount(left),
+                                        unit: requestItems?.[index]?.unit,
+                                      }),
+                                    },
+                                  ]),
+                            ]}
+                          >
+                            <InputNumber
+                              aria-label={t("จำนวนรายการ ") + (index + 1)}
+                              min={0.01}
+                              max={left ?? 1000000000}
+                              precision={2}
+                              inputMode="decimal"
+                              style={{ width: "100%" }}
+                            />
+                          </Form.Item>
+                          <Form.Item
+                            label={t("หน่วย")}
+                            name={[field.name, "unit"]}
+                            rules={[
+                              { required: true, whitespace: true, max: 50 },
+                              {
+                                pattern: /^[^\p{N}]*\p{L}[^\p{N}]*$/u,
+                                message: t("หน่วยเป็นคำ เช่น ถุง เมตร ห้ามใส่ตัวเลข"),
+                              },
+                            ]}
+                          >
+                            <Input
+                              aria-label={t("หน่วยรายการ ") + (index + 1)}
+                              placeholder={t("เช่น ถุง ท่อน เมตร")}
+                              maxLength={50}
+                              readOnly={!!requestItems?.[index]?.stockItemId}
+                            />
+                          </Form.Item>
+                          {fields.length > 1 && (
+                            <Button
+                              className="resource-remove"
+                              icon={<DeleteOutlined />}
+                              danger
+                              aria-label={t("ลบรายการ ") + (index + 1)}
+                              onClick={() => remove(field.name)}
+                            >
+                              {t("ลบ")}
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                   <Form.ErrorList errors={errors} />
                   <div className="stock-quick-add">
@@ -2127,20 +2148,19 @@ export default function Detail({
                         aria-label={t("เลือกจากคลังวัสดุ")}
                         placeholder={t("+ เลือกจากคลังวัสดุ")}
                         disabled={fields.length >= 50}
-                        options={stockOptions(stockItems, t).map((o) => ({
-                          ...o,
-                          disabled: false,
-                        }))}
+                        options={stockOptions(stockItems, t).filter(
+                          (o) => !requestItems?.some((row) => row?.stockItemId === o.value),
+                        )}
                         onChange={(stockId: string) => {
                           const item = stockItems.find((s) => s.id === stockId);
-                          if (!item) return;
                           const rows: D[] = form.getFieldValue("items") || [];
+                          if (!item || rows.some((r) => r?.stockItemId === item.id)) return;
                           const blank = rows.findIndex((r) => !r?.name?.trim() && !r?.stockItemId);
                           const line = {
                             stockItemId: item.id,
                             name: item.name,
                             unit: item.unit,
-                            quantity: 1,
+                            quantity: Math.min(1, stockLeft(item.id) ?? 1),
                           };
                           if (blank >= 0) {
                             rows[blank] = line;

@@ -721,4 +721,42 @@ class StockAndSlaIntegrationTest {
     assertEquals("Road", saved.get("title"));
     assertEquals("", saved.get("description"));
   }
+
+  @Test
+  void aRequestNamesEachStockItemOnceAndNoMoreThanIsLeft() throws Exception {
+    UUID cement = item("Cement", 5);
+    UUID id = accepted();
+    Map<String, Object> three =
+        Map.of("stockItemId", cement, "name", "Cement", "unit", "bags", "quantity", 3);
+    action(
+            id,
+            "FIELD",
+            "REQUEST_RESOURCE",
+            Map.of("reason", "Need", "items", List.of(three, three)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("เลือกวัสดุจากคลังได้รายการละ 1 ครั้ง"));
+    action(
+            id,
+            "FIELD",
+            "REQUEST_RESOURCE",
+            Map.of(
+                "reason",
+                "Need",
+                "items",
+                List.of(Map.of("stockItemId", cement, "name", "C", "unit", "bags", "quantity", 6))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("จำนวนเกินคงคลัง: Cement เหลือ 5 bags"));
+    action(
+            id,
+            "FIELD",
+            "REQUEST_RESOURCE",
+            Map.of(
+                "reason",
+                "Need",
+                "items",
+                List.of(
+                    Map.of("stockItemId", cement, "name", "C", "unit", "bags", "quantity", 5),
+                    Map.of("name", "Pipes", "unit", "pieces", "quantity", 100))))
+        .andExpect(status().isOk());
+  }
 }
