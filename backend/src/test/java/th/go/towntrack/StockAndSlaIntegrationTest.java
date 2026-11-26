@@ -755,6 +755,184 @@ class StockAndSlaIntegrationTest {
     assertEquals("", saved.get("description"));
   }
 
+  @Autowired EquipmentLoans equipmentLoans;
+
+  UUID equip(String name, int qty) throws Exception {
+    var result =
+        send(
+                "OFFICER",
+                () -> post("/api/stock"),
+                Map.of("name", name, "unit", "pcs", "quantity", qty, "itemType", "EQUIPMENT"))
+            .andExpect(status().isOk())
+            .andReturn();
+    return UUID.fromString(
+        json.readTree(result.getResponse().getContentAsString()).get("id").asText());
+  }
+
+  UUID delegateAndApprove(UUID drill, int qty) throws Exception {
+    send(
+            "ADMIN",
+            () -> put("/api/stock/loan-approvers/" + users.get("APPROVER")),
+            Map.of("approver", true, "reference", "คำสั่งที่ 1/2569"))
+        .andExpect(status().isOk());
+    UUID id = approved(drill, qty);
+    action(id, "APPROVER", "APPROVE", Map.of("reason", "Fine")).andExpect(status().isOk());
+    photo(id, "BEFORE");
+    action(id, "FIELD", "START", Map.of()).andExpect(status().isOk());
+    return id;
+  }
+
+  @Test
+  void equipmentRequestRequiresAFutureLoanDueOn() throws Exception {
+    UUID drill = equip("Drill", 2);
+    UUID id = accepted();
+    var drillLine = Map.of("stockItemId", drill, "name", "Drill", "unit", "pcs", "quantity", 1);
+    // Missing loanDueOn → 400
+    action(
+            id,
+            "FIELD",
+            "REQUEST_RESOURCE",
+            Map.of("reason", "Need", "items", List.of(drillLine)))
+        .andExpect(status().isBadRequest())
+        .andExpect(
+            jsonPath("$.message")
+                .value(org.hamcrest.Matchers.containsString("กำหนดวันส่งคืน")));
+    // Past date → 400
+    action(
+            id,
+            "FIELD",
+            "REQUEST_RESOURCE",
+            Map.of("reason", "Need", "loanDueOn", "2020-01-01", "items", List.of(drillLine)))
+        .andExpect(status().isBadRequest())
+        .andExpect(
+            jsonPath("$.message")
+                .value(org.hamcrest.Matchers.containsString("กำหนดวันส่งคืน")));
+    // Valid date within one year → 200
+    String validDue =
+        java.time.LocalDate.now(java.time.ZoneId.of("Asia/Bangkok")).plusDays(30).toString();
+    action(
+            id,
+            "FIELD",
+            "REQUEST_RESOURCE",
+            Map.of("reason", "Need", "loanDueOn", validDue, "items", List.of(drillLine)))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void keeperReceivesEquipmentBackInThreeConditions() throws Exception {
+    UUID drill = equip("Drill", 3);
+    send(
+            "ADMIN",
+            () -> put("/api/stock/loan-approvers/" + users.get("APPROVER")),
+            Map.of("approver", true, "reference", "คำสั่งที่ 1/2569"))
+        .andExpect(status().isOk());
+
+    // GOOD: equipment comes back — balance restored
+    UUID id1 = approved(drill, 1);
+    action(id1, "APPROVER", "APPROVE", Map.of("reason", "Fine")).andExpect(status().isOk());
+    photo(id1, "BEFORE");
+    action(id1, "FIELD", "START", Map.of()).andExpect(status().isOk());
+    UUID loan1 =
+        (UUID)
+            db.one(
+                    "SELECT id FROM equipment_loan WHERE complaint_id=? AND returned_at IS NULL",
+                    id1)
+                .get("id");
+    assertEquals(2, onHand(drill));
+    send("OFFICER", () -> post("/api/stock/loans/" + loan1 + "/return"), Map.of("condition", "GOOD"))
+        .andExpect(status().isOk());
+    assertEquals(3, onHand(drill));
+    assertEquals(
+        "GOOD",
+        db.one("SELECT return_condition FROM equipment_loan WHERE id=?", loan1)
+            .get("return_condition"));
+
+    // DAMAGED: equipment comes back with a note — balance restored
+    UUID id2 = approved(drill, 1);
+    action(id2, "APPROVER", "APPROVE", Map.of("reason", "Fine")).andExpect(status().isOk());
+    photo(id2, "BEFORE");
+    action(id2, "FIELD", "START", Map.of()).andExpect(status().isOk());
+    UUID loan2 =
+        (UUID)
+            db.one(
+                    "SELECT id FROM equipment_loan WHERE complaint_id=? AND returned_at IS NULL",
+                    id2)
+                .get("id");
+    send(
+            "OFFICER",
+            () -> post("/api/stock/loans/" + loan2 + "/return"),
+            Map.of("condition", "DAMAGED", "note", "Cracked casing"))
+        .andExpect(status().isOk());
+    assertEquals(3, onHand(drill));
+    assertEquals(
+        "DAMAGED",
+        db.one("SELECT return_condition FROM equipment_loan WHERE id=?", loan2)
+            .get("return_condition"));
+
+    // LOST: return movement then written-off adjustment — balance drops by one
+    UUID id3 = approved(drill, 1);
+    action(id3, "APPROVER", "APPROVE", Map.of("reason", "Fine")).andExpect(status().isOk());
+    photo(id3, "BEFORE");
+    action(id3, "FIELD", "START", Map.of()).andExpect(status().isOk());
+    assertEquals(2, onHand(drill));
+    UUID loan3 =
+        (UUID)
+            db.one(
+                    "SELECT id FROM equipment_loan WHERE complaint_id=? AND returned_at IS NULL",
+                    id3)
+                .get("id");
+    send(
+            "OFFICER",
+            () -> post("/api/stock/loans/" + loan3 + "/return"),
+            Map.of("condition", "LOST", "note", "Gone"))
+        .andExpect(status().isOk());
+    assertEquals(2, onHand(drill));
+    assertEquals(
+        "LOST",
+        db.one("SELECT return_condition FROM equipment_loan WHERE id=?", loan3)
+            .get("return_condition"));
+  }
+
+  @Test
+  void undoStartCancelsOpenLoans() throws Exception {
+    UUID drill = equip("Drill", 1);
+    UUID id = delegateAndApprove(drill, 1);
+    assertEquals(0, onHand(drill));
+    action(id, "FIELD", "UNDO_START", Map.of("reason", "Bad weather"))
+        .andExpect(status().isOk());
+    assertEquals(1, onHand(drill));
+    assertEquals(
+        "CANCELLED",
+        db.one("SELECT return_condition FROM equipment_loan WHERE complaint_id=?", id)
+            .get("return_condition"));
+    assertNotNull(
+        db.one("SELECT returned_at FROM equipment_loan WHERE complaint_id=?", id)
+            .get("returned_at"));
+  }
+
+  @Test
+  void overdueReminderFiresExactlyOnce() throws Exception {
+    UUID drill = equip("Overdue Drill", 1);
+    UUID loanId = UUID.randomUUID();
+    db.run(
+        "INSERT INTO equipment_loan(id,municipality_id,stock_item_id,borrower_id,quantity,reason,due_on)"
+            + " VALUES(?,?,?,?,1,'',(now() AT TIME ZONE 'Asia/Bangkok')::date-1)",
+        loanId,
+        town,
+        drill,
+        users.get("FIELD"));
+    // A loan due yesterday with no reminder yet → both borrower and keeper are notified.
+    equipmentLoans.remindOverdue();
+    assertEquals(1, notified("FIELD", "เกินกำหนดส่งคืน"));
+    assertEquals(1, notified("OFFICER", "เกินกำหนดส่งคืน"));
+    assertNotNull(
+        db.one("SELECT reminded_at FROM equipment_loan WHERE id=?", loanId).get("reminded_at"));
+    // A second call must not send another notification (reminded_at is now set).
+    equipmentLoans.remindOverdue();
+    assertEquals(1, notified("FIELD", "เกินกำหนดส่งคืน"));
+    assertEquals(1, notified("OFFICER", "เกินกำหนดส่งคืน"));
+  }
+
   @Test
   void aRequestNamesEachStockItemOnceAndNoMoreThanIsLeft() throws Exception {
     UUID cement = item("Cement", 5);

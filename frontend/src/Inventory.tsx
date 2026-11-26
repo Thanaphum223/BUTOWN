@@ -47,9 +47,14 @@ export default function Inventory({ admin }: { admin: boolean }) {
   const [adding, setAdding] = useState(false);
   const [moving, setMoving] = useState<{ item: D; kind: "RECEIVE" | "ADJUST" }>();
   const [history, setHistory] = useState<{ item: D; rows: D[] }>();
+  const [loans, setLoans] = useState<D[]>();
   const [keepers, setKeepers] = useState<D[]>();
+  const [returningLoan, setReturningLoan] = useState<D>();
+  const [delegatingApprover, setDelegatingApprover] = useState<D>();
   const [busy, setBusy] = useState(false);
   const [form] = Form.useForm();
+  const [loanForm] = Form.useForm();
+  const [delegateForm] = Form.useForm();
   useEffect(() => {
     api<{ keeper: boolean; canVerify?: boolean; items: D[] }>("/stock")
       .then((value) => {
@@ -61,6 +66,9 @@ export default function Inventory({ admin }: { admin: boolean }) {
             .catch((e) => setError((e as Error).message));
       })
       .catch((e) => setError((e as Error).message));
+    api<D[]>("/stock/loans")
+      .then(setLoans)
+      .catch(() => setLoans([]));
   }, [revision]);
   async function save(values: D) {
     setBusy(true);
@@ -80,6 +88,45 @@ export default function Inventory({ admin }: { admin: boolean }) {
       setMoving(undefined);
       form.resetFields();
       setRevision((v) => v + 1);
+    } catch (e) {
+      message.error(t((e as Error).message));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function returnLoan(values: D) {
+    if (!returningLoan) return;
+    setBusy(true);
+    try {
+      await post(`/stock/loans/${returningLoan.id}/return`, {
+        condition: values.condition,
+        note: values.note ?? "",
+      });
+      message.success(t("บันทึกแล้ว"));
+      setReturningLoan(undefined);
+      loanForm.resetFields();
+      setRevision((v) => v + 1);
+    } catch (e) {
+      message.error(t((e as Error).message));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function saveDelegation(values: D) {
+    if (!delegatingApprover) return;
+    setBusy(true);
+    try {
+      await api(`/stock/loan-approvers/${delegatingApprover.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ approver: true, reference: values.reference }),
+      });
+      setKeepers((list) =>
+        list?.map((row) =>
+          row.id === delegatingApprover.id ? { ...row, loan_approver: true } : row,
+        ),
+      );
+      setDelegatingApprover(undefined);
+      delegateForm.resetFields();
     } catch (e) {
       message.error(t((e as Error).message));
     } finally {
@@ -216,6 +263,70 @@ export default function Inventory({ admin }: { admin: boolean }) {
         />
       </Card>
       <StockVerifications rows={issues} onChanged={() => setRevision((v) => v + 1)} />
+      {loans && loans.length > 0 && (
+        <Card
+          title={t("ทะเบียนคุมการยืมครุภัณฑ์")}
+          style={{ marginTop: 16 }}
+          extra={
+            <Typography.Text type="secondary">
+              {t("แสดง {{n}} รายการล่าสุด", { n: loans.length })}
+            </Typography.Text>
+          }
+        >
+          <Table
+            size="small"
+            rowKey="id"
+            dataSource={loans}
+            scroll={{ x: true }}
+            pagination={{ pageSize: 10, hideOnSinglePage: true }}
+            rowClassName={(r) => (r.overdue ? "loan-overdue-row" : "")}
+            columns={[
+              {
+                title: t("ครุภัณฑ์"),
+                render: (_, r) => `${r.name} ${amount(r.quantity)} ${r.unit}`,
+              },
+              { title: t("ผู้ยืม"), dataIndex: "borrower_name" },
+              { title: t("ผู้อนุมัติ"), dataIndex: "approved_by_name" },
+              {
+                title: t("กำหนดคืน"),
+                render: (_, r) => (
+                  <Typography.Text type={r.overdue ? "danger" : undefined}>
+                    {date(r.due_on)}
+                  </Typography.Text>
+                ),
+              },
+              {
+                title: t("สถานะ"),
+                render: (_, r) =>
+                  r.returned_at ? (
+                    <Tag color="green">
+                      {t("คืนแล้ว")} ({date(r.returned_at)})
+                    </Tag>
+                  ) : r.overdue ? (
+                    <Tag color="red">{t("เกินกำหนด")}</Tag>
+                  ) : (
+                    <Tag>{t("ยังอยู่")}</Tag>
+                  ),
+              },
+              {
+                title: t("จัดการ"),
+                render: (_, r) =>
+                  keeper && !r.returned_at ? (
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        setReturningLoan(r);
+                        loanForm.setFieldsValue({ condition: "GOOD" });
+                      }}
+                    >
+                      {t("รับคืน")}
+                    </Button>
+                  ) : null,
+              },
+            ]}
+          />
+        </Card>
+      )}
       <Modal
         open={adding || !!moving}
         destroyOnHidden
@@ -393,8 +504,115 @@ export default function Inventory({ admin }: { admin: boolean }) {
                 />
               ),
             },
+            {
+              title: t("ผู้รับมอบอำนาจอนุมัติยืมครุภัณฑ์"),
+              render: (_, p) =>
+                p.role === "APPROVER" ? (
+                  <Switch
+                    checked={p.loan_approver}
+                    aria-label={t("ผู้รับมอบอำนาจอนุมัติยืมครุภัณฑ์ {{name}}", {
+                      name: p.display_name,
+                    })}
+                    onChange={async (value) => {
+                      if (value) {
+                        setDelegatingApprover(p);
+                      } else {
+                        try {
+                          await api(`/stock/loan-approvers/${p.id}`, {
+                            method: "PUT",
+                            body: JSON.stringify({ approver: false, reference: "" }),
+                          });
+                          setKeepers((list) =>
+                            list?.map((row) =>
+                              row.id === p.id ? { ...row, loan_approver: false } : row,
+                            ),
+                          );
+                        } catch (e) {
+                          message.error(t((e as Error).message));
+                        }
+                      }
+                    }}
+                  />
+                ) : null,
+            },
           ]}
         />
+      </Modal>
+      <Modal
+        open={!!returningLoan}
+        destroyOnHidden
+        title={t("รับคืนครุภัณฑ์: {{name}}", { name: returningLoan?.name })}
+        okText={t("บันทึก")}
+        cancelText={t("ยกเลิก")}
+        confirmLoading={busy}
+        onOk={() => loanForm.submit()}
+        onCancel={() => {
+          setReturningLoan(undefined);
+          loanForm.resetFields();
+        }}
+      >
+        <Form
+          form={loanForm}
+          layout="vertical"
+          onFinish={returnLoan}
+          initialValues={{ condition: "GOOD" }}
+        >
+          <Form.Item name="condition" label={t("สภาพที่รับคืน")} rules={[{ required: true }]}>
+            <Segmented
+              options={[
+                { value: "GOOD", label: t("ปกติ") },
+                { value: "DAMAGED", label: t("ชำรุด") },
+                { value: "LOST", label: t("สูญหาย") },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item shouldUpdate>
+            {({ getFieldValue }) => {
+              const condition = getFieldValue("condition");
+              return (
+                <Form.Item
+                  name="note"
+                  label={t("หมายเหตุ (ไม่บังคับ)")}
+                  rules={[
+                    {
+                      required: condition !== "GOOD",
+                      whitespace: true,
+                      max: 500,
+                      message: t("กรุณาระบุสภาพครุภัณฑ์ที่ชำรุดหรือสูญหายไม่เกิน 500 ตัวอักษร"),
+                    },
+                  ]}
+                >
+                  <Input.TextArea rows={2} maxLength={500} />
+                </Form.Item>
+              );
+            }}
+          </Form.Item>
+        </Form>
+      </Modal>
+      <Modal
+        open={!!delegatingApprover}
+        destroyOnHidden
+        title={t("มอบอำนาจอนุมัติยืมครุภัณฑ์: {{name}}", {
+          name: delegatingApprover?.display_name,
+        })}
+        okText={t("บันทึก")}
+        cancelText={t("ยกเลิก")}
+        confirmLoading={busy}
+        onOk={() => delegateForm.submit()}
+        onCancel={() => {
+          setDelegatingApprover(undefined);
+          delegateForm.resetFields();
+        }}
+      >
+        <Form form={delegateForm} layout="vertical" onFinish={saveDelegation}>
+          <Form.Item
+            name="reference"
+            label={t("เลขที่หนังสือมอบอำนาจ")}
+            rules={[{ required: true, whitespace: true, max: 200 }]}
+          >
+            <Input placeholder={t("เช่น มท 0808.1/1234")} maxLength={200} />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );

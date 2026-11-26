@@ -598,6 +598,17 @@ public class Workflow {
                       + " BY step LIMIT 1",
                   r.get("id"));
           if (!u.get("id").equals(step.get("approver_id"))) Access.deny();
+          // Look for later steps before the UPDATE so the check runs before any DB change.
+          List<Map<String, Object>> next =
+              action.equals("APPROVE")
+                  ? db.list(
+                      "SELECT approver_id FROM approval_assignment WHERE resource_id=? AND"
+                          + " decision IS NULL AND step>? ORDER BY step LIMIT 1",
+                      r.get("id"),
+                      step.get("step"))
+                  : List.of();
+          if (action.equals("APPROVE") && next.isEmpty())
+            checkApprovalAuthority((UUID) r.get("id"), u.get("id"));
           db.run(
               "UPDATE approval_assignment SET decision=?,reason=?,decided_at=now() WHERE"
                   + " resource_id=? AND step=? AND decision IS NULL",
@@ -605,21 +616,14 @@ public class Workflow {
               reason,
               r.get("id"),
               step.get("step"));
-          if (action.equals("APPROVE")) {
-            var next =
-                db.list(
-                    "SELECT approver_id FROM approval_assignment WHERE resource_id=? AND decision"
-                        + " IS NULL ORDER BY step LIMIT 1",
-                    r.get("id"));
-            if (!next.isEmpty()) {
-              to = "RESOURCE_APPROVAL";
-              db.run(
-                  "UPDATE resource_request SET approver_id=? WHERE id=?",
-                  next.getFirst().get("approver_id"),
-                  r.get("id"));
-              notifyUser(
-                  next.getFirst().get("approver_id"), id, "มีคำขอทรัพยากรรออนุมัติลำดับถัดไป");
-            } else checkApprovalAuthority((UUID) r.get("id"), u.get("id"));
+          if (action.equals("APPROVE") && !next.isEmpty()) {
+            to = "RESOURCE_APPROVAL";
+            db.run(
+                "UPDATE resource_request SET approver_id=? WHERE id=?",
+                next.getFirst().get("approver_id"),
+                r.get("id"));
+            notifyUser(
+                next.getFirst().get("approver_id"), id, "มีคำขอทรัพยากรรออนุมัติลำดับถัดไป");
           }
         }
         String state =

@@ -1,3 +1,4 @@
+import dayjs from "dayjs";
 import { useLiveQuery } from "./useLiveQuery";
 import { useLocalizedFormErrors } from "./i18n/useLocalizedFormErrors";
 import { useI18n } from "./i18n/useI18n";
@@ -18,6 +19,7 @@ import {
   Card,
   Checkbox,
   Col,
+  DatePicker,
   Descriptions,
   Form,
   Input,
@@ -2181,6 +2183,31 @@ export default function Detail({
               )}
             </Form.List>
           )}
+          {action === "REQUEST_RESOURCE" &&
+            requestItems?.some(
+              (item) =>
+                stockItems.find((s) => s.id === item?.stockItemId)?.item_type === "EQUIPMENT",
+            ) && (
+              <Form.Item
+                label={t("กำหนดวันส่งคืนครุภัณฑ์")}
+                name="loanDueOn"
+                rules={[{ required: true, message: t("กรุณาระบุกำหนดวันส่งคืนครุภัณฑ์") }]}
+                getValueProps={(v) => ({ value: v ? dayjs(v) : undefined })}
+                getValueFromEvent={(d: dayjs.Dayjs | null) =>
+                  d ? d.format("YYYY-MM-DD") : undefined
+                }
+              >
+                <DatePicker
+                  style={{ width: "100%" }}
+                  disabledDate={(d) =>
+                    d.isBefore(dayjs().add(1, "day"), "day") ||
+                    d.isAfter(dayjs().add(1, "year"), "day")
+                  }
+                  placeholder={t("เลือกวันส่งคืน")}
+                  format="DD/MM/YYYY"
+                />
+              </Form.Item>
+            )}
           {!["ACCEPT", "START", "PROPOSE", "REPORT"].includes(action) && (
             <Form.Item
               label={

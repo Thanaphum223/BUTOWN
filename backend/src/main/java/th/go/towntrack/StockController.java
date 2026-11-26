@@ -321,9 +321,9 @@ public class StockController {
     var u = access.user(a);
     if (!"ADMIN".equals(u.get("account_role"))) Access.deny();
     return db.list(
-        "SELECT id,display_name,role,stock_keeper FROM app_user WHERE municipality_id=? AND"
-            + " enabled=true AND role IN ('OFFICER','LEADER','FIELD','APPROVER') ORDER BY"
-            + " display_name",
+        "SELECT id,display_name,role,gov_role,stock_keeper,loan_approver FROM app_user WHERE"
+            + " municipality_id=? AND enabled=true AND role IN"
+            + " ('OFFICER','LEADER','FIELD','APPROVER') ORDER BY display_name",
         u.get("municipality_id"));
   }
 
