@@ -176,6 +176,7 @@ const messages: Record<string, string> = {
   "ระบุจำนวนที่เหลือนำกลับคืน ส่วนที่ไม่คืนจะนับเป็นวัสดุที่ใช้ไปในงานนี้":
     "Enter how much comes back. Anything not returned counts as used on this job.",
   "{{name}} · เบิกไป {{held}} {{unit}}": "{{name}} · {{held}} {{unit}} taken",
+  "เกินจำนวนคงเหลือ {{left}} {{unit}}": "More than the {{left}} {{unit}} in stock",
   "จำนวนที่คืน {{name}}": "Quantity returned: {{name}}",
   รับเข้า: "Receive",
   เบิกจ่าย: "Issued",

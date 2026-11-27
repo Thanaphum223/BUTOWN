@@ -599,6 +599,17 @@ test("starting without a request offers only consumables from the store", async 
   await expect(page.locator(".ant-select-item-option", { hasText: "เครื่องสูบน้ำ" })).toHaveCount(
     0,
   );
+  await page.locator(".ant-select-item-option", { hasText: "ปูนซีเมนต์" }).click();
+  const first = dialog.getByRole("spinbutton", { name: "จำนวนที่เบิก 1" });
+  await first.fill("80");
+  await first.blur();
+  await expect(first).toHaveValue("10.00");
+  // Two lines of the same item together cannot exceed what is left.
+  await dialog.getByRole("button", { name: "เพิ่มวัสดุจากคลัง" }).click();
+  await dialog.getByRole("combobox", { name: "วัสดุรายการที่ 2" }).click();
+  await page.locator(".ant-select-item-option", { hasText: "ปูนซีเมนต์" }).last().click();
+  await dialog.getByRole("spinbutton", { name: "จำนวนที่เบิก 2" }).fill("2");
+  await expect(dialog.getByText("เกินจำนวนคงเหลือ 10 ถุง").first()).toBeVisible();
 });
 
 test("leader filters field workers by Gov rank", async ({ page }) => {

@@ -59,17 +59,53 @@ export function StockTaken({ items, approved }: { items: D[]; approved: boolean 
                     options={stockOptions(consumables, t)}
                   />
                 </Form.Item>
-                <Form.Item
-                  name={[field.name, "quantity"]}
-                  rules={[{ required: true, type: "number", min: 0.01 }]}
-                >
-                  <InputNumber
-                    aria-label={t("จำนวนที่เบิก ") + (index + 1)}
-                    min={0.01}
-                    precision={2}
-                    inputMode="decimal"
-                    placeholder={t("จำนวน")}
-                  />
+                <Form.Item noStyle dependencies={[["stockItems", field.name, "stockItemId"]]}>
+                  {({ getFieldValue }) => {
+                    const item = consumables.find(
+                      (c) => c.id === getFieldValue(["stockItems", field.name, "stockItemId"]),
+                    );
+                    const left = item ? Number(item.available ?? item.on_hand) : undefined;
+                    return (
+                      <Form.Item
+                        name={[field.name, "quantity"]}
+                        dependencies={[["stockItems"]]}
+                        rules={[
+                          { required: true, type: "number", min: 0.01 },
+                          {
+                            // Lines for the same item share one balance.
+                            validator: (_, value) => {
+                              if (!item || value == null) return Promise.resolve();
+                              const taken = (getFieldValue("stockItems") ?? [])
+                                .filter((line: D) => line?.stockItemId === item.id)
+                                .reduce(
+                                  (sum: number, line: D) => sum + Number(line.quantity ?? 0),
+                                  0,
+                                );
+                              return taken <= left!
+                                ? Promise.resolve()
+                                : Promise.reject(
+                                    new Error(
+                                      t("เกินจำนวนคงเหลือ {{left}} {{unit}}", {
+                                        left: amount(left),
+                                        unit: item.unit,
+                                      }),
+                                    ),
+                                  );
+                            },
+                          },
+                        ]}
+                      >
+                        <InputNumber
+                          aria-label={t("จำนวนที่เบิก ") + (index + 1)}
+                          min={0.01}
+                          max={left}
+                          precision={2}
+                          inputMode="decimal"
+                          placeholder={t("จำนวน")}
+                        />
+                      </Form.Item>
+                    );
+                  }}
                 </Form.Item>
                 <Button
                   icon={<DeleteOutlined />}
