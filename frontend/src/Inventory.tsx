@@ -21,6 +21,7 @@ import { api, date, post, roleNames } from "./api";
 import { amount } from "./format";
 import { useI18n } from "./i18n/useI18n";
 import StockVerifications from "./StockVerifications";
+import UnitInput from "./UnitInput";
 
 type D = Record<string, any>;
 type StockData = {
@@ -521,7 +522,7 @@ export default function Inventory({ admin }: { admin: boolean }) {
                   },
                 ]}
               >
-                <Input placeholder={t("เช่น ถุง ท่อน เมตร")} />
+                <UnitInput known={(data?.items || []).map((item) => item.unit)} />
               </Form.Item>
             </>
           )}

@@ -336,12 +336,21 @@ test("a vehicle gets its plate and its trips appear in the form 4 log", async ({
   await expect(create.getByLabel(/ทะเบียนรถ/)).toHaveCount(0);
   await create.getByText("ครุภัณฑ์", { exact: true }).click();
   await create.getByLabel("ชื่อวัสดุ", { exact: true }).fill("รถบรรทุก");
-  await create.getByLabel("หน่วย", { exact: true }).fill("คัน");
+  // The unit box suggests the usual units; typing narrows the list.
+  await create.getByLabel("หน่วย", { exact: true }).click();
+  await expect(page.locator(".ant-select-item-option").first()).toBeVisible();
+  await create.getByLabel("หน่วย", { exact: true }).fill("คั");
+  await page.locator(".ant-select-item-option").filter({ hasText: /^คัน$/ }).click();
   await create.getByLabel(/ทะเบียนรถ/).fill("1กก 999");
   await create.getByRole("button", { name: "บันทึก" }).click();
   await expect
     .poll(() => posts.find((p) => p.path === "/api/stock")?.body)
-    .toMatchObject({ itemType: "EQUIPMENT", name: "รถบรรทุก", vehiclePlate: "1กก 999" });
+    .toMatchObject({
+      itemType: "EQUIPMENT",
+      name: "รถบรรทุก",
+      unit: "คัน",
+      vehiclePlate: "1กก 999",
+    });
 });
 
 const sla = (values: D) => ({

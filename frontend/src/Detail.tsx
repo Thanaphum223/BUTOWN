@@ -56,6 +56,7 @@ import {
 } from "./govRoles";
 import StockUsage from "./StockUsage";
 import { StockReturns, StockTaken, VehicleOdometers, stockOptions } from "./StockFields";
+import UnitInput from "./UnitInput";
 type D = Record<string, any>;
 const { Title, Text, Paragraph } = Typography;
 const denialPresets = [
@@ -2141,10 +2142,9 @@ export default function Detail({
                               },
                             ]}
                           >
-                            <Input
-                              aria-label={t("หน่วยรายการ ") + (index + 1)}
-                              placeholder={t("เช่น ถุง ท่อน เมตร")}
-                              maxLength={50}
+                            <UnitInput
+                              ariaLabel={t("หน่วยรายการ ") + (index + 1)}
+                              known={(stockItems || []).map((s: D) => s.unit)}
                               readOnly={!!requestItems?.[index]?.stockItemId}
                             />
                           </Form.Item>
