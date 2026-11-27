@@ -181,6 +181,15 @@ public class StockController {
         new StringBuilder(
             "\uFEFFชื่อวัสดุ,ประเภท,หน่วย,สถานะ,คงเหลือในคลัง,จองรอเบิก,พร้อมเบิก,กำลังใช้งานหน้างาน,"
                 + "รับเข้าสะสม,เบิกจ่ายสะสม,คืนคลังสะสม,ใช้ไปสุทธิ\r\n");
+    // Stamp when the file was taken out, so a printed or forwarded copy shows how current it is.
+    var now = java.time.ZonedDateTime.now(zone);
+    csv.insert(
+        1,
+        "ส่งออกเมื่อ,"
+            + now.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/"))
+            + (now.getYear() + 543)
+            + now.format(java.time.format.DateTimeFormatter.ofPattern(" เวลา HH:mm น."))
+            + "\r\n");
     for (var r :
         db.list(
             "SELECT b.*,GREATEST(b.on_hand-b.reserved,0) available,COALESCE(t.received,0) received,"
@@ -220,7 +229,11 @@ public class StockController {
     }
     return ResponseEntity.ok()
         .header("Content-Type", "text/csv; charset=UTF-8")
-        .header("Content-Disposition", "attachment; filename=\"stock-report.csv\"")
+        .header(
+            "Content-Disposition",
+            "attachment; filename=\"stock-report-"
+                + now.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmm"))
+                + ".csv\"")
         .header("Cache-Control", "no-store")
         .body(csv.toString().getBytes(StandardCharsets.UTF_8));
   }

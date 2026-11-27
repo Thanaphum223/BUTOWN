@@ -673,11 +673,23 @@ class StockAndSlaIntegrationTest {
         mvc.perform(get("/api/stock/export.csv").with(user(names.get("APPROVER"))))
             .andExpect(status().isOk())
             .andExpect(header().string("Content-Type", "text/csv; charset=UTF-8"))
+            .andExpect(
+                header()
+                    .string(
+                        "Content-Disposition",
+                        org.hamcrest.Matchers.matchesPattern(
+                            "attachment; filename=\"stock-report-\\d{4}-\\d{2}-\\d{2}-\\d{4}\\.csv\"")))
             .andReturn()
             .getResponse()
             .getContentAsByteArray();
     String csv = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
-    assertTrue(csv.startsWith("\uFEFFชื่อวัสดุ,ประเภท,หน่วย,สถานะ,"));
+    assertTrue(csv.startsWith("\uFEFFส่งออกเมื่อ,"));
+    // The first line says when the file was exported, in the Thai calendar.
+    assertTrue(
+        csv.matches(
+            "(?s).ส่งออกเมื่อ,\\d{2}/\\d{2}/25\\d{2} เวลา \\d{2}:\\d{2} น\\.\r\n"
+                + "ชื่อวัสดุ,ประเภท,หน่วย,สถานะ,.*"),
+        csv);
     assertTrue(
         csv.contains("\"'=HYPERLINK(1)\",วัสดุสิ้นเปลือง,\"bags\",ใช้งาน,6,0,6,4,10,4,0,4"), csv);
     for (String formula : List.of("=1", "+1", "-1", "@A", "\t=1"))
