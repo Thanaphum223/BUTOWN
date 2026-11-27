@@ -34,6 +34,16 @@
 - docs/EMERGENCY_CONTACTS.md: สายด่วนและข้อมูลสถานที่สำคัญใกล้ฉัน
 - docs/OPERATIONS.md: ติดตั้ง สำรอง กู้คืน และเชื่อม LINE
 - docs/STATUS.md: ผลทดสอบและข้อจำกัดที่ยังต้องจัดการ
+- docs/UI_REFERENCE.md: หน้าจอของแต่ละบทบาท รวมหน้าคลังวัสดุและการเริ่มปฏิบัติงาน
+- docs/DATA_FLOW.md: ข้อมูลเข้า-ออกของแต่ละขั้นตอนงาน
+- docs/ATTACHMENTS_AND_CATEGORIES.md: หมวดแจ้งปัญหาเริ่มต้นและกติกาไฟล์แนบ
+- docs/WIP_EQUIPMENT_LOANS.md: ใบยืมครุภัณฑ์ (ระเบียบพัสดุฯ ข้อ 208–211) แบบ 3/แบบ 4 การใช้รถ และสิ่งที่ต้องตั้งค่าหลัง deploy
+- docs/WIP_NEXT.md: งานที่ทำล่าสุดและงานที่ยังค้าง
+- docs/CODE_QUALITY_SECURITY.md: การจัดรูปแบบโค้ด ชุดทดสอบ และขอบเขตความปลอดภัย
+- docs/GOV_SSO.md, docs/GOV_SSO_CONTRACT.md, docs/GOVCENTER_SSO.md: การเชื่อม Gov Center SSO/LINE สัญญากับผู้ให้บริการ และการตั้งค่า
+- docs/GPS_WIZARD.md: ขอสิทธิ์ตำแหน่งและฟอร์มแจ้งปัญหา 2 ขั้น
+- docs/CLOUD_TEST_DEPLOYMENT.md: เครื่องทดสอบบน DigitalOcean
+- docs/task-route-planning.md: บันทึกว่าเลิกใช้ฟีเจอร์วางเส้นทางงานแล้ว
 
 ## เชื่อม Gov Center SSO
 หน้าเข้าสู่ระบบเป็นฟอร์มอีเมล Gov พร้อมปุ่ม LINE ส่วนหน้าสมัครรับชื่อ-นามสกุล อีเมล รหัสผ่าน และการยืนยันรหัสผ่าน โดยส่งสมัครผ่าน backend ไปยัง Gov API และตรวจรหัสใช้ครั้งเดียวก่อนเปิด session ของ TownTrack ไม่มีการเก็บรหัสผ่าน Gov
