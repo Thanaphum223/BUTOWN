@@ -12,6 +12,8 @@ import { useFontScale } from "./fontScale";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/noto-sans-thai";
 import "./style.css";
+// A failed submit brings the topmost invalid field into view, so a required box above the fold is not missed.
+const firstErrorScroll = { behavior: "smooth", block: "center", focus: true } as const;
 export function mount(govReturn: GovCallbackReturn | null) {
   installGovTokens();
   ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -28,7 +30,11 @@ function LocalizedApp({ govReturn }: { govReturn: GovCallbackReturn | null }) {
     [scale],
   );
   return (
-    <ConfigProvider locale={language === "en" ? enUS : thTH} theme={theme}>
+    <ConfigProvider
+      locale={language === "en" ? enUS : thTH}
+      theme={theme}
+      form={{ scrollToFirstError: firstErrorScroll }}
+    >
       <AntApp>
         <React.Suspense fallback={<div className="loading">{t("กำลังโหลด…")}</div>}>
           <GeoProvider>

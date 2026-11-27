@@ -41,6 +41,9 @@ for (const width of [390, 1280]) {
     await page.locator('input[type="file"][multiple]').setInputFiles(photo("site.png"));
     await page.getByRole("button", { name: "ส่งคำร้อง", exact: true }).click();
     await expect(page.getByText("กรุณากรอกรายละเอียด หรือแตะเลือกอาการที่พบ")).toBeVisible();
+    // The failed submit brings the empty required box into view instead of leaving it above the fold.
+    await expect(details).toBeFocused();
+    await expect(details).toBeInViewport();
     await symptoms.getByText("ถนนเป็นหลุม", { exact: true }).click();
     await symptoms.getByText("เกิดซ้ำบ่อย", { exact: true }).click();
     await expect(symptoms.locator(".ant-tag-checkable-checked")).toHaveCount(2);
@@ -75,6 +78,18 @@ for (const width of [390, 1280]) {
     );
   });
 }
+
+test("submitting without evidence brings the attachment field into view", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 700 });
+  await page.goto("/");
+  await openReport(page);
+  await confirmLocation(page, "หน้าตลาด");
+  await page.getByRole("button", { name: /ถนนและทางเท้า/ }).click();
+  await page.getByLabel("รายละเอียด", { exact: true }).fill("ถนนเป็นหลุมลึก");
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.getByRole("button", { name: "ส่งคำร้อง", exact: true }).click();
+  await expect(page.getByRole("button", { name: /ถ่ายรูปด้วยกล้อง/ })).toBeInViewport();
+});
 
 test("an oversized file is refused before upload with how far over the limit it is", async ({
   page,

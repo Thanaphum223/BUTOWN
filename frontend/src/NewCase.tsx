@@ -142,6 +142,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
   const searchVersion = useRef(0);
   const pendingFiles = useRef<File[]>([]);
   const [attachmentMissing, setAttachmentMissing] = useState(false);
+  const attachmentField = useRef<HTMLDivElement>(null);
   const [symptoms, setSymptoms] = useState<string[]>([]);
   function pickSymptoms(next: string[]) {
     form.setFieldValue(
@@ -441,11 +442,16 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
     }
     try {
       await form.validateFields();
-    } catch {
+    } catch (e) {
+      // Bring the topmost unfilled field into view; the submit button sits far below it.
+      const first = (e as { errorFields?: { name: (string | number)[] }[] }).errorFields?.[0];
+      if (first)
+        form.scrollToField(first.name, { behavior: "smooth", block: "center", focus: true });
       return;
     }
     if (!files.length) {
       setAttachmentMissing(true);
+      attachmentField.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       message.error(t("กรุณาแนบหลักฐานอย่างน้อย 1 ไฟล์"));
       return;
     }
@@ -949,6 +955,7 @@ export default function NewCase({ onDone }: { onDone: (id: string) => void }) {
               <Input />
             </Form.Item>
           ))}
+          <div ref={attachmentField} />
           <Form.Item
             label={t("ภาพ วิดีโอ หรือเอกสารประกอบ")}
             required
